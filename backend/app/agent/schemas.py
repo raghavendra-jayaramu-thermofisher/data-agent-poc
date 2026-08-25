@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ToolExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    job_id: uuid.UUID
+    sequence: int
+    tool_name: str
+    status: str
+    input_summary: dict[str, object]
+    output_summary: dict[str, object] | None
+    error_code: str | None
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class SQLExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tool_execution_id: uuid.UUID
+    data_source_id: uuid.UUID
+    sql_text: str
+    status: str
+    row_count: int | None
+    truncated: bool
+    columns: list[str] | None
+    result_bytes: int | None
+    duration_ms: int | None
+    error_code: str | None
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class ModelExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    job_id: uuid.UUID
+    sequence: int
+    model_profile_id: uuid.UUID
+    model_name: str
+    phase: str
+    status: str
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    error_code: str | None
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class JobArtifactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    job_id: uuid.UUID
+    kind: str
+    name: str | None
+    source_sql_execution_id: uuid.UUID | None
+    payload: dict[str, object]
+    created_at: datetime
+
+
+class JobExecutionTraceResponse(BaseModel):
+    tools: list[ToolExecutionResponse] = Field(default_factory=list)
+    sql: list[SQLExecutionResponse] = Field(default_factory=list)
+    models: list[ModelExecutionResponse] = Field(default_factory=list)
+    artifacts: list[JobArtifactResponse] = Field(default_factory=list)

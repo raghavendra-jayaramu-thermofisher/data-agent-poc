@@ -1,0 +1,64 @@
+import type { ExecutionTrace } from '../api/execution-api';
+import { normalizeTrace } from '../lib/normalize-trace';
+import { ModelExecutionCard } from './ModelExecutionCard';
+import { SqlExecutionBlock } from './SqlExecutionBlock';
+import { ToolExecutionCard } from './ToolExecutionCard';
+
+export function ExecutionTimeline({
+  trace,
+  dataSourceNames = {},
+}: {
+  trace: ExecutionTrace;
+  dataSourceNames?: Record<string, string>;
+}) {
+  const allEntries = normalizeTrace(trace);
+  const entries = allEntries.slice(0, 500);
+
+  if (!entries.length) {
+    return (
+      <div className="p-3 text-center text-xs text-[#8B848C] bg-[#F0EEE9] rounded-lg border border-[#DAD5CD]">
+        No persisted execution records are available for this job.
+      </div>
+    );
+  }
+
+  return (
+    <div className="execution-timeline space-y-2 mt-2" aria-label="Execution trace">
+      {allEntries.length > entries.length ? (
+        <p className="text-[11px] text-[#8B848C] mb-2" role="status">
+          Showing the first 500 persisted execution records.
+        </p>
+      ) : null}
+
+      <div className="space-y-1.5">
+        {entries.map((entry) => {
+          if (entry.kind === 'tool') {
+            return (
+              <ToolExecutionCard
+                key={`tool:${entry.record.id}`}
+                execution={entry.record}
+              />
+            );
+          }
+          if (entry.kind === 'sql') {
+            return (
+              <SqlExecutionBlock
+                key={`sql:${entry.record.id}`}
+                execution={entry.record}
+                dataSourceName={
+                  dataSourceNames[entry.record.data_source_id] ?? 'Data source'
+                }
+              />
+            );
+          }
+          return (
+            <ModelExecutionCard
+              key={`model:${entry.record.id}`}
+              execution={entry.record}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}

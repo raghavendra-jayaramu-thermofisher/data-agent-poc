@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+import logging
+import time
+from datetime import timedelta
+from pathlib import Path
+
+from redis.asyncio import Redis
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.models import AuthActionToken, AuthSession
+from app.core.config import Settings
+from app.core.time import utc_now
+from app.jobs.service import JobService
+
+logger = logging.getLogger(__name__)
+
+
+class MaintenanceService:
+    """Explicit cleanup/recovery entry point suitable for cron/systemd/Kubernetes later."""
+
+    def __init__(self, session: AsyncSession, redis: Redis, settings: Settings) -> None:
+        self.session = session
+        self.redis = redis
+        self.settings = settings
+
+    async def run_once(self) -> dict[str, int]:
+        auth_rows = await self.cleanup_expired_auth()
+        stale_jobs = await self.requeue_abandoned_jobs()
+        temp_files = self.cleanup_temporary_files()
+        return {
+            "expired_auth_rows_deleted": auth_rows,
+            "abandoned_jobs_requeued": stale_jobs,
+            "temporary_files_deleted": temp_files,
+        }
+
+    async def cleanup_expired_auth(self) -> int:
+        cutoff = utc_now() - timedelta(days=self.settings.auth_expired_retention_days)
+        sessions = await self.session.execute(
+            delete(AuthSession).where(AuthSession.expires_at < cutoff)
+        )
+        tokens = await self.session.execute(
+            delete(AuthActionToken).where(AuthActionToken.expires_at < cutoff)
+        )
+        await self.session.commit()
+        return int(sessions.rowcount or 0) + int(tokens.rowcount or 0)  # type: ignore[attr-defined]
+
+    async def requeue_abandoned_jobs(self) -> int:
+        before = utc_now() - timedelta(seconds=self.settings.stale_job_grace_seconds)
+        return await JobService(self.session, self.redis, self.settings).recover_abandoned_jobs(
+            before=before, limit=100
+        )
+
+    def cleanup_temporary_files(self) -> int:
+        root = self.settings.data_directory.expanduser().resolve()
+        if not root.exists():
+            return 0
+        cutoff = time.time() - self.settings.temporary_file_retention_hours * 3600
+        removed = 0
+        for path in root.rglob("*.tmp.duckdb"):
+            try:
+                if path.is_file() and path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+                    removed += 1
+            except OSError:
+                logger.warning("temporary_file_cleanup_failed", extra={"path": str(path)})
+        return removed

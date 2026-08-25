@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+.heroui-docs
+frontend-master-prompt.md
+design.md
+coding-standards.md
+package-lock.json

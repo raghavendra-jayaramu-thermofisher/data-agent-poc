@@ -1,0 +1,10 @@
+import { z } from 'zod';
+const password = z.string().min(10, 'Use at least 10 characters.').max(256).regex(/[a-z]/, 'Include a lowercase letter.').regex(/[A-Z]/, 'Include an uppercase letter.').regex(/\d/, 'Include a number.');
+export const loginSchema = z.object({ email: z.string().email('Enter a valid email address.'), password: z.string().min(1, 'Password is required.') });
+export const signupSchema = z.object({ email: z.string().email('Enter a valid email address.'), password, displayName: z.string().max(160).optional(), organizationName: z.string().max(160).optional() });
+export const forgotPasswordSchema = z.object({ email: z.string().email('Enter a valid email address.') });
+export const resetPasswordSchema = z.object({ token: z.string().min(32, 'Reset token is invalid.'), newPassword: password });
+export type LoginValues = z.infer<typeof loginSchema>;
+export type SignupValues = z.infer<typeof signupSchema>;
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;

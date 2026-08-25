@@ -1,0 +1,883 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import math
+import time
+import uuid
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+
+from pydantic import BaseModel, ValidationError
+
+from app.agent.models import JobArtifact, SQLExecution, ToolExecution
+from app.agent.repository import AgentExecutionRepository
+from app.agent.serialization import bound_query_result, model_result_preview
+from app.agent.sql_safety import SQLSafetyViolation, validate_read_only_sql
+from app.agent.tool_schemas import (
+    CreateChartArgs,
+    ExecuteSQLArgs,
+    ReadKnowledgeIndexArgs,
+    ReadTableSchemaArgs,
+)
+from app.core.config import Settings, get_settings
+from app.core.database import get_session_factory
+from app.core.redis import get_redis
+from app.core.time import utc_now
+from app.data_sources.errors import DataSourceOperationError
+from app.data_sources.service import DataSourceService
+from app.jobs.repository import JobRepository
+from app.jobs.service import JobService
+from app.knowledge.repository import KnowledgeRepository
+
+
+class AgentCancelledError(Exception):
+    pass
+
+
+class AgentLimitError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.public_message = message
+        super().__init__(message)
+
+
+class AgentToolError(Exception):
+    def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
+        self.code = code
+        self.public_message = message
+        self.retryable = retryable
+        super().__init__(message)
+
+
+@dataclass(frozen=True, slots=True)
+class AgentToolContext:
+    job_id: uuid.UUID
+    organization_id: uuid.UUID
+    conversation_id: uuid.UUID
+    allowed_data_source_ids: frozenset[uuid.UUID]
+    settings: Settings
+
+
+ToolHandler = Callable[[AgentToolContext, dict[str, object], uuid.UUID], Awaitable[dict[str, object]]]
+
+
+@dataclass(frozen=True, slots=True)
+class AgentToolDefinition:
+    name: str
+    description: str
+    args_schema: type[BaseModel]
+    handler: ToolHandler
+
+
+class AgentToolRegistry:
+    def __init__(self) -> None:
+        self._tools: dict[str, AgentToolDefinition] = {}
+
+    def register(self, tool: AgentToolDefinition) -> None:
+        if tool.name in self._tools:
+            raise ValueError(f"Agent tool already registered: {tool.name}")
+        self._tools[tool.name] = tool
+
+    def get(self, name: str) -> AgentToolDefinition | None:
+        return self._tools.get(name)
+
+    def all(self) -> tuple[AgentToolDefinition, ...]:
+        return tuple(self._tools.values())
+
+
+async def append_agent_event(
+    job_id: uuid.UUID,
+    event_type: str,
+    payload: dict[str, object],
+    *,
+    level: str = "info",
+) -> None:
+    settings = get_settings()
+    async with get_session_factory()() as session:
+        await JobService(session, get_redis(), settings).append_event(
+            job_id, event_type, payload, level=level
+        )
+
+
+async def is_cancel_requested(job_id: uuid.UUID) -> bool:
+    async with get_session_factory()() as session:
+        job = await JobRepository(session).get(job_id)
+        return bool(job and job.cancel_requested_at is not None)
+
+
+async def run_cancellable(
+    job_id: uuid.UUID,
+    awaitable: Awaitable[object],
+    *,
+    timeout_seconds: float,
+) -> object:
+    """Run an awaitable while polling the durable job cancellation flag."""
+
+    task = asyncio.create_task(awaitable)
+    started = time.monotonic()
+    try:
+        while True:
+            elapsed = time.monotonic() - started
+            remaining = timeout_seconds - elapsed
+            if remaining <= 0:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+                raise TimeoutError
+            done, _ = await asyncio.wait({task}, timeout=min(0.5, remaining))
+            if task in done:
+                return await task
+            if await is_cancel_requested(job_id):
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+                raise AgentCancelledError
+    except asyncio.CancelledError:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        raise
+
+
+def _parse_source_id(context: AgentToolContext, arguments: dict[str, object]) -> uuid.UUID:
+    raw = arguments.get("data_source_id")
+    try:
+        source_id = uuid.UUID(str(raw))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise AgentToolError("TOOL_ARGUMENT_INVALID", "A valid data_source_id is required.") from exc
+    if source_id not in context.allowed_data_source_ids:
+        raise AgentToolError(
+            "DATASOURCE_NOT_AUTHORIZED",
+            "This datasource is not available in the current conversation.",
+        )
+    return source_id
+
+
+async def read_knowledge_index(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    _tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    source_id = _parse_source_id(context, arguments)
+    async with get_session_factory()() as session:
+        repo = KnowledgeRepository(session)
+        base = await repo.get_base_for_source(source_id, context.organization_id)
+        if base is None or base.current_version_id is None or base.status != "ready":
+            raise AgentToolError(
+                "KNOWLEDGE_NOT_READY",
+                "Knowledge has not been generated for this datasource yet.",
+            )
+        doc = await repo.get_document(base.current_version_id, "index", "index")
+        if doc is None:
+            raise AgentToolError("KNOWLEDGE_INDEX_MISSING", "The knowledge index is unavailable.")
+        annotations = await repo.list_annotations(base.id)
+        business = [
+            {"scope_type": item.scope_type, "scope_key": item.scope_key, "content": item.content}
+            for item in annotations
+            if item.scope_type in {"datasource", "metric"}
+        ]
+        payload: dict[str, object] = {
+            "data_source_id": str(source_id),
+            "knowledge_version_id": str(base.current_version_id),
+            "index_markdown": doc.content_markdown,
+            "business_annotations": business,
+        }
+        estimated_tokens = doc.estimated_tokens
+    await append_agent_event(
+        context.job_id,
+        "knowledge.index.loaded",
+        {"data_source_id": str(source_id), "estimated_tokens": estimated_tokens},
+    )
+    return payload
+
+
+async def read_table_schema(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    _tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    source_id = _parse_source_id(context, arguments)
+    raw_key = arguments.get("table_key")
+    if not isinstance(raw_key, str) or not raw_key.strip():
+        raise AgentToolError("TOOL_ARGUMENT_INVALID", "table_key is required.")
+    table_key = raw_key.strip()
+    async with get_session_factory()() as session:
+        repo = KnowledgeRepository(session)
+        base = await repo.get_base_for_source(source_id, context.organization_id)
+        if base is None or base.current_version_id is None or base.status != "ready":
+            raise AgentToolError(
+                "KNOWLEDGE_NOT_READY",
+                "Knowledge has not been generated for this datasource yet.",
+            )
+        doc = await repo.get_document(base.current_version_id, "table_schema", table_key)
+        if doc is None:
+            raise AgentToolError(
+                "KNOWLEDGE_TABLE_NOT_FOUND",
+                "The requested table schema is not present in the current knowledge version.",
+            )
+        annotations = await repo.list_annotations(base.id)
+        relevant = [
+            {"scope_type": item.scope_type, "scope_key": item.scope_key, "content": item.content}
+            for item in annotations
+            if (item.scope_type == "table" and item.scope_key == table_key)
+            or (
+                item.scope_type == "column"
+                and item.scope_key is not None
+                and item.scope_key.startswith(f"{table_key}.")
+            )
+        ]
+        payload = {
+            "data_source_id": str(source_id),
+            "table_key": table_key,
+            "schema_markdown": doc.content_markdown,
+            "business_annotations": relevant,
+        }
+        estimated_tokens = doc.estimated_tokens
+    await append_agent_event(
+        context.job_id,
+        "knowledge.schema.loaded",
+        {
+            "data_source_id": str(source_id),
+            "table_key": table_key,
+            "estimated_tokens": estimated_tokens,
+        },
+    )
+    return payload
+
+
+async def execute_sql(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    source_id = _parse_source_id(context, arguments)
+    raw_sql = arguments.get("sql")
+    if not isinstance(raw_sql, str):
+        raise AgentToolError("TOOL_ARGUMENT_INVALID", "sql is required.")
+
+    async with get_session_factory()() as session:
+        source_service = DataSourceService(session, context.settings)
+        source = await source_service.require_for_org(source_id, context.organization_id)
+        if source.status != "active":
+            raise AgentToolError("DATASOURCE_NOT_ACTIVE", "The datasource is not active.")
+        try:
+            sql = validate_read_only_sql(raw_sql, source_kind=source.kind)
+        except SQLSafetyViolation as exc:
+            raise AgentToolError(exc.code, exc.public_message) from exc
+        adapter = await source_service.resolve_adapter(source)
+        source_kind = source.kind
+        sql_execution = SQLExecution(
+            tool_execution_id=tool_execution_id,
+            data_source_id=source_id,
+            sql_text=sql,
+            status="started",
+            started_at=utc_now(),
+        )
+        repo = AgentExecutionRepository(session)
+        repo.add_sql(sql_execution)
+        await session.commit()
+        sql_execution_id = sql_execution.id
+
+    await append_agent_event(
+        context.job_id,
+        "sql.started",
+        {
+            "sql_execution_id": str(sql_execution_id),
+            "tool_execution_id": str(tool_execution_id),
+            "data_source_id": str(source_id),
+            "sql": sql,
+        },
+    )
+
+    started = time.perf_counter()
+    try:
+        result = await run_cancellable(
+            context.job_id,
+            adapter.execute_read_query(sql, max_rows=context.settings.agent_result_max_rows),
+            timeout_seconds=context.settings.agent_query_timeout_seconds,
+        )
+        columns, rows, truncated, result_bytes = bound_query_result(  # type: ignore[arg-type]
+            result, max_bytes=context.settings.agent_result_max_bytes
+        )
+        duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+
+        async with get_session_factory()() as session:
+            sql_item = await session.get(SQLExecution, sql_execution_id)
+            if sql_item is None:
+                raise AgentToolError("SQL_EXECUTION_NOT_FOUND", "SQL execution audit state is unavailable.")
+            sql_item.status = "succeeded"
+            sql_item.columns = columns
+            sql_item.row_count = len(rows)
+            sql_item.truncated = truncated
+            sql_item.result_bytes = result_bytes
+            sql_item.duration_ms = duration_ms
+            sql_item.finished_at = utc_now()
+            artifact = JobArtifact(
+                job_id=context.job_id,
+                kind="table",
+                name="Query result",
+                source_sql_execution_id=sql_execution_id,
+                payload={
+                    "schema_version": 1,
+                    "data_source_id": str(source_id),
+                    "columns": columns,
+                    "rows": rows,
+                    "row_count": len(rows),
+                    "truncated": truncated,
+                },
+                created_at=utc_now(),
+            )
+            session.add(artifact)
+            await session.commit()
+            artifact_id = artifact.id
+
+        await append_agent_event(
+            context.job_id,
+            "sql.completed",
+            {
+                "sql_execution_id": str(sql_execution_id),
+                "data_source_id": str(source_id),
+                "row_count": len(rows),
+                "truncated": truncated,
+                "duration_ms": duration_ms,
+                "result_bytes": result_bytes,
+            },
+        )
+        preview = model_result_preview(
+            columns=columns,
+            rows=rows,
+            truncated=truncated,
+            max_rows=context.settings.agent_model_result_max_rows,
+            max_bytes=context.settings.agent_model_result_max_bytes,
+        )
+        return {
+            "ok": True,
+            "data_source_id": str(source_id),
+            "source_kind": source_kind,
+            "sql_execution_id": str(sql_execution_id),
+            "table_artifact_id": str(artifact_id),
+            **preview,
+        }
+    except AgentCancelledError:
+        duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+        await _mark_sql_failed(
+            sql_execution_id,
+            status="cancelled",
+            code="JOB_CANCELLED",
+            message="SQL execution was cancelled.",
+            duration_ms=duration_ms,
+        )
+        await append_agent_event(
+            context.job_id,
+            "sql.cancelled",
+            {"sql_execution_id": str(sql_execution_id), "data_source_id": str(source_id)},
+        )
+        raise
+    except TimeoutError as exc:
+        duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+        await _mark_sql_failed(
+            sql_execution_id,
+            status="failed",
+            code="SQL_QUERY_TIMEOUT",
+            message="The analytical query timed out.",
+            duration_ms=duration_ms,
+        )
+        await append_agent_event(
+            context.job_id,
+            "sql.failed",
+            {"sql_execution_id": str(sql_execution_id), "code": "SQL_QUERY_TIMEOUT"},
+            level="warning",
+        )
+        raise AgentToolError("SQL_QUERY_TIMEOUT", "The analytical query timed out.") from exc
+    except DataSourceOperationError as exc:
+        duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+        await _mark_sql_failed(
+            sql_execution_id,
+            status="failed",
+            code=exc.code,
+            message=exc.public_message,
+            duration_ms=duration_ms,
+        )
+        await append_agent_event(
+            context.job_id,
+            "sql.failed",
+            {"sql_execution_id": str(sql_execution_id), "code": exc.code},
+            level="warning",
+        )
+        raise AgentToolError(exc.code, exc.public_message, retryable=exc.retryable) from exc
+    except AgentToolError:
+        raise
+    except Exception as exc:
+        duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+        await _mark_sql_failed(
+            sql_execution_id,
+            status="failed",
+            code="SQL_EXECUTION_FAILED",
+            message="The analytical query failed.",
+            duration_ms=duration_ms,
+        )
+        await append_agent_event(
+            context.job_id,
+            "sql.failed",
+            {"sql_execution_id": str(sql_execution_id), "code": "SQL_EXECUTION_FAILED"},
+            level="warning",
+        )
+        raise AgentToolError("SQL_EXECUTION_FAILED", "The analytical query failed.") from exc
+
+
+async def create_chart(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    _tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    """Create a frontend chart artifact grounded in an already persisted SQL result."""
+
+    try:
+        parsed = CreateChartArgs.model_validate(arguments)
+    except ValidationError as exc:
+        raise AgentToolError("CHART_SPEC_INVALID", "The frontend chart specification is invalid.") from exc
+
+    async with get_session_factory()() as session:
+        repo = AgentExecutionRepository(session)
+        sql_item = await repo.get_sql_for_job(parsed.sql_execution_id, context.job_id)
+        if sql_item is None or sql_item.status != "succeeded":
+            raise AgentToolError(
+                "CHART_SOURCE_NOT_FOUND",
+                "The chart must reference a successful SQL execution from this job.",
+            )
+        table_artifact = await repo.get_table_artifact_for_sql(
+            context.job_id, parsed.sql_execution_id
+        )
+        if table_artifact is None:
+            raise AgentToolError("CHART_SOURCE_NOT_FOUND", "The SQL result is unavailable for charting.")
+        payload = table_artifact.payload
+        columns = payload.get("columns")
+        rows = payload.get("rows")
+        if not isinstance(columns, list) or not all(isinstance(item, str) for item in columns):
+            raise AgentToolError("CHART_SOURCE_INVALID", "The SQL result columns are unavailable.")
+        if not isinstance(rows, list):
+            raise AgentToolError("CHART_SOURCE_INVALID", "The SQL result rows are unavailable.")
+        if len(rows) > context.settings.agent_chart_max_rows:
+            raise AgentToolError(
+                "CHART_SOURCE_TOO_LARGE",
+                "The SQL result has too many rows for a chart. Run an aggregation query first.",
+            )
+
+        chart_payload, records = build_frontend_chart_payload(parsed, columns, rows)
+
+        artifact = JobArtifact(
+            job_id=context.job_id,
+            kind="chart",
+            name=parsed.title,
+            source_sql_execution_id=parsed.sql_execution_id,
+            payload=chart_payload,
+            created_at=utc_now(),
+        )
+        repo.add_artifact(artifact)
+        await session.commit()
+        artifact_id = artifact.id
+
+    await append_agent_event(
+        context.job_id,
+        "chart.generated",
+        {
+            "artifact_id": str(artifact_id),
+            "sql_execution_id": str(parsed.sql_execution_id),
+            "chart_type": parsed.chart_type,
+            "title": parsed.title,
+            "row_count": len(records),
+        },
+    )
+    return {
+        "ok": True,
+        "chart_artifact_id": str(artifact_id),
+        "chart_type": parsed.chart_type,
+        "title": parsed.title,
+        "row_count": len(records),
+        "renderer": "frontend",
+    }
+
+
+def build_frontend_chart_payload(
+    parsed: CreateChartArgs, columns: list[str], rows: list[object]
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    required_fields: list[str]
+    if parsed.chart_type == "pie":
+        required_fields = [parsed.category_field or "", parsed.value_field or ""]
+    elif parsed.chart_type == "metric":
+        required_fields = [parsed.value_field or ""]
+    else:
+        required_fields = [parsed.x_field or "", *[item.field for item in parsed.series]]
+    missing = sorted({field for field in required_fields if field not in columns})
+    if missing:
+        raise AgentToolError(
+            "CHART_COLUMN_NOT_FOUND",
+            f"The chart references unavailable SQL result column(s): {', '.join(missing)}.",
+        )
+
+    records: list[dict[str, object]] = []
+    for raw_row in rows:
+        if not isinstance(raw_row, list):
+            continue
+        records.append(
+            {
+                column: raw_row[index] if index < len(raw_row) else None
+                for index, column in enumerate(columns)
+            }
+        )
+
+    chart_payload: dict[str, object] = {
+        "schema_version": 1,
+        "renderer": "frontend",
+        "chart_type": parsed.chart_type,
+        "title": parsed.title,
+        "source_sql_execution_id": str(parsed.sql_execution_id),
+        "data": records,
+    }
+    numeric_fields = (
+        [parsed.value_field or ""]
+        if parsed.chart_type in ("pie", "metric")
+        else [item.field for item in parsed.series]
+    )
+    for field in numeric_fields:
+        for record in records:
+            value = record.get(field)
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                raise AgentToolError(
+                    "CHART_VALUE_NOT_NUMERIC",
+                    f"Chart value field {field!r} contains non-numeric values.",
+                )
+            if isinstance(value, (int, float)):
+                continue
+            if isinstance(value, str):
+                cleaned = value.replace(",", "").replace("$", "").replace(" ", "").strip()
+                try:
+                    number = float(cleaned)
+                except ValueError:
+                    number = float("nan")
+                if math.isfinite(number):
+                    continue
+            raise AgentToolError(
+                "CHART_VALUE_NOT_NUMERIC",
+                f"Chart value field {field!r} contains non-numeric values.",
+            )
+
+    if parsed.chart_type == "pie":
+        chart_payload["encoding"] = {
+            "category": {"field": parsed.category_field},
+            "value": {"field": parsed.value_field, "label": parsed.value_label},
+        }
+    elif parsed.chart_type == "metric":
+        chart_payload["encoding"] = {
+            "value": {"field": parsed.value_field, "label": parsed.value_label},
+        }
+    else:
+        chart_payload["encoding"] = {
+            "x": {"field": parsed.x_field, "label": parsed.x_label},
+            "series": [item.model_dump() for item in parsed.series],
+        }
+    return chart_payload, records
+
+
+async def _mark_sql_failed(
+    sql_execution_id: uuid.UUID,
+    *,
+    status: str,
+    code: str,
+    message: str,
+    duration_ms: int,
+) -> None:
+    async with get_session_factory()() as session:
+        item = await session.get(SQLExecution, sql_execution_id)
+        if item is None:
+            return
+        item.status = status
+        item.error_code = code[:100]
+        item.error_message = message[:2000]
+        item.duration_ms = duration_ms
+        item.finished_at = utc_now()
+        await session.commit()
+
+
+def build_default_tool_registry() -> AgentToolRegistry:
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolDefinition(
+            name="read_knowledge_index",
+            description=(
+                "Read the compact schema index and datasource-level business definitions for one "
+                "datasource. Use this before requesting table schemas."
+            ),
+            args_schema=ReadKnowledgeIndexArgs,
+            handler=read_knowledge_index,
+        )
+    )
+    registry.register(
+        AgentToolDefinition(
+            name="read_table_schema",
+            description=(
+                "Read one table or view schema document selected from the compact knowledge index."
+            ),
+            args_schema=ReadTableSchemaArgs,
+            handler=read_table_schema,
+        )
+    )
+    registry.register(
+        AgentToolDefinition(
+            name="execute_sql",
+            description=(
+                "Execute one read-only analytical SQL statement against a datasource in this "
+                "conversation. The server independently parses, limits and audits the query."
+            ),
+            args_schema=ExecuteSQLArgs,
+            handler=execute_sql,
+        )
+    )
+    registry.register(
+        AgentToolDefinition(
+            name="create_chart",
+            description=(
+                "Create a frontend-rendered visualization from a successful SQL execution in this "
+                "job: chart_type='metric' for a single headline number (KPI card); 'bar', 'line', or "
+                "'area' for grouped/trend breakdowns; 'pie' for category share of a whole. Provide "
+                "only field mappings and a title; the server reads the persisted SQL rows so values "
+                "cannot be invented. If the SQL result is too large, run an aggregation query first. "
+                "This tool never creates Python images."
+            ),
+            args_schema=CreateChartArgs,
+            handler=create_chart,
+        )
+    )
+    return registry
+
+
+def tool_result_json(payload: dict[str, object]) -> str:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+
+
+def enforce_tool_preconditions(
+    name: str,
+    arguments: dict[str, object],
+    *,
+    loaded_knowledge_indexes: set[uuid.UUID],
+) -> None:
+    """Enforce deterministic orchestration prerequisites outside the model prompt."""
+
+    if name != "read_table_schema":
+        return
+    try:
+        source_id = uuid.UUID(str(arguments.get("data_source_id")))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise AgentToolError(
+            "TOOL_ARGUMENT_INVALID", "A valid data_source_id is required."
+        ) from exc
+    if source_id not in loaded_knowledge_indexes:
+        raise AgentToolError(
+            "KNOWLEDGE_INDEX_REQUIRED",
+            "Read the datasource knowledge index before requesting table schemas.",
+        )
+
+
+class AuditedToolExecutor:
+    """Applies DB Assistant limits/audit/events around tools invoked by Deep Agents."""
+
+    def __init__(self, context: AgentToolContext, registry: AgentToolRegistry) -> None:
+        self.context = context
+        self.registry = registry
+        self._sequence_lock = asyncio.Lock()
+        self._loaded_knowledge_indexes: set[uuid.UUID] = set()
+
+    async def invoke(self, name: str, arguments: dict[str, object]) -> str:
+        definition = self.registry.get(name)
+        if definition is None:
+            return tool_result_json(
+                {"ok": False, "error": {"code": "TOOL_NOT_FOUND", "message": "Tool not found."}}
+            )
+        if await is_cancel_requested(self.context.job_id):
+            raise AgentCancelledError
+
+        try:
+            parsed = definition.args_schema.model_validate(arguments)
+        except ValidationError:
+            return tool_result_json(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "TOOL_ARGUMENT_INVALID",
+                        "message": "The tool arguments are invalid.",
+                    },
+                }
+            )
+        safe_arguments = parsed.model_dump(mode="json")
+
+        async with self._sequence_lock:
+            async with get_session_factory()() as session:
+                repo = AgentExecutionRepository(session)
+                total_calls = await repo.count_tools(self.context.job_id)
+                if total_calls >= self.context.settings.agent_max_tool_calls:
+                    raise AgentLimitError(
+                        "AGENT_TOOL_LIMIT_EXCEEDED",
+                        "The analytical job exceeded its maximum tool-call limit.",
+                    )
+                if name == "execute_sql":
+                    sql_attempts = await repo.count_tools(self.context.job_id, tool_name="execute_sql")
+                    if sql_attempts >= self.context.settings.agent_max_sql_attempts:
+                        raise AgentLimitError(
+                            "AGENT_SQL_ATTEMPT_LIMIT_EXCEEDED",
+                            "The analytical job exceeded its maximum SQL-attempt limit.",
+                        )
+                sequence = await repo.next_tool_sequence(self.context.job_id)
+                item = ToolExecution(
+                    job_id=self.context.job_id,
+                    sequence=sequence,
+                    tool_name=name,
+                    status="started",
+                    input_summary=_safe_tool_input(name, safe_arguments),
+                    started_at=utc_now(),
+                )
+                repo.add_tool(item)
+                await session.commit()
+                tool_execution_id = item.id
+
+        await append_agent_event(
+            self.context.job_id,
+            "tool.started",
+            {"tool_execution_id": str(tool_execution_id), "tool_name": name},
+        )
+
+        try:
+            enforce_tool_preconditions(
+                name,
+                safe_arguments,
+                loaded_knowledge_indexes=self._loaded_knowledge_indexes,
+            )
+            result = await definition.handler(self.context, safe_arguments, tool_execution_id)
+            if name == "read_knowledge_index" and bool(result.get("data_source_id")):
+                self._loaded_knowledge_indexes.add(
+                    uuid.UUID(str(result["data_source_id"]))
+                )
+        except AgentCancelledError:
+            await self._finish_tool(
+                tool_execution_id,
+                status="cancelled",
+                error_code="JOB_CANCELLED",
+                error_message="Tool execution was cancelled.",
+            )
+            await append_agent_event(
+                self.context.job_id,
+                "tool.cancelled",
+                {"tool_execution_id": str(tool_execution_id), "tool_name": name},
+            )
+            raise
+        except AgentLimitError:
+            raise
+        except AgentToolError as exc:
+            await self._finish_tool(
+                tool_execution_id,
+                status="failed",
+                error_code=exc.code,
+                error_message=exc.public_message,
+            )
+            await append_agent_event(
+                self.context.job_id,
+                "tool.failed",
+                {
+                    "tool_execution_id": str(tool_execution_id),
+                    "tool_name": name,
+                    "code": exc.code,
+                },
+                level="warning",
+            )
+            # Tool/domain failures are observations the agent may correct. Credentials and raw
+            # driver/provider exceptions are never included.
+            return tool_result_json(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": exc.code,
+                        "message": exc.public_message,
+                        "retryable": exc.retryable,
+                    },
+                }
+            )
+        except Exception:
+            await self._finish_tool(
+                tool_execution_id,
+                status="failed",
+                error_code="TOOL_EXECUTION_FAILED",
+                error_message="The tool failed unexpectedly.",
+            )
+            await append_agent_event(
+                self.context.job_id,
+                "tool.failed",
+                {
+                    "tool_execution_id": str(tool_execution_id),
+                    "tool_name": name,
+                    "code": "TOOL_EXECUTION_FAILED",
+                },
+                level="error",
+            )
+            return tool_result_json(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "TOOL_EXECUTION_FAILED",
+                        "message": "The tool failed unexpectedly.",
+                    },
+                }
+            )
+
+        await self._finish_tool(
+            tool_execution_id,
+            status="succeeded",
+            output_summary=_safe_tool_output(name, result),
+        )
+        await append_agent_event(
+            self.context.job_id,
+            "tool.completed",
+            {"tool_execution_id": str(tool_execution_id), "tool_name": name},
+        )
+        return tool_result_json(result)
+
+    async def _finish_tool(
+        self,
+        tool_execution_id: uuid.UUID,
+        *,
+        status: str,
+        output_summary: dict[str, object] | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        async with get_session_factory()() as session:
+            item = await session.get(ToolExecution, tool_execution_id)
+            if item is None:
+                return
+            item.status = status
+            item.output_summary = output_summary
+            item.error_code = error_code[:100] if error_code else None
+            item.error_message = error_message[:2000] if error_message else None
+            item.finished_at = utc_now()
+            await session.commit()
+
+
+def _safe_tool_input(name: str, arguments: dict[str, object]) -> dict[str, object]:
+    if name == "execute_sql":
+        return {
+            "data_source_id": arguments.get("data_source_id"),
+            "sql": arguments.get("sql"),
+        }
+    return arguments
+
+
+def _safe_tool_output(name: str, result: dict[str, object]) -> dict[str, object]:
+    # Avoid duplicating result rows into the tool audit record. Full bounded rows already live in
+    # a table artifact; the Deep Agent receives the bounded tool return directly.
+    if name == "execute_sql":
+        return {
+            key: value
+            for key, value in result.items()
+            if key not in {"rows"}
+        }
+    if name in {"read_knowledge_index", "read_table_schema"}:
+        return {key: value for key, value in result.items() if not key.endswith("_markdown")}
+    return result
