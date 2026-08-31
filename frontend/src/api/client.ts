@@ -3,7 +3,9 @@ import { authSession } from '../auth/session-storage';
 import { getApiOrganizationId } from '../organizations/organization-store';
 import { normalizeApiError, type AppError } from './errors';
 import type { components, paths } from './generated/schema';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+export const API_BASE_URL = configuredApiBaseUrl
+    || (import.meta.env.PROD ? window.location.origin : 'http://localhost:8000');
 const baseUrl = API_BASE_URL;
 export const apiClient = createClient<paths>({ baseUrl });
 const headersMiddleware: Middleware = {

@@ -1,0 +1,109 @@
+name: db-assistant
+
+x-backend-service: &backend-service
+  image: db-assistant-backend:local
+  build:
+    context: ./backend
+  env_file:
+    - path: ./backend/.env
+      required: false
+    - path: ./.env
+      required: false
+  environment: &backend-environment
+    APP_ENV: "${APP_ENV:-development}"
+    DATABASE_URL: "${CONTAINER_DATABASE_URL:-postgresql+asyncpg://dbassistant:dbassistant@postgres:5432/dbassistant}"
+    REDIS_URL: "redis://redis:6379/0"
+    DATA_DIRECTORY: "/app/runtime-data"
+    CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:8080","http://127.0.0.1:8080"]}'
+    PASSWORD_RESET_URL_BASE: "${PASSWORD_RESET_URL_BASE:-http://localhost:8080/reset-password}"
+  volumes:
+    - application-data:/app/runtime-data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-dbassistant}"
+      POSTGRES_USER: "${POSTGRES_USER:-dbassistant}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-dbassistant}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend-service
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend-service
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    <<: *backend-service
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: db-assistant-frontend:local
+    build:
+      context: ./frontend
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  application-data:
