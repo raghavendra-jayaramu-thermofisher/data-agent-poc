@@ -18,10 +18,8 @@ import {
   Plus,
   Sparkles,
   MessageSquare,
-  Clock,
   X,
   Search,
-  Shield,
   FileText,
   Wrench,
   Trash2,
@@ -32,6 +30,8 @@ import { useConversationList, useDeleteConversation } from '../conversations/hoo
 import { BRANDING } from '../lib/branding';
 import { formatRelativeTime } from '../lib/datetime';
 import { JobCenter } from '../jobs/components/JobCenter';
+import { useSidebarDisplay } from './useSidebarDisplay';
+import { DisplaySettingsModal } from './DisplaySettingsModal';
 
 const railNavigationItems = [
   { label: 'Ask', to: '/ask', icon: MessageSquarePlus },
@@ -46,7 +46,9 @@ const railNavigationItems = [
 export function AppShell() {
   const { user, signOut } = useAuth();
   const { organizations, activeOrganization, setActiveOrganization } = useOrganization();
+  const { visibility, isTabVisible, toggleTab, resetDefaults } = useSidebarDisplay();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
@@ -159,36 +161,54 @@ export function AppShell() {
       </header>
 
       {/* Primary 64px Icon Rail Sidebar */}
-      <aside className="primary-rail-sidebar">
-        <button
-          type="button"
-          className="rail-new-btn"
-          onClick={() => navigate('/ask')}
-          title="New Analysis"
-        >
-          <Plus size={18} />
-        </button>
+      <aside className="primary-rail-sidebar flex flex-col justify-between h-full">
+        <div className="flex flex-col items-center gap-1 w-full">
+          <button
+            type="button"
+            className="rail-new-btn"
+            onClick={() => navigate('/ask')}
+            title="New Analysis"
+          >
+            <Plus size={18} />
+          </button>
 
-        <nav className="rail-nav" aria-label="Primary navigation">
-          {railNavigationItems.map(({ label, to, icon: Icon }) => {
-            const isActive =
-              to === '/ask'
-                ? location.pathname === '/ask' || location.pathname.startsWith('/conversations/')
-                : location.pathname.startsWith(to);
+          <nav className="rail-nav" aria-label="Primary navigation">
+            {railNavigationItems
+              .filter(({ to }) => isTabVisible(to))
+              .map(({ label, to, icon: Icon }) => {
+                const isActive =
+                  to === '/ask'
+                    ? location.pathname === '/ask' || location.pathname.startsWith('/conversations/')
+                    : location.pathname.startsWith(to);
 
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                className={`rail-link ${isActive ? 'active' : ''}`}
-                title={label}
-              >
-                <Icon size={19} />
-                <span className="rail-link-label">{label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={`rail-link ${isActive ? 'active' : ''}`}
+                    title={label}
+                  >
+                    <Icon size={19} />
+                    <span className="rail-link-label">{label}</span>
+                  </NavLink>
+                );
+              })}
+          </nav>
+        </div>
+
+        {/* Bottom Rail Action: Display Settings */}
+        <div className="mt-auto pt-2 flex flex-col items-center w-full border-t border-[#DAD5CD]/60">
+          <button
+            type="button"
+            className="rail-link cursor-pointer"
+            onClick={() => setDisplaySettingsOpen(true)}
+            title="Display Settings"
+            aria-label="Display Settings"
+          >
+            <SlidersHorizontal size={18} />
+            <span className="rail-link-label">Display</span>
+          </button>
+        </div>
       </aside>
 
       {/* Secondary Sidebar (Context-Driven) */}
@@ -359,21 +379,35 @@ export function AppShell() {
             </div>
 
             <nav className="space-y-1 mb-4">
-              {railNavigationItems.map(({ label, to, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-2 rounded text-xs font-medium ${
-                      isActive ? 'bg-[#F4E8F0] text-[#4B123F]' : 'text-[#252127]'
-                    }`
-                  }
-                >
-                  <Icon size={16} />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
+              {railNavigationItems
+                .filter(({ to }) => isTabVisible(to))
+                .map(({ label, to, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 px-3 py-2 rounded text-xs font-medium ${
+                        isActive ? 'bg-[#F4E8F0] text-[#4B123F]' : 'text-[#252127]'
+                      }`
+                    }
+                  >
+                    <Icon size={16} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  setDisplaySettingsOpen(true);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium text-[#252127] hover:bg-[#EAE7E1] transition-colors cursor-pointer"
+              >
+                <SlidersHorizontal size={16} />
+                <span>Display Settings</span>
+              </button>
             </nav>
 
             {isAskRoute && (
@@ -398,6 +432,14 @@ export function AppShell() {
           </div>
         </div>
       )}
+
+      <DisplaySettingsModal
+        isOpen={displaySettingsOpen}
+        onClose={() => setDisplaySettingsOpen(false)}
+        visibility={visibility}
+        onToggleTab={toggleTab}
+        onResetDefaults={resetDefaults}
+      />
     </div>
   );
 }
