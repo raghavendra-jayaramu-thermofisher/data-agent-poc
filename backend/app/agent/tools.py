@@ -367,6 +367,16 @@ async def execute_sql(
             "source_kind": source_kind,
             "sql_execution_id": str(sql_execution_id),
             "table_artifact_id": str(artifact_id),
+            "table_display": display_mode,
+            "presentation_guidance": (
+                "This result is hidden in the UI. Use it only for analysis, or present it once in "
+                "the written answer if the user needs to see it."
+                if display_mode == "hidden"
+                else (
+                    "The UI presents this table artifact. Do not repeat these rows as a "
+                    "Markdown table."
+                )
+            ),
             **preview,
         }
     except AgentCancelledError:
@@ -618,8 +628,11 @@ def build_default_tool_registry() -> AgentToolRegistry:
         AgentToolDefinition(
             name="read_knowledge_index",
             description=(
-                "Read the compact schema index and datasource-level business definitions for one "
-                "datasource. Use this before requesting table schemas."
+                "Start data discovery for one authorized datasource. Returns its compact table/view "
+                "catalog plus datasource- and metric-level business guidance; it does not return "
+                "columns or data rows. Call this before read_table_schema or execute_sql, use it to "
+                "shortlist likely tables, and revisit discovery if the first candidates are not "
+                "sufficient."
             ),
             args_schema=ReadKnowledgeIndexArgs,
             handler=read_knowledge_index,
@@ -629,7 +642,11 @@ def build_default_tool_registry() -> AgentToolRegistry:
         AgentToolDefinition(
             name="read_table_schema",
             description=(
-                "Read one table or view schema document selected from the compact knowledge index."
+                "Inspect one exact table or view selected from read_knowledge_index. Returns verified "
+                "columns, native types, keys, relationships, and relevant table/column annotations; "
+                "it does not return data rows. Read the schema of every table you intend to reference "
+                "in SQL. If it cannot support the question, inspect another indexed table instead of "
+                "guessing identifiers."
             ),
             args_schema=ReadTableSchemaArgs,
             handler=read_table_schema,
@@ -639,8 +656,12 @@ def build_default_tool_registry() -> AgentToolRegistry:
         AgentToolDefinition(
             name="execute_sql",
             description=(
-                "Execute one read-only analytical SQL statement against a datasource in this "
-                "conversation. The server independently parses, limits and audits the query."
+                "Run one read-only analytical statement after inspecting the knowledge index and the "
+                "schema of every referenced table. Use the datasource's native SQL dialect and only "
+                "verified identifiers. The server validates, limits, executes, and audits the query, "
+                "then returns a bounded preview and persists a table artifact. If an identifier fails, "
+                "read the missing schema before retrying; do not guess successive names. Choose display "
+                "to ensure the result appears only once in the final presentation."
             ),
             args_schema=ExecuteSQLArgs,
             handler=execute_sql,
@@ -650,12 +671,12 @@ def build_default_tool_registry() -> AgentToolRegistry:
         AgentToolDefinition(
             name="create_chart",
             description=(
-                "Create a frontend-rendered visualization from a successful SQL execution in this "
-                "job: chart_type='metric' for a single headline number (KPI card); 'bar', 'line', or "
-                "'area' for grouped/trend breakdowns; 'pie' for category share of a whole. Provide "
-                "only field mappings and a title; the server reads the persisted SQL rows so values "
-                "cannot be invented. If the SQL result is too large, run an aggregation query first. "
-                "This tool never creates Python images."
+                "Create a frontend visualization from one successful execute_sql result in this job. "
+                "Use metric for one headline value, line or area for an ordered trend, bar for category "
+                "comparison, and pie only for a small part-to-whole result. Reference exact output "
+                "fields; this tool reads persisted rows and never accepts invented values. The SQL must "
+                "already have the final grain, ordering, and manageable category count. Do not create a "
+                "chart when a table or sentence communicates the result more clearly."
             ),
             args_schema=CreateChartArgs,
             handler=create_chart,

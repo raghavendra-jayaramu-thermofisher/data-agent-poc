@@ -42,6 +42,16 @@ def test_task6_uses_current_deepagents_without_todo_assumption() -> None:
     assert "multiple steps and multiple SQL queries" in SYSTEM_PROMPT
 
 
+def test_agent_prompt_assigns_one_owner_to_each_result_set() -> None:
+    assert "Choose One Owner for Each Result Set" in SYSTEM_PROMPT
+    assert "A result set must have exactly one" in SYSTEM_PROMPT
+    assert "primary presentation owner" in SYSTEM_PROMPT
+    assert "Never present equivalent rows twice" in SYSTEM_PROMPT
+    assert "Multiple tables are allowed" in SYSTEM_PROMPT
+    assert "genuinely different" in SYSTEM_PROMPT
+    assert 'display="hidden"' in SYSTEM_PROMPT
+
+
 def test_maintenance_removes_only_old_temp_duckdb_files(tmp_path: Path) -> None:
     old = tmp_path / "old.tmp.duckdb"
     recent = tmp_path / "recent.tmp.duckdb"
