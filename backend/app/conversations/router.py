@@ -74,6 +74,18 @@ async def get_conversation(
     )
 
 
+@router.delete("/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: uuid.UUID,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    organization, _ = context
+    service = ConversationService(session, settings)
+    await service.delete(conversation_id, organization.id)
+
+
 @router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
 async def list_messages(
     conversation_id: uuid.UUID,

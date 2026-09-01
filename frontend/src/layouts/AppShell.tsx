@@ -24,10 +24,12 @@ import {
   Shield,
   FileText,
   Wrench,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { useOrganization } from '../organizations/OrganizationProvider';
-import { useConversationList } from '../conversations/hooks/useConversations';
+import { useConversationList, useDeleteConversation } from '../conversations/hooks/useConversations';
+import { BRANDING } from '../lib/branding';
 import { formatRelativeTime } from '../lib/datetime';
 import { JobCenter } from '../jobs/components/JobCenter';
 
@@ -48,6 +50,7 @@ export function AppShell() {
   const [searchFilter, setSearchFilter] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+  const deleteConversationMutation = useDeleteConversation();
   const conversations = useConversationList();
 
   const logout = async () => {
@@ -91,17 +94,17 @@ export function AppShell() {
               <Sparkles size={15} />
             </span>
             <span className="desktop-brand-text font-semibold tracking-tight text-sm">
-              DB Assistant
+              {BRANDING.name}
             </span>
           </button>
 
           <span className="topbar-divider" />
 
           <Dropdown>
-            <Button variant="ghost" size="sm" className="topbar-btn">
-              <Building2 size={14} />
-              <span className="text-xs font-medium">{activeOrganization?.name ?? 'Workspace'}</span>
-              <ChevronDown size={11} className="opacity-70" />
+            <Button variant="ghost" size="sm" className="topbar-btn text-white">
+              <Building2 size={14} className="text-white shrink-0" />
+              <span className="text-xs font-medium text-white">{activeOrganization?.name ?? 'Workspace'}</span>
+              <ChevronDown size={11} className="text-white/80 shrink-0" />
             </Button>
             <Dropdown.Popover>
               <Dropdown.Menu
@@ -122,12 +125,12 @@ export function AppShell() {
           <JobCenter />
 
           <Dropdown>
-            <Button variant="ghost" size="sm" className="topbar-btn" aria-label="User menu">
-              <UserIcon size={14} />
-              <span className="max-w-[140px] truncate text-xs font-medium">
+            <Button variant="ghost" size="sm" className="topbar-btn text-white" aria-label="User menu">
+              <UserIcon size={14} className="text-white shrink-0" />
+              <span className="max-w-[140px] truncate text-xs font-medium text-white">
                 {user?.display_name || user?.email || 'Account'}
               </span>
-              <ChevronDown size={11} className="opacity-70" />
+              <ChevronDown size={11} className="text-white/80 shrink-0" />
             </Button>
             <Dropdown.Popover>
               <Dropdown.Menu
@@ -222,25 +225,47 @@ export function AppShell() {
                 {recentList.map((conv) => {
                   const isActive = location.pathname === `/conversations/${conv.id}`;
                   return (
-                    <Link
-                      key={conv.id}
-                      to={`/conversations/${conv.id}`}
-                      className={`secondary-chat-item ${isActive ? 'active' : ''}`}
-                      title={conv.title || 'Untitled analysis'}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <MessageSquare
-                          size={14}
-                          className={isActive ? 'text-[#4B123F] shrink-0' : 'text-[#8B848C] shrink-0'}
-                        />
-                        <span className="text-[13px] truncate font-medium text-[#252127]">
-                          {conv.title?.trim() || 'Untitled analysis'}
+                    <div key={conv.id} className="relative group">
+                      <Link
+                        to={`/conversations/${conv.id}`}
+                        className={`secondary-chat-item pr-7 ${isActive ? 'active' : ''}`}
+                        title={conv.title || 'Untitled analysis'}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MessageSquare
+                            size={14}
+                            className={isActive ? 'text-[#4B123F] shrink-0' : 'text-[#8B848C] shrink-0'}
+                          />
+                          <span className="text-[13px] truncate font-medium text-[#252127]">
+                            {conv.title?.trim() || 'Untitled analysis'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#8B848C] pl-5">
+                          {formatRelativeTime(conv.updated_at)}
                         </span>
-                      </div>
-                      <span className="text-[11px] text-[#8B848C] pl-5">
-                        {formatRelativeTime(conv.updated_at)}
-                      </span>
-                    </Link>
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label="Delete analysis"
+                        title="Delete analysis"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1.5 rounded hover:bg-[#EAE7E1] text-[#8B848C] hover:text-[#A84545] transition-all absolute right-1.5 top-2 z-10 cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (window.confirm(`Delete analysis "${conv.title?.trim() || 'Untitled'}"?`)) {
+                            deleteConversationMutation.mutate(conv.id, {
+                              onSuccess: () => {
+                                if (location.pathname === `/conversations/${conv.id}`) {
+                                  navigate('/ask', { replace: true });
+                                }
+                              },
+                            });
+                          }
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   );
                 })}
 
@@ -322,7 +347,7 @@ export function AppShell() {
           <div className="relative w-72 max-w-[85vw] bg-[#F0EEE9] h-full flex flex-col p-4 z-10 shadow-xl border-r border-[#DAD5CD]">
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#DAD5CD]">
               <span className="font-semibold text-sm text-[#4B123F] flex items-center gap-1.5">
-                <Sparkles size={15} /> DB Assistant
+                <Sparkles size={15} /> {BRANDING.name}
               </span>
               <button
                 type="button"

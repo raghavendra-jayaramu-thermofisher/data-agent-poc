@@ -35,3 +35,9 @@ export function submitMessage(id: string, body: MessageCreate): Promise<MessageA
     body,
   }));
 }
+
+export function deleteConversation(id: string): Promise<void> {
+  return withAuthRefresh(() => (apiClient as any).DELETE('/api/v1/conversations/{conversation_id}', {
+    params: { path: { conversation_id: id } },
+  }));
+}

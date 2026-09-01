@@ -19,6 +19,7 @@ import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/conversation-api';
 import { ChatComposer } from '../components/ChatComposer';
 import { deriveConversationTitle } from '../utils/title';
+import { BRANDING } from '../../lib/branding';
 
 type PendingConversationState = { pendingQuestion: string; modelProfileId: string | null };
 
@@ -138,7 +139,7 @@ export function AskPage() {
         <div className="chat-landing">
           <div className="chat-landing-badge">
             <Sparkles size={12} />
-            <span>DB Assistant</span>
+            <span>{BRANDING.name}</span>
           </div>
 
           <h1>Ask your data anything</h1>

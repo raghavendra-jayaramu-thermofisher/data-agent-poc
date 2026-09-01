@@ -87,6 +87,11 @@ class ConversationService:
     async def list_for_org(self, organization_id: uuid.UUID) -> list[Conversation]:
         return await self.repo.list_for_org(organization_id)
 
+    async def delete(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> None:
+        item = await self.require_for_org(conversation_id, organization_id)
+        await self.session.delete(item)
+        await self.session.commit()
+
     async def resolve_model_profile_id(
         self,
         *,

@@ -4,6 +4,7 @@ import type { ConversationMessage as Message } from '../api/conversation-api';
 import { formatLocalDateTime } from '../../lib/datetime';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDetails';
+import { BRANDING } from '../../lib/branding';
 
 export function ConversationMessage({
   message,
@@ -48,7 +49,7 @@ export function ConversationMessage({
             <span className="w-5 h-5 rounded bg-[#F4E8F0] text-[#4B123F] grid place-items-center">
               <Sparkles size={11} />
             </span>
-            <span>DB Assistant</span>
+            <span>{BRANDING.name}</span>
           </div>
 
           <div className="flex items-center gap-2">

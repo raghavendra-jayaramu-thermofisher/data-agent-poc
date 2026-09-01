@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { Plus, Database, Sparkles } from 'lucide-react';
+import { Plus, Database, Sparkles, Trash2 } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageError, PageLoading, PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
@@ -15,7 +15,7 @@ import { AnalysisFailure } from '../components/AnalysisFailure';
 import { AnalysisProgress } from '../components/AnalysisProgress';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { ChatComposer } from '../components/ChatComposer';
-import { useConversation, useConversationMessages } from '../hooks/useConversations';
+import { useConversation, useConversationMessages, useDeleteConversation } from '../hooks/useConversations';
 
 type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
 
@@ -35,6 +35,7 @@ export function ConversationPage() {
 
   const conversation = useConversation(conversationId);
   const messages = useConversationMessages(conversationId);
+  const deleteConversationMutation = useDeleteConversation();
   const dataSources = useQuery({
     queryKey: queryKeys.dataSources.list(orgId),
     queryFn: listDataSources,
@@ -225,14 +226,33 @@ export function ConversationPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-[#FFFDFC] text-[#252127] border border-[#DAD5CD] rounded hover:bg-[#F0EEE9] transition-colors flex-shrink-0"
-            onClick={() => navigate('/ask')}
-          >
-            <Plus size={13} />
-            <span>New Analysis</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#A84545] bg-[#FFFDFC] border border-[#DAD5CD] rounded hover:bg-[#F7E7E5] hover:border-[#A84545]/40 transition-colors cursor-pointer"
+              onClick={() => {
+                if (conversationId && window.confirm('Are you sure you want to delete this analysis?')) {
+                  deleteConversationMutation.mutate(conversationId, {
+                    onSuccess: () => {
+                      navigate('/ask', { replace: true });
+                    },
+                  });
+                }
+              }}
+            >
+              <Trash2 size={13} />
+              <span>Delete</span>
+            </button>
+
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-[#FFFDFC] text-[#252127] border border-[#DAD5CD] rounded hover:bg-[#F0EEE9] transition-colors cursor-pointer"
+              onClick={() => navigate('/ask')}
+            >
+              <Plus size={13} />
+              <span>New Analysis</span>
+            </button>
+          </div>
         </header>
 
         {initialSubmitError && (

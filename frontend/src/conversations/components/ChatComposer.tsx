@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../models/api/models-api';
+import { BRANDING } from '../../lib/branding';
 
 type ChatComposerProps = {
   question: string;
@@ -241,7 +242,7 @@ export function ChatComposer({
       </div>
 
       <p className="chat-composer-disclaimer">
-        DB Assistant executes verified, read-only analytical SQL over authorized data sources.
+        {BRANDING.chatDisclaimer}
       </p>
     </div>
   );
