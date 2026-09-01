@@ -50,8 +50,8 @@ start "Data Agent - API Server (Port 9000)" cmd /k "cd /d "%BACKEND_DIR%" && cal
 :: Launch Background Agent Worker
 start "Data Agent - Worker Service" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && python -m app.worker"
 
-:: Launch Frontend Web UI on port 9080
-start "Data Agent - Frontend UI (Port 9080)" cmd /k "cd /d "%FRONTEND_DIR%" && npx serve -s dist -l 9080"
+:: Launch Frontend Web UI on port 9080 (with automatic API proxy to port 9000)
+start "Data Agent - Frontend UI (Port 9080)" cmd /k "cd /d "%FRONTEND_DIR%" && npm run preview -- --port 9080 --host 0.0.0.0"
 
 echo.
 echo ===================================================
