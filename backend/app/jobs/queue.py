@@ -44,21 +44,55 @@ class RedisJobQueue:
         return self._parse(response)
 
     async def claim_stale(self, consumer: str, count: int = 10) -> list[QueueMessage]:
-        response = await self.redis.xautoclaim(
-            self.stream,
-            self.group,
-            consumer,
-            min_idle_time=self.stale_idle_ms,
-            start_id="0-0",
-            count=count,
-        )
-        messages = response[1] if len(response) >= 2 else []
-        parsed: list[QueueMessage] = []
-        for message_id, fields in messages:
-            job_id = fields.get("job_id")
-            if job_id:
-                parsed.append(QueueMessage(str(message_id), uuid.UUID(str(job_id))))
-        return parsed
+        try:
+            response = await self.redis.xautoclaim(
+                self.stream,
+                self.group,
+                consumer,
+                min_idle_time=self.stale_idle_ms,
+                start_id="0-0",
+                count=count,
+            )
+            messages = response[1] if len(response) >= 2 else []
+            parsed: list[QueueMessage] = []
+            for message_id, fields in messages:
+                job_id = fields.get("job_id")
+                if job_id:
+                    parsed.append(QueueMessage(str(message_id), uuid.UUID(str(job_id))))
+            return parsed
+        except ResponseError as exc:
+            if "unknown command" in str(exc).lower() or "xautoclaim" in str(exc).lower():
+                # Backwards-compatibility fallback for Redis < 6.2 (e.g. Windows Redis 5.x)
+                pending = await self.redis.xpending_range(
+                    self.stream,
+                    self.group,
+                    min="-",
+                    max="+",
+                    count=count,
+                )
+                if not pending:
+                    return []
+                stale_ids = [
+                    entry["message_id"]
+                    for entry in pending
+                    if entry.get("idle", 0) >= self.stale_idle_ms
+                ]
+                if not stale_ids:
+                    return []
+                claimed = await self.redis.xclaim(
+                    self.stream,
+                    self.group,
+                    consumer,
+                    min_idle_time=self.stale_idle_ms,
+                    message_ids=stale_ids,
+                )
+                parsed: list[QueueMessage] = []
+                for message_id, fields in claimed:
+                    job_id = fields.get("job_id")
+                    if job_id:
+                        parsed.append(QueueMessage(str(message_id), uuid.UUID(str(job_id))))
+                return parsed
+            raise
 
     async def ack(self, message_id: str) -> None:
         await self.redis.xack(self.stream, self.group, message_id)
