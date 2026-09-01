@@ -7,7 +7,34 @@ export type AnalyticalTableModel = {
   rowCount: number;
   truncated: boolean;
   dataSourceId?: string | null;
+  display?: 'expanded' | 'collapsed' | 'hidden' | 'auto';
+  columnLabels?: Record<string, string>;
 };
+
+const UPPERCASE_TOKENS = new Set(['id', 'url', 'api', 'kpi', 'sql', 'sku', 'tsv', 'csv', 'db', 'ip']);
+
+export function formatColumnHeader(column: string, customLabels?: Record<string, string>): string {
+  if (customLabels && customLabels[column]?.trim()) {
+    return customLabels[column].trim();
+  }
+  if (!column) return '';
+  const words = column
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .trim()
+    .split(/\s+/);
+
+  return words
+    .map((word) => {
+      const lower = word.toLowerCase();
+      if (UPPERCASE_TOKENS.has(lower)) {
+        return lower.toUpperCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
 
 export function rowsFromPositional(columns: string[], rows: unknown[][]): AnalyticalRow[] {
   return rows.map((raw, rowIndex) => ({
@@ -16,7 +43,7 @@ export function rowsFromPositional(columns: string[], rows: unknown[][]): Analyt
   }));
 }
 
-export function formatAnalyticalValue(value: AnalyticalValue): string {
+export function formatAnalyticalValue(value: AnalyticalValue | undefined): string {
   if (value == null) return '—';
   if (typeof value === 'number') return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value);
   if (typeof value === 'boolean') return value ? 'True' : 'False';

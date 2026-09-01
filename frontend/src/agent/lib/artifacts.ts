@@ -39,11 +39,24 @@ export function parseTableArtifact(artifact: JobArtifact): AnalyticalTableModel 
       : payload.rows.length;
   const truncated = payload.truncated === true;
   const dataSourceId = typeof payload.data_source_id === 'string' ? payload.data_source_id : null;
+  const display =
+    payload.display === 'expanded' ||
+    payload.display === 'collapsed' ||
+    payload.display === 'hidden' ||
+    payload.display === 'auto'
+      ? payload.display
+      : 'auto';
+  const columnLabels =
+    payload.column_labels != null && typeof payload.column_labels === 'object' && !Array.isArray(payload.column_labels)
+      ? (payload.column_labels as Record<string, string>)
+      : undefined;
   return {
     columns: payload.columns,
     rows: rowsFromPositional(payload.columns, payload.rows as unknown[][]),
     rowCount,
     truncated,
     dataSourceId,
+    display,
+    columnLabels,
   };
 }

@@ -1736,9 +1736,15 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 .analytical-table-shell {
   border: 1px solid var(--db-border-default);
   background: var(--db-surface);
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
+
+.table-artifact .analytical-table-shell {
+  border: none;
+  border-radius: 0;
+}
+
 
 .analytical-table-scroll,
 .virtual-table-scroll,
@@ -1768,8 +1774,25 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   box-shadow: 0 1px 0 var(--db-border-default, #DAD5CD);
 }
 
+.virtual-table-row {
+  display: grid;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.virtual-table-header {
+  display: grid;
+  align-items: center;
+  box-sizing: border-box;
+}
+
 .virtual-table-row[data-parity="even"] {
   background: var(--db-surface-muted);
+}
+
+.numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .markdown-table-wrapper td,
@@ -1779,5 +1802,6 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   border-bottom: 1px solid var(--db-border-light, #EAE7E1);
   font-size: 12px;
 }
+
 
 

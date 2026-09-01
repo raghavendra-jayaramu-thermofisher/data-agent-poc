@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { BookmarkPlus, Code2, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookmarkPlus, Code2, ChevronDown, ChevronUp, Copy, Check, Maximize2, Table as TableIcon } from 'lucide-react';
 import type { JobArtifact, SqlExecution } from '../api/execution-api';
 import { AnalyticalTable } from '../../analytics/table/AnalyticalTable';
+import { toTsv, type AnalyticalTableModel } from '../../analytics/table/table-domain';
+import { notifications } from '../../components/notifications';
 import { AssistantMarkdown } from '../../conversations/components/AssistantMarkdown';
 import { AnalyticalChart } from '../../charts/AnalyticalChart';
 import { MetricCard } from '../../charts/MetricCard';
@@ -80,6 +82,141 @@ function ArtifactSource({
   );
 }
 
+function CollapsibleTableArtifact({
+  artifact,
+  model,
+  sourceSql,
+  dataSourceNames,
+  defaultOpen,
+  jobId,
+}: {
+  artifact: JobArtifact;
+  model: AnalyticalTableModel;
+  sourceSql?: SqlExecution;
+  dataSourceNames: Record<string, string>;
+  defaultOpen: boolean;
+  jobId: string;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [copied, setCopied] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [sqlVisible, setSqlVisible] = useState(false);
+  const sourceName = sourceSql ? (dataSourceNames[sourceSql.data_source_id] ?? 'Data source') : null;
+
+  async function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(toTsv(model));
+      setCopied(true);
+      notifications.success('Copied table to clipboard');
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      notifications.error('Unable to copy table');
+    }
+  }
+
+  return (
+    <section className="artifact-block table-artifact mb-3 border border-[#DAD5CD] rounded-none bg-[#FFFDFC] overflow-hidden transition-all">
+      <header
+        className="flex items-center justify-between px-3.5 py-2 bg-[#FBFAF7] hover:bg-[#F0EEE9] border-b border-[#DAD5CD] cursor-pointer select-none transition-colors"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <TableIcon size={14} className="text-[#4B123F] shrink-0" />
+          <span className="font-semibold text-xs text-[#252127] truncate">
+            {artifact.name || 'Query result'}
+          </span>
+          <span className="text-[11px] px-1.5 py-0.5 bg-[#EAE7E1] text-[#625C64] rounded font-medium shrink-0">
+            {model.rowCount.toLocaleString()} row{model.rowCount === 1 ? '' : 's'}
+            {model.truncated ? ' · truncated' : ''}
+          </span>
+          {sourceName ? (
+            <span className="text-[11px] text-[#8B848C] hidden sm:inline truncate">
+              · {sourceName}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isOpen && (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFFDFC] hover:bg-[#EAE7E1] text-[#252127] border border-[#DAD5CD] rounded text-[11px] font-medium transition-colors cursor-pointer"
+                onClick={handleCopy}
+                title="Copy table to clipboard"
+              >
+                {copied ? <Check size={11} className="text-[#32745A]" /> : <Copy size={11} />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+
+              <button
+                type="button"
+                className="p-1 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] border border-[#DAD5CD] bg-[#FFFDFC] rounded transition-colors cursor-pointer"
+                onClick={() => setFullscreen(true)}
+                title="Expand table to full screen"
+              >
+                <Maximize2 size={12} />
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1 text-xs text-[#4B123F] font-medium pl-1">
+            <span className="text-[11px]">{isOpen ? 'Hide' : 'View'}</span>
+            {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </div>
+        </div>
+      </header>
+
+      {isOpen && (
+        <div>
+          <AnalyticalTable
+            model={model}
+            label={artifact.name || 'Query result'}
+            hideToolbar={true}
+            fullscreen={fullscreen}
+            onCloseFullscreen={() => setFullscreen(false)}
+          />
+
+          <div className="artifact-source border-t border-[#DAD5CD] px-3.5 py-2 flex items-center justify-between text-xs text-[#625C64] bg-[#FBFAF7]">
+            <div className="flex items-center gap-3">
+              {sourceSql?.duration_ms != null ? (
+                <span className="text-[11px] text-[#8B848C]">
+                  {sourceSql.duration_ms.toLocaleString()} ms
+                </span>
+              ) : null}
+              {sourceSql ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#4B123F] hover:underline cursor-pointer"
+                  onClick={() => setSqlVisible((v) => !v)}
+                >
+                  <Code2 size={11} />
+                  <span>{sqlVisible ? 'Hide SQL' : 'View SQL'}</span>
+                  {sqlVisible ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                </button>
+              ) : null}
+            </div>
+
+            <SaveEntryPoint
+              jobId={jobId}
+              sqlExecutionId={artifact.source_sql_execution_id}
+              artifactId={artifact.id}
+            />
+          </div>
+
+          {sqlVisible && sourceSql ? (
+            <pre className="p-3 bg-[#F0EEE9] border-t border-[#DAD5CD] text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed" aria-label="SQL query">
+              {sourceSql.sql_text}
+            </pre>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function chartSql(chart: NormalizedChartModel, sqlById: Map<string, SqlExecution>) {
   if (chart.provenance.length !== 1) return undefined;
   const id = chart.provenance[0]?.executionId;
@@ -121,7 +258,7 @@ export function ArtifactRenderer({
   const invalidCharts = chartArtifacts.filter((item) => !validChartIds.has(item.id));
   const tables = artifacts
     .map((artifact) => ({ artifact, model: parseTableArtifact(artifact) }))
-    .filter((item) => item.model != null);
+    .filter((item): item is { artifact: JobArtifact; model: AnalyticalTableModel } => item.model != null);
   const texts = artifacts
     .map((artifact) => ({ artifact, model: parseTextArtifact(artifact) }))
     .filter((item) => item.model != null && item.model.markdown.trim() !== excludeTextMarkdown?.trim());
@@ -135,6 +272,20 @@ export function ArtifactRenderer({
   ]);
   const unsupported = artifacts.filter((artifact) => !supportedIds.has(artifact.id));
   if (!artifacts.length) return null;
+
+  const hasCharts = charts.length > 0;
+  // Filter out tables marked 'hidden' or 0-row exploratory retries when other successful data exists
+  const visibleTables = tables.filter(({ model }) => {
+    if (model.display === 'hidden') return false;
+    if (
+      model.display === 'auto' &&
+      model.rowCount === 0 &&
+      (hasCharts || tables.some((t) => t.model.rowCount > 0))
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   const entries: Array<{ order: number; key: string; node: ReactNode }> = [];
   for (const chart of charts) {
@@ -169,35 +320,37 @@ export function ArtifactRenderer({
       ),
     });
   }
-  for (const { artifact, model } of tables) {
+
+  for (const [i, { artifact, model }] of visibleTables.entries()) {
     const sourceSql = artifact.source_sql_execution_id ? sqlById.get(artifact.source_sql_execution_id) : undefined;
+    const isLastTable = i === visibleTables.length - 1;
+
+    let defaultOpen = false;
+    if (model.display === 'expanded') {
+      defaultOpen = true;
+    } else if (model.display === 'collapsed') {
+      defaultOpen = false;
+    } else {
+      // auto mode: collapsed if charts exist, or open if it's the primary table
+      defaultOpen = hasCharts ? false : isLastTable;
+    }
+
     entries.push({
       order: artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER,
       key: `table-${artifact.id}`,
       node: (
-        <section className="artifact-block table-artifact mb-4">
-          <header className="artifact-heading flex items-center justify-between mb-2">
-            <div>
-              <h4 className="font-semibold text-xs text-[#252127]">{artifact.name || 'Query result'}</h4>
-              <p className="text-[11px] text-[#625C64]">
-                {model!.rowCount.toLocaleString()} row{model!.rowCount === 1 ? '' : 's'}
-                {model!.truncated ? ' · truncated' : ''}
-              </p>
-            </div>
-          </header>
-          <AnalyticalTable model={model!} label={artifact.name || 'Query result'} />
-          <ArtifactSource sql={sourceSql} dataSourceNames={dataSourceNames} />
-          <div className="artifact-actions mt-2 flex justify-end">
-            <SaveEntryPoint
-              jobId={jobId}
-              sqlExecutionId={artifact.source_sql_execution_id}
-              artifactId={artifact.id}
-            />
-          </div>
-        </section>
+        <CollapsibleTableArtifact
+          artifact={artifact}
+          model={model}
+          sourceSql={sourceSql}
+          dataSourceNames={dataSourceNames}
+          defaultOpen={defaultOpen}
+          jobId={jobId}
+        />
       ),
     });
   }
+
   for (const { artifact, model } of texts) {
     entries.push({
       order: artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER,
@@ -250,3 +403,4 @@ export function ArtifactRenderer({
     </div>
   );
 }
+

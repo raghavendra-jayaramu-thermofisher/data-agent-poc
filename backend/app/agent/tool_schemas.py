@@ -21,6 +21,19 @@ class ExecuteSQLArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     data_source_id: uuid.UUID
     sql: str = Field(min_length=1, max_length=100_000)
+    title: str | None = Field(
+        default=None,
+        max_length=240,
+        description="Human-readable title describing what this query computes.",
+    )
+    display: Literal["expanded", "collapsed", "hidden", "auto"] = Field(
+        default="auto",
+        description="How this table should be displayed in the UI: 'expanded', 'collapsed', 'hidden', or 'auto'.",
+    )
+    column_labels: dict[str, str] | None = Field(
+        default=None,
+        description="Optional mapping of raw SQL column names to human-friendly display labels, e.g. {'total_expense': 'Total Expense', 'reason': 'Expense Category'}.",
+    )
 
 
 class ChartSeriesInput(BaseModel):

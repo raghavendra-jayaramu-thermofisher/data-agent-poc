@@ -16,7 +16,7 @@ const sql: SqlExecution[] = [{ id: 's1', tool_execution_id: 't1', data_source_id
 function a(id: string, kind: string, payload: Record<string, unknown>): JobArtifact { return { id, job_id: 'j1', kind, name: id, source_sql_execution_id: kind === 'text' ? null : 's1', payload, created_at: '2026-08-24T12:00:01Z' }; }
 
 const artifacts = [
-  a('table-output', 'table', { schema_version: 1, data_source_id: 'ds1', columns: ['month', 'revenue'], rows: [['Jan', 10], ['Feb', 20]], row_count: 2, truncated: false }),
+  a('table-output', 'table', { schema_version: 1, data_source_id: 'ds1', columns: ['month', 'revenue'], rows: [['Jan', 10], ['Feb', 20]], row_count: 2, truncated: false, display: 'expanded' }),
   a('chart-output', 'chart', { schema_version: 1, renderer: 'frontend', chart_type: 'bar', title: 'Revenue', source_sql_execution_id: 's1', encoding: { x: { field: 'month' }, series: [{ field: 'revenue', label: 'Revenue' }] }, data: [{ month: 'Jan', revenue: 10 }, { month: 'Feb', revenue: 20 }] }),
   a('answer-copy', 'text', { schema_version: 1, markdown: 'Same answer' }),
   a('future-artifact', 'future_kind', { schema_version: 1 }),
@@ -28,7 +28,7 @@ describe('ArtifactRenderer', () => {
   it('renders charts and tables as first-class chat artifacts, skips duplicate answer text, and contains malformed future kinds', () => {
     render(<MemoryRouter><ArtifactRenderer jobId="j1" artifacts={artifacts} sql={sql} dataSourceNames={{ ds1: 'Warehouse' }} excludeTextMarkdown="Same answer"/></MemoryRouter>);
     expect(screen.getByTestId('echarts')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'table-output' })).toBeInTheDocument();
+    expect(screen.getByText('table-output')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'table-output' })).toBeInTheDocument();
     expect(screen.queryByText('Same answer')).not.toBeInTheDocument();
     expect(screen.getByText('Unsupported artifact')).toBeInTheDocument();

@@ -310,10 +310,21 @@ async def execute_sql(
             sql_item.result_bytes = result_bytes
             sql_item.duration_ms = duration_ms
             sql_item.finished_at = utc_now()
+
+            custom_title = arguments.get("title")
+            artifact_name = str(custom_title).strip() if custom_title and str(custom_title).strip() else "Query result"
+            display_mode = str(arguments.get("display") or "auto")
+            raw_column_labels = arguments.get("column_labels")
+            column_labels = (
+                {str(k): str(v) for k, v in raw_column_labels.items()}
+                if isinstance(raw_column_labels, dict)
+                else None
+            )
+
             artifact = JobArtifact(
                 job_id=context.job_id,
                 kind="table",
-                name="Query result",
+                name=artifact_name,
                 source_sql_execution_id=sql_execution_id,
                 payload={
                     "schema_version": 1,
@@ -322,6 +333,8 @@ async def execute_sql(
                     "rows": rows,
                     "row_count": len(rows),
                     "truncated": truncated,
+                    "display": display_mode,
+                    "column_labels": column_labels,
                 },
                 created_at=utc_now(),
             )

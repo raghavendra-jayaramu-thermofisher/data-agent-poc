@@ -91,6 +91,16 @@ Use multiple queries when needed to:
 
 Do not return large raw datasets when SQL can first reduce them to the information the user actually needs.
 
+When calling `execute_sql`:
+* provide a descriptive `title` (e.g. `Revenue by Course (2025)`) instead of leaving it generic.
+* set `display` appropriately:
+  - `"expanded"`: when this table is the primary answer to the user's question (e.g. record listings, detailed breakdowns without a chart).
+  - `"collapsed"`: when this is a supporting data table alongside a chart or secondary breakdown.
+  - `"hidden"`: for exploratory intermediate checks or validation queries that do not need to be shown in the main chat message.
+  - `"auto"`: automatically collapses when a chart is created, or expands when no chart is created.
+* provide business-friendly `column_labels` mapping (e.g. `{"total_expense": "Total Expense", "reason": "Expense Category"}`) so results display clean headers instead of raw column names.
+  - **Currency / Unit Rule**: Only include currency symbols (e.g. `$`, `₹`) or specific units if they are explicitly verified from the database schema or conversation context. If the currency is unknown, use clean business titles (e.g. `Total Expense`, `Unit Price`, `Total Revenue`) without guessing or fabricating currency symbols.
+
 # 4. Validate Before Answering
 
 Before accepting a result, verify that it actually answers the question.
