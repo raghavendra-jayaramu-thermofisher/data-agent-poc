@@ -509,7 +509,51 @@ python -m compileall -q app migrations tests
 
 Use a dedicated test database/environment for integration or E2E tests outside the provided local development stack.
 
-## 10. Upgrade procedure
+## 10. Reset local test data
+
+The repository includes a guarded reset command for returning the local Docker
+Compose environment to an empty data state after manual testing:
+
+```powershell
+./scripts/reset-test-environment.ps1
+```
+
+The command only runs when the rendered Compose configuration uses
+`APP_ENV=development`, the local `postgres` service, Redis database `0` on the
+local `redis` service, and `/app/runtime-data`. It asks for confirmation and
+then:
+
+1. stops the API and worker so no writes can occur;
+2. creates PostgreSQL and `application-data` backups outside the repository;
+3. restore-tests PostgreSQL and validates both backup archives;
+4. truncates application tables while preserving `alembic_version` and the
+   current schema;
+5. clears Redis, uploaded workbooks, generated artifacts, and artifact run
+   files;
+6. restarts the API and worker; and
+7. verifies the empty state and API readiness before writing a JSON manifest.
+
+Preview the targets without changing anything:
+
+```powershell
+./scripts/reset-test-environment.ps1 -WhatIf
+```
+
+For an explicitly non-interactive local run, suppress the confirmation prompt:
+
+```powershell
+./scripts/reset-test-environment.ps1 -Confirm:$false
+```
+
+Backups default to the sibling `bi-backups` directory. Use
+`-BackupDirectory D:\path\to\backups` to select another location. The reset
+removes users and authentication sessions, so clear the browser's site data or
+sign in with a newly created account afterward.
+
+Do not use `docker compose down -v` as a substitute: it removes the working
+schema as well as the data and provides no verified backup.
+
+## 11. Upgrade procedure
 
 Recommended release sequence:
 
@@ -527,7 +571,7 @@ Recommended release sequence:
 
 Do not run multiple independent migrations against the same database concurrently.
 
-## 11. Common troubleshooting
+## 12. Common troubleshooting
 
 ### `/ready` returns 503
 
@@ -581,7 +625,7 @@ The settings validator intentionally refuses unsafe production configuration. Ch
 - replacement of the development encryption key;
 - presence of `SECRET_ENCRYPTION_CURRENT_VERSION` in `SECRET_ENCRYPTION_KEYS`.
 
-## 12. Minimal local startup checklist
+## 13. Minimal local startup checklist
 
 ```text
 [ ] Python 3.12+ installed
