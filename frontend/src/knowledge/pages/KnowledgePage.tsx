@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
-import { BrainCircuit, Database, Plus, Sparkles } from 'lucide-react';
+import { BrainCircuit, Database, Plus } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageState } from '../../components/PageState';
 import { StatusChip } from '../../components/StatusChip';

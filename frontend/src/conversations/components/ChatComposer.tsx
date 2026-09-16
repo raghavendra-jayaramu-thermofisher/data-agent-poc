@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search } from 'lucide-react';
 import type { DataSource } from '../../api/types';
-import type { ModelProfile } from '../../models/api/models-api';
+import type { ModelProfile } from '../../api/types';
 import { BRANDING } from '../../lib/branding';
 
 type ChatComposerProps = {

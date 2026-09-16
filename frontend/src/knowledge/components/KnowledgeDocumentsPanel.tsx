@@ -1,4 +1,4 @@
-import { Search, FileCode2, Table, Hash, BookOpen } from 'lucide-react';
+import { Search, FileCode2, Table, BookOpen } from 'lucide-react';
 import type { components } from '../../api/generated/schema';
 import { PageState } from '../../components/PageState';
 import { MarkdownDocument } from './MarkdownDocument';

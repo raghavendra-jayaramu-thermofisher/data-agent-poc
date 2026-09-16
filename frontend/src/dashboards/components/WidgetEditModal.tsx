@@ -5,7 +5,7 @@ import { FormField } from '../../auth/components/FormField';
 import { SingleSelect } from '../../components/SingleSelect';
 import type { DashboardWidget, DashboardWidgetUpdate } from '../api/dashboard-api';
 import { buildVisualizationConfig, findSaveSource, validateWidgetMapping, widgetValuesFromConfig } from '../lib/widget-config';
-import type { SaveWidgetValues, WidgetType } from '../schemas/dashboard-schemas';
+import type { WidgetType } from '../schemas/dashboard-schemas';
 import { WidgetMappingFields } from './WidgetMappingFields';
 
 export function WidgetEditModal({ widget, onSave }: { widget: DashboardWidget; onSave(body: DashboardWidgetUpdate): Promise<void> }) {

@@ -5,11 +5,8 @@ import {
   LayoutDashboard,
   Edit,
   RefreshCw,
-  Trash2,
   ArrowLeft,
-  Plus,
   BarChart3,
-  Calendar,
 } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';

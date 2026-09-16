@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, Building2, Shield, Calendar } from 'lucide-react';
+import { Save, Shield } from 'lucide-react';
 import type { AppError } from '../../api/errors';
 import { FormField } from '../../auth/components/FormField';
 import { PageLoading, PageState } from '../../components/PageState';

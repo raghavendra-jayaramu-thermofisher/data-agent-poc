@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router';
-import { Activity, Clock, Loader2, CheckCircle2, XCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router';
+import { Activity, ArrowRight } from 'lucide-react';
 import { PageState } from '../../components/PageState';
 import { StatusChip } from '../../components/StatusChip';
 import { formatLocalDateTime, formatRelativeTime } from '../../lib/datetime';
@@ -17,7 +17,6 @@ function isJobFilter(value: string | null): value is JobFilter {
 
 export function JobsPage() {
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
   const manager = useJobManager();
   const requestedFilter = params.get('status');
   const filter: JobFilter = isJobFilter(requestedFilter) ? requestedFilter : 'all';

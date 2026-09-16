@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { BrainCircuit, RefreshCw, Sparkles, BookOpen, Database, ArrowLeft } from 'lucide-react';
+import { BrainCircuit, RefreshCw, ArrowLeft } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageState } from '../../components/PageState';
 import { StatusChip } from '../../components/StatusChip';

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { LayoutDashboard, Plus, Trash2, X } from 'lucide-react';
+import { LayoutDashboard, Plus, X } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { PageState } from '../../components/PageState';

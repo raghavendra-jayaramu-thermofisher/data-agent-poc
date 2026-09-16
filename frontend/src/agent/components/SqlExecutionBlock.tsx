@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, Database, Code2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Copy, Check, Database, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react';
 import { notifications } from '../../components/notifications';
 import { formatLocalDateTime } from '../../lib/datetime';
 import type { SqlExecution } from '../api/execution-api';

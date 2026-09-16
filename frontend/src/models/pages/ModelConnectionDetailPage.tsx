@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useParams, Link } from 'react-router';
-import { ArrowLeft, Cpu, Activity, Save, KeyRound, Globe, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Cpu, Activity, Save, AlertTriangle, ShieldCheck } from 'lucide-react';
 import type { AppError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
 import { FormField } from '../../auth/components/FormField';

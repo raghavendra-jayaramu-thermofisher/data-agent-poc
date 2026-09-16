@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatLocalDateTime } from '../../lib/datetime';
 import type { ToolExecution } from '../api/execution-api';
 import { formatElapsed, safeSummaryEntries, sanitizeOperationalText } from '../lib/execution-format';
