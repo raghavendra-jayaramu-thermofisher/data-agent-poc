@@ -15,18 +15,20 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.drop_constraint("ck_job_artifacts_valid_kind", "job_artifacts", type_="check")
+    constraint_name = op.f("ck_job_artifacts_valid_kind")
+    op.drop_constraint(constraint_name, "job_artifacts", type_="check")
     op.create_check_constraint(
-        "ck_job_artifacts_valid_kind",
+        constraint_name,
         "job_artifacts",
         "kind IN ('text','table','chart','html')",
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_job_artifacts_valid_kind", "job_artifacts", type_="check")
+    constraint_name = op.f("ck_job_artifacts_valid_kind")
+    op.drop_constraint(constraint_name, "job_artifacts", type_="check")
     op.create_check_constraint(
-        "ck_job_artifacts_valid_kind",
+        constraint_name,
         "job_artifacts",
         "kind IN ('text','table','chart')",
     )
