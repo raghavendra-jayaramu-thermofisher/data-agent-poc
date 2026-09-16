@@ -31,9 +31,12 @@ export function MessageAnalysisDetails({
     (dataSources.data ?? []).map((source) => [source.id, source.name])
   );
 
+  const artifactCount = trace.data?.artifacts?.length ?? 0;
+
   return (
-    <div className="message-analysis-details">
-      {trace.data ? (
+    <>
+      {trace.data && artifactCount > 0 ? (
+        <div className="assistant-card-artifacts">
         <ArtifactRenderer
           jobId={jobId}
           artifacts={trace.data.artifacts ?? []}
@@ -42,9 +45,11 @@ export function MessageAnalysisDetails({
           excludeTextMarkdown={answerMarkdown}
           onFollowUp={onFollowUp}
         />
+        </div>
       ) : null}
 
-      <div className="execution-ledger">
+      <footer className="assistant-card-footer">
+        <div className="execution-ledger">
         <button
           type="button"
           className="execution-ledger-summary"
@@ -58,21 +63,11 @@ export function MessageAnalysisDetails({
 
           <span className="execution-ledger-stats">
             {trace.isLoading ? (
-              <span className="execution-ledger-stat">Loading…</span>
+              'Loading…'
             ) : trace.data ? (
-              <>
-                <span className="execution-ledger-stat">
-                  {(trace.data.tools ?? []).length} tool{(trace.data.tools ?? []).length === 1 ? '' : 's'} executed
-                </span>
-                <span className="execution-ledger-stat">
-                  {(trace.data.sql ?? []).length} SQL quer{(trace.data.sql ?? []).length === 1 ? 'y' : 'ies'}
-                </span>
-                <span className="execution-ledger-stat">
-                  {(trace.data.artifacts ?? []).length} artifact{(trace.data.artifacts ?? []).length === 1 ? '' : 's'}
-                </span>
-              </>
+              `${(trace.data.tools ?? []).length} tools · ${(trace.data.sql ?? []).length} queries · ${artifactCount} outputs`
             ) : (
-              <span className="execution-ledger-stat">Execution details unavailable</span>
+              'Unavailable'
             )}
           </span>
 
@@ -101,7 +96,8 @@ export function MessageAnalysisDetails({
             ) : null}
           </div>
         ) : null}
-      </div>
-    </div>
+        </div>
+      </footer>
+    </>
   );
 }

@@ -166,6 +166,7 @@ function ConnectionEdit({
       await api.updateConnection(connection.id, {
         name: v.name,
         base_url: v.baseUrl,
+        clear_api_key: false,
         ...(v.apiKey ? { api_key: v.apiKey } : {}),
       });
       resetField('apiKey');

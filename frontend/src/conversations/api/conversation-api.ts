@@ -4,7 +4,7 @@ import type { components } from '../../api/generated/schema';
 type S = components['schemas'];
 export type Conversation = S['ConversationResponse'];
 export type ConversationDetail = S['ConversationDetailResponse'];
-export type ConversationMessage = S['MessageResponse'];
+export type ConversationMessage = S['app__conversations__schemas__MessageResponse'];
 export type ConversationCreate = S['ConversationCreate'];
 export type MessageCreate = S['MessageCreate'];
 export type MessageAccepted = S['MessageAcceptedResponse'];
@@ -36,8 +36,8 @@ export function submitMessage(id: string, body: MessageCreate): Promise<MessageA
   }));
 }
 
-export function deleteConversation(id: string): Promise<void> {
-  return withAuthRefresh(() => (apiClient as any).DELETE('/api/v1/conversations/{conversation_id}', {
+export async function deleteConversation(id: string): Promise<void> {
+  await withAuthRefresh(() => apiClient.DELETE('/api/v1/conversations/{conversation_id}', {
     params: { path: { conversation_id: id } },
   }));
 }

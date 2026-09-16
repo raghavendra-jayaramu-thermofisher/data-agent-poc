@@ -23,15 +23,17 @@ import {
   FileText,
   Wrench,
   Trash2,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { useOrganization } from '../organizations/OrganizationProvider';
 import { useConversationList, useDeleteConversation } from '../conversations/hooks/useConversations';
 import { BRANDING } from '../lib/branding';
 import { formatRelativeTime } from '../lib/datetime';
-import { JobCenter } from '../jobs/components/JobCenter';
 import { useSidebarDisplay } from './useSidebarDisplay';
 import { DisplaySettingsModal } from './DisplaySettingsModal';
+import { preferences } from '../lib/preferences';
 
 const railNavigationItems = [
   { label: 'Ask', to: '/ask', icon: MessageSquarePlus },
@@ -50,6 +52,9 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [historyCollapsed, setHistoryCollapsed] = useState(
+    () => preferences.get('sidebarCollapsed') ?? false,
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const deleteConversationMutation = useDeleteConversation();
@@ -62,7 +67,12 @@ export function AppShell() {
 
   const isAskRoute = location.pathname === '/ask' || location.pathname.startsWith('/conversations/');
   const isSettingsRoute = location.pathname.startsWith('/settings');
-  const hasSecondarySidebar = isAskRoute || isSettingsRoute;
+  const hasSecondarySidebar = isSettingsRoute || (isAskRoute && !historyCollapsed);
+
+  const setHistorySidebarCollapsed = (collapsed: boolean) => {
+    setHistoryCollapsed(collapsed);
+    preferences.set('sidebarCollapsed', collapsed);
+  };
 
   const rawList = conversations.data ?? [];
   const recentList = rawList.filter((c) =>
@@ -124,8 +134,6 @@ export function AppShell() {
         </div>
 
         <div className="topbar-actions">
-          <JobCenter />
-
           <Dropdown>
             <Button variant="ghost" size="sm" className="topbar-btn text-white" aria-label="User menu">
               <UserIcon size={14} className="text-white shrink-0" />
@@ -171,6 +179,18 @@ export function AppShell() {
           >
             <Plus size={18} />
           </button>
+
+          {isAskRoute && historyCollapsed ? (
+            <button
+              type="button"
+              className="rail-history-toggle"
+              onClick={() => setHistorySidebarCollapsed(false)}
+              title="Show chat history"
+              aria-label="Show chat history"
+            >
+              <PanelLeftOpen size={18} />
+            </button>
+          ) : null}
 
           <nav className="rail-nav" aria-label="Primary navigation">
             {railNavigationItems
@@ -222,21 +242,33 @@ export function AppShell() {
                   <span className="text-xs font-semibold uppercase tracking-wider text-[#625C64]">
                     Recent Analyses
                   </span>
-                  <span className="text-[11px] px-1.5 py-0.5 bg-[#EAE7E1] text-[#625C64] rounded-full font-semibold">
-                    {rawList.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] px-1.5 py-0.5 bg-[#EAE7E1] text-[#625C64] rounded-full font-semibold">
+                      {rawList.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="secondary-sidebar-toggle"
+                      onClick={() => setHistorySidebarCollapsed(true)}
+                      title="Hide chat history"
+                      aria-label="Hide chat history"
+                    >
+                      <PanelLeftClose size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div className="p-2 border-b border-[#DAD5CD]">
-                <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-2 text-[#8B848C]" />
+                <div className="db-icon-search sidebar-search">
+                  <Search size={13} />
                   <input
                     type="text"
                     placeholder="Search history…"
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    className="w-full h-8 pl-8 pr-2.5 bg-[#FFFDFC] border border-[#DAD5CD] rounded text-xs text-[#252127] placeholder:text-[#8B848C] outline-none focus:border-[#9A4D86]"
+                    className="db-icon-search__input"
+                    aria-label="Search conversation history"
                   />
                 </div>
               </div>
@@ -245,10 +277,10 @@ export function AppShell() {
                 {recentList.map((conv) => {
                   const isActive = location.pathname === `/conversations/${conv.id}`;
                   return (
-                    <div key={conv.id} className="relative group">
+                    <div key={conv.id} className="secondary-chat-item-wrapper group">
                       <Link
                         to={`/conversations/${conv.id}`}
-                        className={`secondary-chat-item pr-7 ${isActive ? 'active' : ''}`}
+                        className={`secondary-chat-item ${isActive ? 'active' : ''}`}
                         title={conv.title || 'Untitled analysis'}
                       >
                         <div className="flex items-center gap-2 min-w-0">

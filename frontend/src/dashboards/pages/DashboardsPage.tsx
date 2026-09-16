@@ -58,18 +58,20 @@ export function DashboardsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors"
-          onClick={() => setCreating((value) => !value)}
-        >
-          {creating ? <X size={14} /> : <Plus size={14} />}
-          <span>{creating ? 'Cancel' : 'New Dashboard'}</span>
-        </button>
+        {dashboards.data?.length || creating ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors cursor-pointer"
+            onClick={() => setCreating((value) => !value)}
+          >
+            {creating ? <X size={14} /> : <Plus size={14} />}
+            <span>{creating ? 'Cancel' : 'New Dashboard'}</span>
+          </button>
+        ) : null}
       </div>
 
       {creating && (
-        <div className="p-4 mb-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-md">
+        <div className="p-5 mb-6 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg shadow-xs">
           <h2 className="text-sm font-semibold text-[var(--db-text-primary)] mb-3">Create New Dashboard</h2>
           <DashboardForm
             submitLabel="Create dashboard"
@@ -85,62 +87,67 @@ export function DashboardsPage() {
       )}
 
       {dashboards.data?.length ? (
-        <div className="analytical-table-shell">
-          <table className="analytical-table" aria-label="Dashboards">
-            <thead>
-              <tr>
-                <th>Dashboard Title</th>
-                <th>Widgets</th>
-                <th>Last Updated</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboards.data.map((dashboard) => (
-                <tr key={dashboard.id}>
-                  <td>
-                    <Link
-                      to={`/dashboards/${dashboard.id}`}
-                      className="font-medium text-[var(--db-primary)] hover:underline"
-                    >
-                      {dashboard.title}
-                    </Link>
-                    {dashboard.description ? (
-                      <div className="text-[11px] text-[var(--db-text-secondary)]">{dashboard.description}</div>
-                    ) : null}
-                  </td>
-                  <td className="text-xs text-[var(--db-text-secondary)]">{dashboard.widget_count ?? 0} widgets</td>
-                  <td className="text-xs text-[var(--db-text-secondary)]">{formatLocalDateTime(dashboard.updated_at)}</td>
-                  <td>
-                    <ConfirmationDialog
-                      triggerLabel="Delete"
-                      title="Delete dashboard?"
-                      description="This removes the dashboard and its widgets. The originating analyses remain available."
-                      confirmLabel="Delete dashboard"
-                      onConfirm={() => void remove(dashboard.id)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="dashboard-grid">
+          {dashboards.data.map((dashboard) => (
+            <div key={dashboard.id} className="dashboard-card group">
+              <div className="mb-3">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <Link
+                    to={`/dashboards/${dashboard.id}`}
+                    className="font-semibold text-sm text-[var(--db-text-primary)] hover:text-[var(--db-primary)] transition-colors line-clamp-1"
+                  >
+                    {dashboard.title}
+                  </Link>
+                  <ConfirmationDialog
+                    triggerLabel="Delete"
+                    title="Delete dashboard?"
+                    description="This removes the dashboard and its widgets. The originating analyses remain available."
+                    confirmLabel="Delete dashboard"
+                    onConfirm={() => void remove(dashboard.id)}
+                  />
+                </div>
+                {dashboard.description ? (
+                  <p className="text-xs text-[var(--db-text-secondary)] line-clamp-2 mb-2 leading-relaxed">
+                    {dashboard.description}
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--db-text-muted)] italic mb-2">No description provided</p>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-[var(--db-border-subtle)] flex items-center justify-between text-xs text-[var(--db-text-secondary)]">
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 bg-[var(--db-surface-muted)] text-[var(--db-text-secondary)] rounded border border-[var(--db-border-subtle)] font-medium">
+                  {dashboard.widget_count ?? 0} widget{(dashboard.widget_count ?? 0) === 1 ? '' : 's'}
+                </span>
+                <span className="text-[11px] text-[var(--db-text-muted)]">
+                  {formatLocalDateTime(dashboard.updated_at)}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <PageState
-          title="No dashboards yet"
-          description="Create a dashboard, or save useful charts and tables from a conversation."
-          action={
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
-              onClick={() => setCreating(true)}
-            >
-              <Plus size={14} />
-              <span>Create dashboard</span>
-            </button>
-          }
-        />
-      )}
+      ) : !creating ? (
+        <div className="dashboard-empty-card">
+          <div className="dashboard-empty-card__icon">
+            <LayoutDashboard size={26} />
+          </div>
+          <h2 className="text-base font-semibold text-[var(--db-text-primary)] mb-1.5">No dashboards yet</h2>
+          <p className="text-xs text-[var(--db-text-secondary)] max-w-md mx-auto mb-5 leading-relaxed">
+            Dashboards let you organize and monitor charts, metrics, and SQL query tables saved from your chat analyses in one centralized place.
+          </p>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded-md text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            onClick={() => setCreating(true)}
+          >
+            <Plus size={14} />
+            <span>Create your first dashboard</span>
+          </button>
+          <div className="mt-8 pt-5 border-t border-[var(--db-border-subtle)] text-[11px] text-[var(--db-text-muted)] max-w-xs text-center">
+            💡 <strong>Tip:</strong> While asking questions to the Data Agent, click <strong>"Save to Dashboard"</strong> under any generated chart or table to add widgets instantly.
+          </div>
+        </div>
+      ) : null}
 
       <SaveToDashboardModal />
     </section>

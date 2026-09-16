@@ -10,7 +10,9 @@ describe('chart artifact normalization', () => {
   it.each(['bar', 'line', 'area'] as const)('accepts controlled %s field encodings and numeric strings', (chartType) => {
     const model = normalizeChartArtifact(chart('a1', 's1', { ...linePayload(), chart_type: chartType }), sql('s1', 'ds1'), 'Warehouse');
     expect(model?.chartType).toBe(chartType);
-    if (model?.chartType !== 'pie') expect(model?.series[0].points[0].revenue).toBe(10.5);
+    if (model && model.chartType !== 'pie' && model.chartType !== 'metric') {
+      expect(model.series[0]?.points[0]?.revenue).toBe(10.5);
+    }
   });
 
   it('accepts controlled pie encoding', () => {
@@ -29,7 +31,10 @@ describe('chart artifact normalization', () => {
     const combined = combineCompatibleCharts([first!, second!]);
     expect(combined).toHaveLength(1);
     expect(combined[0]!.provenance.map((item) => item.dataSourceName)).toEqual(['Primary DB', 'Secondary DB']);
-    if (combined[0]!.chartType !== 'pie') expect(combined[0]!.series.map((item) => item.dataSourceName)).toEqual(['Primary DB', 'Secondary DB']);
+    const combinedModel = combined[0];
+    if (combinedModel && combinedModel.chartType !== 'pie' && combinedModel.chartType !== 'metric') {
+      expect(combinedModel.series.map((item) => item.dataSourceName)).toEqual(['Primary DB', 'Secondary DB']);
+    }
   });
 
   it('does not silently merge multi-source results without an explicit comparison key', () => {

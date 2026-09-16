@@ -67,7 +67,7 @@ export function ConversationMessage({
           </div>
         </header>
 
-        <div className="assistant-markdown">
+        <div className="assistant-card-content">
           <AssistantMarkdown content={message.content} />
         </div>
 

@@ -48,6 +48,8 @@ describe('durable conversation workspace', () => {
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-chat'));
     expect(submissions).toBe(1);
     expect(document.querySelector('[data-message-id="m-durable"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Delete analysis' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Analysis' })).not.toBeInTheDocument();
   });
 
   it('refetches and renders the persisted assistant answer after query reconciliation', async () => {
@@ -61,6 +63,11 @@ describe('durable conversation workspace', () => {
     completed = true;
     await client.invalidateQueries({ queryKey: ['conversations', 'org-1', 'messages', 'c1'] });
     expect(await screen.findByText('Revenue declined 8%.')).toBeInTheDocument();
+    const assistantCard = document.querySelector('[data-message-id="m2"] .assistant-card');
+    expect(assistantCard?.querySelector('.assistant-card-header')).not.toBeNull();
+    expect(assistantCard?.querySelector('.assistant-card-content')).not.toBeNull();
+    expect(assistantCard?.querySelector('.assistant-card-footer')).not.toBeNull();
+    expect(screen.getByRole('button', { name: /execution ledger/i })).toBeInTheDocument();
   });
 
   it('creates an independent durable job for a follow-up without waiting for an earlier answer', async () => {

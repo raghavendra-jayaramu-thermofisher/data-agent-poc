@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
-import { BRANDING } from '../../lib/branding';
 
 type ChatComposerProps = {
   question: string;
@@ -17,6 +16,9 @@ type ChatComposerProps = {
   isSubmitting?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  placement?: 'docked' | 'inline';
+  dataSourceSelection?: 'editable' | 'hidden';
+  inputLabel?: string;
 };
 
 export function ChatComposer({
@@ -32,11 +34,16 @@ export function ChatComposer({
   isSubmitting = false,
   disabled = false,
   placeholder = 'Ask a question about your business data…',
+  placement = 'docked',
+  dataSourceSelection = 'editable',
+  inputLabel = 'Ask a question',
 }: ChatComposerProps) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sourcesPickerRef = useRef<HTMLDivElement>(null);
+  const modelsPickerRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -46,6 +53,31 @@ export function ChatComposer({
     }
   }, [question]);
 
+  useEffect(() => {
+    if (!sourcesOpen && !modelsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!sourcesPickerRef.current?.contains(target) && !modelsPickerRef.current?.contains(target)) {
+        setSourcesOpen(false);
+        setModelsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSourcesOpen(false);
+        setModelsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [modelsOpen, sourcesOpen]);
+
   const activeSources = dataSources.filter((s) => s.status === 'active');
   const filteredSources = activeSources.filter((s) =>
     s.name.toLowerCase().includes(sourceSearch.toLowerCase()) ||
@@ -53,6 +85,7 @@ export function ChatComposer({
   );
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const hasDataSourceScope = dataSourceSelection === 'hidden' || selectedDataSourceIds.length > 0;
 
   const toggleSource = (sourceId: string) => {
     if (selectedDataSourceIds.includes(sourceId)) {
@@ -66,14 +99,14 @@ export function ChatComposer({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (question.trim() && !isSubmitting && !disabled && activeSources.length > 0) {
+      if (question.trim() && !isSubmitting && !disabled && hasDataSourceScope) {
         void onSubmit();
       }
     }
   };
 
   return (
-    <div className="chat-composer-deck" role="region" aria-label="Query composer">
+    <div className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
       <div className="chat-composer-card">
         <textarea
           ref={textareaRef}
@@ -84,14 +117,14 @@ export function ChatComposer({
           onChange={(e) => onQuestionChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled || isSubmitting}
-          aria-label="Ask a question"
+          aria-label={inputLabel}
         />
 
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
-            {/* Data Source Picker */}
-            <div className="relative">
-              <button
+            {dataSourceSelection === 'editable' ? (
+              <div className="chat-composer-picker" ref={sourcesPickerRef}>
+                <button
                 type="button"
                 className={`chat-composer-chip ${selectedDataSourceIds.length > 0 ? 'active' : ''}`}
                 onClick={() => {
@@ -104,70 +137,75 @@ export function ChatComposer({
                 <Database size={12} />
                 <span>
                   {selectedDataSourceIds.length === 0
-                    ? 'All active sources'
+                    ? 'Select data source'
                     : `${selectedDataSourceIds.length} source${selectedDataSourceIds.length === 1 ? '' : 's'}`}
                 </span>
                 <ChevronDown size={11} />
-              </button>
+                </button>
 
-              {sourcesOpen && (
-                <div
-                  className="absolute bottom-full left-0 mb-2 w-72 bg-[#FFFDFC] border border-[#DAD5CD] rounded-md shadow-lg p-2 z-50 text-xs"
+                {sourcesOpen && (
+                  <div
+                  className="chat-composer-popover chat-composer-popover--sources"
                   role="dialog"
                   aria-label="Select data sources"
                 >
-                  <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#E7E3DC]">
-                    <span className="font-semibold text-[#252127]">Scope Data Sources</span>
+                  <div className="chat-composer-popover__header">
+                    <div>
+                      <strong>Choose data sources</strong>
+                      <span>Fixed after your first question</span>
+                    </div>
                     <button
                       type="button"
-                      className="text-[#8B848C] hover:text-[#252127]"
+                      className="chat-composer-popover__close"
                       onClick={() => setSourcesOpen(false)}
-                      aria-label="Close"
+                      aria-label="Close data source picker"
                     >
-                      <X size={13} />
+                      <X size={14} />
                     </button>
                   </div>
 
-                  <div className="relative mb-2">
-                    <Search size={12} className="absolute left-2 top-2 text-[#8B848C]" />
+                  <label className="db-icon-search chat-composer-search">
+                    <Search size={13} />
                     <input
                       type="text"
-                      className="w-full h-7 pl-6 pr-2 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-xs text-[#252127] placeholder-[#8B848C] outline-none focus:border-[#9A4D86]"
+                      className="db-icon-search__input"
                       placeholder="Search sources…"
                       value={sourceSearch}
                       onChange={(e) => setSourceSearch(e.target.value)}
+                      aria-label="Search data sources"
                     />
-                  </div>
+                  </label>
 
-                  <div className="max-h-40 overflow-y-auto space-y-1">
+                  <div className="chat-composer-popover__list">
                     {filteredSources.map((source) => {
                       const isSelected = selectedDataSourceIds.includes(source.id);
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={source.id}
                           onClick={() => toggleSource(source.id)}
-                          className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
-                            isSelected ? 'bg-[#F4E8F0] text-[#4B123F] font-medium' : 'hover:bg-[#F0EEE9] text-[#252127]'
-                          }`}
+                          aria-pressed={isSelected}
+                          className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
                         >
-                          <div className="flex flex-col min-w-0 pr-2">
-                            <span className="truncate">{source.name}</span>
-                            <span className="text-[10px] text-[#625C64] uppercase">{source.display_type}</span>
+                          <div className="chat-composer-option__label">
+                            <span>{source.name}</span>
+                            <small>{source.display_type}</small>
                           </div>
-                          {isSelected ? <Check size={13} className="text-[#4B123F] flex-shrink-0" /> : null}
-                        </div>
+                          {isSelected ? <Check size={14} /> : null}
+                        </button>
                       );
                     })}
                     {filteredSources.length === 0 && (
-                      <p className="text-center py-2 text-[#8B848C]">No matching sources</p>
+                      <p className="chat-composer-popover__empty">No matching sources</p>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {/* Model Profile Picker */}
-            <div className="relative">
+            <div className="chat-composer-picker" ref={modelsPickerRef}>
               <button
                 type="button"
                 className={`chat-composer-chip ${selectedProfileId ? 'active' : ''}`}
@@ -185,42 +223,44 @@ export function ChatComposer({
 
               {modelsOpen && (
                 <div
-                  className="absolute bottom-full left-0 mb-2 w-64 bg-[#FFFDFC] border border-[#DAD5CD] rounded-md shadow-lg p-1.5 z-50 text-xs"
+                  className="chat-composer-popover chat-composer-popover--models"
                   role="listbox"
                   aria-label="Select model profile"
                 >
-                  <div
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selectedProfileId === null}
                     onClick={() => {
                       onProfileIdChange(null);
                       setModelsOpen(false);
                     }}
-                    className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
-                      selectedProfileId === null ? 'bg-[#F4E8F0] text-[#4B123F] font-medium' : 'hover:bg-[#F0EEE9] text-[#252127]'
-                    }`}
+                    className={`chat-composer-option ${selectedProfileId === null ? 'is-selected' : ''}`}
                   >
-                    <span>Workspace default</span>
-                    {selectedProfileId === null ? <Check size={13} className="text-[#4B123F]" /> : null}
-                  </div>
+                    <span className="chat-composer-option__label">Workspace default</span>
+                    {selectedProfileId === null ? <Check size={14} /> : null}
+                  </button>
 
                   {profiles.filter((p) => p.enabled).map((profile) => {
                     const isSelected = selectedProfileId === profile.id;
                     return (
-                      <div
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
                         key={profile.id}
                         onClick={() => {
                           onProfileIdChange(profile.id);
                           setModelsOpen(false);
                         }}
-                        className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
-                          isSelected ? 'bg-[#F4E8F0] text-[#4B123F] font-medium' : 'hover:bg-[#F0EEE9] text-[#252127]'
-                        }`}
+                        className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
                       >
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className="truncate">{profile.display_name}</span>
-                          <span className="text-[10px] text-[#8B848C] font-mono">{profile.model_name}</span>
+                        <div className="chat-composer-option__label">
+                          <span>{profile.display_name}</span>
+                          <small className="chat-composer-option__meta--mono">{profile.model_name}</small>
                         </div>
-                        {isSelected ? <Check size={13} className="text-[#4B123F] flex-shrink-0" /> : null}
-                      </div>
+                        {isSelected ? <Check size={14} /> : null}
+                      </button>
                     );
                   })}
                 </div>
@@ -232,7 +272,7 @@ export function ChatComposer({
           <button
             type="button"
             className="chat-send-btn"
-            disabled={!question.trim() || isSubmitting || disabled || activeSources.length === 0}
+            disabled={!question.trim() || isSubmitting || disabled || !hasDataSourceScope}
             onClick={() => void onSubmit()}
             aria-label="Send question"
           >
@@ -240,10 +280,6 @@ export function ChatComposer({
           </button>
         </div>
       </div>
-
-      <p className="chat-composer-disclaimer">
-        {BRANDING.chatDisclaimer}
-      </p>
     </div>
   );
 }

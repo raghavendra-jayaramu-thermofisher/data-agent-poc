@@ -1,7 +1,7 @@
 import type { JobArtifact, SqlExecution } from '../../agent/api/execution-api';
 import { parseTableArtifact } from '../../agent/lib/artifacts';
 import type { AnalyticalTableModel, AnalyticalValue } from '../../analytics/table/table-domain';
-import { normalizeChartArtifact, type NormalizedChartModel } from '../../charts/chart-domain';
+import { normalizeChartArtifact, type ChartableModel } from '../../charts/chart-domain';
 import type { DashboardWidget } from '../api/dashboard-api';
 
 type LatestArtifact = { id: string; kind: string; name: string | null; payload: Record<string, unknown>; created_at: string };
@@ -39,7 +39,8 @@ export function metricValue(widget: DashboardWidget): { field: string; value: An
   const table = tableModelForWidget(widget);
   const field = text(widget.visualization_config.field);
   if (!table || !field || !table.columns.includes(field) || !table.rows.length) return null;
-  return { field, value: table.rows[0]!.values[field] };
+  const value = table.rows[0]?.values[field];
+  return value === undefined ? null : { field, value };
 }
 
 function tableToChartArtifact(widget: DashboardWidget, latest: LatestArtifact): JobArtifact | null {
@@ -70,7 +71,7 @@ function tableToChartArtifact(widget: DashboardWidget, latest: LatestArtifact): 
   return { ...asJobArtifact(widget, latest), kind: 'chart', payload };
 }
 
-export function chartModelForWidget(widget: DashboardWidget, dataSourceName: string): NormalizedChartModel | null {
+export function chartModelForWidget(widget: DashboardWidget, dataSourceName: string): ChartableModel | null {
   const latest = parseLatestArtifact(widget);
   if (!latest) return null;
   const artifact = latest.kind === 'chart' ? asJobArtifact(widget, latest) : latest.kind === 'table' ? tableToChartArtifact(widget, latest) : null;
@@ -91,5 +92,6 @@ export function chartModelForWidget(widget: DashboardWidget, dataSourceName: str
     started_at: widget.created_at,
     finished_at: widget.updated_at,
   };
-  return normalizeChartArtifact(artifact, sql, dataSourceName);
+  const model = normalizeChartArtifact(artifact, sql, dataSourceName);
+  return model?.chartType === 'metric' ? null : model;
 }

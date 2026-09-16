@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { Plus, Database, Trash2 } from 'lucide-react';
+import { Database, LockKeyhole, Trash2 } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageError, PageLoading, PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
@@ -197,63 +197,63 @@ export function ConversationPage() {
 
   return (
     <div className="chat-workspace">
-      <div className="chat-main-scroll">
-        {/* Conversation Header */}
-        <header className="flex items-center justify-between gap-4 pb-3 mb-5 border-b border-[#DAD5CD]">
-          <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-[#252127] truncate">
-              {conversation.data?.title?.trim() || 'Analysis'}
-            </h1>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-[#625C64]">
-              <span className="flex items-center gap-1">
-                <Database size={11} />
-                <span>
-                  {conversation.data?.data_source_ids?.length ?? 0} source
-                  {conversation.data?.data_source_ids?.length === 1 ? '' : 's'}:
-                </span>
+      {/* Sticky Compact Conversation Header */}
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 px-6 py-2.5 bg-[#F6F4EF]/95 backdrop-blur-sm border-b border-[#DAD5CD]">
+        <div className="min-w-0 flex items-center gap-2.5 flex-1">
+          <h1 className="text-sm font-semibold text-[#252127] truncate shrink-0 max-w-[320px] md:max-w-[460px]">
+            {conversation.data?.title?.trim() || 'Analysis'}
+          </h1>
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#625C64] min-w-0">
+            <span className="text-[#DAD5CD]">•</span>
+            <span className="flex items-center gap-1 text-[11px] text-[#625C64] shrink-0">
+              <Database size={11} />
+              <span>
+                {conversation.data?.data_source_ids?.length ?? 0} source
+                {conversation.data?.data_source_ids?.length === 1 ? '' : 's'}:
               </span>
-              {scopedSources.map((source) =>
-                source ? (
-                  <span
-                    key={source.id}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[11px] text-[#252127]"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#32745A]" />
-                    <span>{source.name}</span>
-                  </span>
-                ) : null
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#A84545] bg-[#FFFDFC] border border-[#DAD5CD] rounded hover:bg-[#F7E7E5] hover:border-[#A84545]/40 transition-colors cursor-pointer"
-              onClick={() => {
-                if (conversationId && window.confirm('Are you sure you want to delete this analysis?')) {
-                  deleteConversationMutation.mutate(conversationId, {
-                    onSuccess: () => {
-                      navigate('/ask', { replace: true });
-                    },
-                  });
-                }
-              }}
+            </span>
+            {scopedSources.map((source) =>
+              source ? (
+                <span
+                  key={source.id}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[11px] text-[#252127] truncate max-w-[180px]"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#32745A] shrink-0" />
+                  <span className="truncate">{source.name}</span>
+                </span>
+              ) : null
+            )}
+            <span
+              className="inline-flex items-center gap-1 text-[11px] text-[#8B848C] shrink-0"
+              title="Data source selection is fixed for this conversation"
             >
-              <Trash2 size={13} />
-              <span>Delete</span>
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-[#FFFDFC] text-[#252127] border border-[#DAD5CD] rounded hover:bg-[#F0EEE9] transition-colors cursor-pointer"
-              onClick={() => navigate('/ask')}
-            >
-              <Plus size={13} />
-              <span>New Analysis</span>
-            </button>
+              <LockKeyhole size={10} />
+            </span>
           </div>
-        </header>
+        </div>
+
+        <div className="flex items-center flex-shrink-0">
+          <button
+            type="button"
+            className="conversation-header-icon conversation-header-icon--danger"
+            aria-label="Delete analysis"
+            title="Delete analysis"
+            onClick={() => {
+              if (conversationId && window.confirm('Are you sure you want to delete this analysis?')) {
+                deleteConversationMutation.mutate(conversationId, {
+                  onSuccess: () => {
+                    navigate('/ask', { replace: true });
+                  },
+                });
+              }
+            }}
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </header>
+
+      <div className="chat-main-scroll !pt-5">
 
         {initialSubmitError && (
           <div className="p-3 mb-4 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545]" role="alert">
@@ -304,6 +304,8 @@ export function ConversationPage() {
         onProfileIdChange={setSelectedProfileId}
         isSubmitting={isSubmitting || Boolean(activeRunningJob)}
         placeholder="Ask a follow-up about this analysis…"
+        inputLabel="Ask a follow-up"
+        dataSourceSelection="hidden"
       />
     </div>
   );

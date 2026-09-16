@@ -71,7 +71,7 @@
       "Body_create_excel_data_source_api_v1_data_sources_excel_post": {
         "properties": {
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           },
@@ -92,7 +92,7 @@
       "Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post": {
         "properties": {
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           }
@@ -216,7 +216,7 @@
           },
           "messages": {
             "items": {
-              "$ref": "#/components/schemas/MessageResponse"
+              "$ref": "#/components/schemas/app__conversations__schemas__MessageResponse"
             },
             "title": "Messages",
             "type": "array"
@@ -1942,61 +1942,6 @@
         "title": "MessageCreate",
         "type": "object"
       },
-      "MessageResponse": {
-        "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
-          },
-          "conversation_id": {
-            "format": "uuid",
-            "title": "Conversation Id",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "job_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Job Id"
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "title": "Metadata",
-            "type": "object"
-          },
-          "role": {
-            "title": "Role",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "conversation_id",
-          "role",
-          "content",
-          "job_id",
-          "metadata",
-          "created_at"
-        ],
-        "title": "MessageResponse",
-        "type": "object"
-      },
       "ModelConnectionCreate": {
         "additionalProperties": false,
         "properties": {
@@ -3247,6 +3192,61 @@
         ],
         "title": "MessageResponse",
         "type": "object"
+      },
+      "app__conversations__schemas__MessageResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "role",
+          "content",
+          "job_id",
+          "metadata",
+          "created_at"
+        ],
+        "title": "MessageResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -3725,6 +3725,61 @@
       }
     },
     "/api/v1/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "delete_conversation_api_v1_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
       "get": {
         "operationId": "get_conversation_api_v1_conversations__conversation_id__get",
         "parameters": [
@@ -3849,7 +3904,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MessageResponse"
+                    "$ref": "#/components/schemas/app__conversations__schemas__MessageResponse"
                   },
                   "title": "Response List Messages Api V1 Conversations  Conversation Id  Messages Get",
                   "type": "array"
@@ -5337,6 +5392,56 @@
         "summary": "Get Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/html": {
+      "get": {
+        "description": "Serve a shareable POC HTML artifact; UUIDs are the public capability URL.",
+        "operationId": "get_html_artifact_api_v1_jobs__job_id__artifacts__artifact_id__html_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Html Artifact",
+        "tags": [
+          "job execution"
         ]
       }
     },

@@ -24,8 +24,8 @@ function dataModel(chart: ChartableModel): AnalyticalTableModel {
         id: String(index),
         values: {
           'Data source': chart.dataSourceName,
-          [chart.category]: point[chart.category],
-          [chart.value]: point[chart.value],
+          [chart.category]: point[chart.category] ?? null,
+          [chart.value]: point[chart.value] ?? null,
         },
       })),
     };
@@ -36,9 +36,9 @@ function dataModel(chart: ChartableModel): AnalyticalTableModel {
       id: `${series.id}:${index}`,
       values: {
         'Data source': series.dataSourceName,
-        [chart.dimension]: point[chart.dimension],
+        [chart.dimension]: point[chart.dimension] ?? null,
         Metric: series.label,
-        Value: point[series.metric],
+        Value: point[series.metric] ?? null,
       },
     }))
   );

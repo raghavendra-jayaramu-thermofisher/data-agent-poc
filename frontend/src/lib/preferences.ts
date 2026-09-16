@@ -4,6 +4,7 @@ export type Preferences = {
     lastOrganizationId?: string;
     lastPath?: string;
     lastAskDataSourceIds?: string[];
+    lastSelectedModelProfileId?: string | null;
 };
 function readAll(): Preferences {
     try {
