@@ -13,7 +13,8 @@ import {
   normalizeChartArtifact,
   type NormalizedChartModel,
 } from '../../charts/chart-domain';
-import { parseTableArtifact, parseTextArtifact } from '../lib/artifacts';
+import { parseHtmlArtifact, parseTableArtifact, parseTextArtifact } from '../lib/artifacts';
+import { HtmlArtifactCard } from './HtmlArtifactCard';
 
 function SaveEntryPoint({
   jobId,
@@ -262,6 +263,9 @@ export function ArtifactRenderer({
   const texts = artifacts
     .map((artifact) => ({ artifact, model: parseTextArtifact(artifact) }))
     .filter((item) => item.model != null && item.model.markdown.trim() !== excludeTextMarkdown?.trim());
+  const htmlArtifacts = artifacts
+    .map((artifact) => ({ artifact, model: parseHtmlArtifact(artifact) }))
+    .filter((item) => item.model != null);
   const allValidTextArtifactIds = artifacts
     .filter((artifact) => parseTextArtifact(artifact) != null)
     .map((artifact) => artifact.id);
@@ -269,6 +273,7 @@ export function ArtifactRenderer({
     ...tables.map((item) => item.artifact.id),
     ...allValidTextArtifactIds,
     ...chartArtifacts.map((item) => item.id),
+    ...htmlArtifacts.map((item) => item.artifact.id),
   ]);
   const unsupported = artifacts.filter((artifact) => !supportedIds.has(artifact.id));
   if (!artifacts.length) return null;
@@ -325,7 +330,7 @@ export function ArtifactRenderer({
     const sourceSql = artifact.source_sql_execution_id ? sqlById.get(artifact.source_sql_execution_id) : undefined;
     const isLastTable = i === visibleTables.length - 1;
 
-    let defaultOpen = false;
+    let defaultOpen: boolean;
     if (model.display === 'expanded') {
       defaultOpen = true;
     } else if (model.display === 'collapsed') {
@@ -361,6 +366,13 @@ export function ArtifactRenderer({
           <AssistantMarkdown content={model!.markdown} />
         </section>
       ),
+    });
+  }
+  for (const { artifact, model } of htmlArtifacts) {
+    entries.push({
+      order: artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER,
+      key: `html-${artifact.id}`,
+      node: <HtmlArtifactCard jobId={jobId} artifact={artifact} model={model!} />,
     });
   }
   if (invalidCharts.length) {

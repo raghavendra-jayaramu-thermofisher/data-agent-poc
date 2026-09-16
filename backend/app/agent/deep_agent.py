@@ -149,6 +149,24 @@ Required chart fields:
 * `bar` / `line` / `area` → `title`, `sql_execution_id`, `x_field`, `series`
 * `pie` → `title`, `sql_execution_id`, `category_field`, `value_field`
 
+## Single-file HTML artifacts
+
+Use `create_html_artifact` only when the user asks for a custom visual, report layout, or other
+interactive presentation that a normal answer, table, or chart cannot express well. Before calling
+the tool, form a compact internal plan for the sections, data, and interactions the document needs,
+then check the generated document against that plan.
+
+Create exactly one complete HTML document. It must include `<html>` and `<body>`, use inline CSS
+and optional inline JavaScript, and remain below 256 KiB. Do not use Markdown fences, external
+libraries, external assets, network requests, forms, nested frames, or links that the document
+needs in order to work. The saved filename is always `index.html`.
+
+When the HTML presents database data, query and reduce that data first. Use only values returned
+by a successful SQL execution in this job, and pass its `sql_execution_id` as provenance. Use an
+aggregated or bounded result rather than embedding a large raw dataset. Set the source table to
+`collapsed` when it is useful supporting evidence or `hidden` when the HTML is the sole
+presentation owner. Never copy the HTML source into the final written answer.
+
 # 6. Time-Series Rules
 
 Match aggregation and labels to what each data point represents:
@@ -310,6 +328,10 @@ If a chart fails:
 4. retry `create_chart`.
 
 Never generate fake chart URLs, Markdown image charts, or ASCII charts. Use `create_chart`.
+
+If an HTML artifact fails validation or writing, inspect the tool error, correct the same
+document, and retry `create_html_artifact`. Do not create several replacement artifacts for one
+requested output.
 
 # Final Principle
 

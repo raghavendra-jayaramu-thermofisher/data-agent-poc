@@ -10,12 +10,14 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
+from app.agent.html_artifacts import HtmlArtifactStorage, HtmlArtifactValidationError
 from app.agent.models import JobArtifact, SQLExecution, ToolExecution
 from app.agent.repository import AgentExecutionRepository
 from app.agent.serialization import bound_query_result, model_result_preview
 from app.agent.sql_safety import SQLSafetyViolation, validate_read_only_sql
 from app.agent.tool_schemas import (
     CreateChartArgs,
+    CreateHtmlArtifactArgs,
     ExecuteSQLArgs,
     ReadKnowledgeIndexArgs,
     ReadTableSchemaArgs,
@@ -519,6 +521,80 @@ async def create_chart(
     }
 
 
+async def create_html_artifact(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    _tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    """Persist one complete HTML document as a managed file plus small DB metadata."""
+
+    try:
+        parsed = CreateHtmlArtifactArgs.model_validate(arguments)
+    except ValidationError as exc:
+        raise AgentToolError("HTML_ARTIFACT_INVALID", "The HTML artifact is invalid.") from exc
+
+    if parsed.source_sql_execution_id is not None:
+        async with get_session_factory()() as session:
+            source = await AgentExecutionRepository(session).get_sql_for_job(
+                parsed.source_sql_execution_id, context.job_id
+            )
+            if source is None or source.status != "succeeded":
+                raise AgentToolError(
+                    "HTML_SOURCE_NOT_FOUND",
+                    "The HTML artifact must reference a successful SQL execution from this job.",
+                )
+
+    artifact_id = uuid.uuid4()
+    storage = HtmlArtifactStorage(
+        context.settings.data_directory,
+        context.settings.agent_html_artifact_max_bytes,
+    )
+    try:
+        size_bytes = storage.write(context.job_id, artifact_id, parsed.html)
+    except HtmlArtifactValidationError as exc:
+        raise AgentToolError("HTML_ARTIFACT_INVALID", str(exc)) from exc
+    except OSError as exc:
+        raise AgentToolError(
+            "HTML_ARTIFACT_WRITE_FAILED",
+            "The HTML artifact file could not be written.",
+            retryable=True,
+        ) from exc
+
+    try:
+        async with get_session_factory()() as session:
+            repo = AgentExecutionRepository(session)
+            repo.add_artifact(
+                JobArtifact(
+                    id=artifact_id,
+                    job_id=context.job_id,
+                    kind="html",
+                    name=parsed.title,
+                    source_sql_execution_id=parsed.source_sql_execution_id,
+                    payload={
+                        "schema_version": 1,
+                        "file_name": "index.html",
+                        "size_bytes": size_bytes,
+                    },
+                    created_at=utc_now(),
+                )
+            )
+            await session.commit()
+    except Exception:
+        storage.delete(context.job_id, artifact_id)
+        raise
+
+    event_payload: dict[str, object] = {
+        "artifact_id": str(artifact_id),
+        "title": parsed.title,
+        "file_name": "index.html",
+        "size_bytes": size_bytes,
+    }
+    if parsed.source_sql_execution_id is not None:
+        event_payload["sql_execution_id"] = str(parsed.source_sql_execution_id)
+    await append_agent_event(context.job_id, "html.generated", event_payload)
+    return {"ok": True, **event_payload}
+
+
 def build_frontend_chart_payload(
     parsed: CreateChartArgs, columns: list[str], rows: list[object]
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -680,6 +756,20 @@ def build_default_tool_registry() -> AgentToolRegistry:
             ),
             args_schema=CreateChartArgs,
             handler=create_chart,
+        )
+    )
+    registry.register(
+        AgentToolDefinition(
+            name="create_html_artifact",
+            description=(
+                "Create one separately stored, self-contained HTML document for a custom result "
+                "that a normal answer, table, or chart cannot present well. Supply exactly one "
+                "complete HTML document with inline CSS and optional inline JavaScript. External "
+                "resources and Markdown fences are not allowed. If the document presents queried "
+                "data, reference the successful SQL execution from this job and use only its values."
+            ),
+            args_schema=CreateHtmlArtifactArgs,
+            handler=create_html_artifact,
         )
     )
     return registry
@@ -899,6 +989,13 @@ def _safe_tool_input(name: str, arguments: dict[str, object]) -> dict[str, objec
         return {
             "data_source_id": arguments.get("data_source_id"),
             "sql": arguments.get("sql"),
+        }
+    if name == "create_html_artifact":
+        html = arguments.get("html")
+        return {
+            "title": arguments.get("title"),
+            "source_sql_execution_id": arguments.get("source_sql_execution_id"),
+            "size_bytes": len(str(html).encode("utf-8")) if html is not None else 0,
         }
     return arguments
 

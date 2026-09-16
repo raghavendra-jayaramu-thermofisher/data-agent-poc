@@ -1,4 +1,4 @@
-import { apiClient, withAuthRefresh } from '../../api/client';
+import { API_BASE_URL, apiClient, withAuthRefresh } from '../../api/client';
 import type { components } from '../../api/generated/schema';
 
 type Schemas = components['schemas'];
@@ -12,4 +12,9 @@ export function getExecutionTrace(jobId: string): Promise<ExecutionTrace> {
   return withAuthRefresh(() => apiClient.GET('/api/v1/jobs/{job_id}/execution', {
     params: { path: { job_id: jobId } },
   }));
+}
+
+export function getHtmlArtifactUrl(jobId: string, artifactId: string): string {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  return `${base}/api/v1/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}/html`;
 }

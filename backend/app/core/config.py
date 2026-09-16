@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     agent_model_result_max_rows: int = Field(default=500, ge=1, le=5000)
     agent_model_result_max_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
     agent_chart_max_rows: int = Field(default=2000, ge=2, le=5000)
+    agent_html_artifact_max_bytes: int = Field(default=256 * 1024, ge=1024, le=2 * 1024 * 1024)
     agent_max_history_messages: int = Field(default=50, ge=1, le=200)
 
     # Task 6 retention/maintenance controls. Durable audit/history is never auto-deleted.

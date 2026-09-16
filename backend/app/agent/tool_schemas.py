@@ -164,3 +164,29 @@ class CreateChartArgs(BaseModel):
             if self.category_field is not None or self.value_field is not None:
                 raise ValueError("non-pie charts must not define category_field/value_field")
         return self
+
+
+class CreateHtmlArtifactArgs(BaseModel):
+    """One complete, self-contained HTML document stored as a file."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(
+        min_length=1,
+        max_length=240,
+        description="Concise business-facing title shown above the HTML preview.",
+    )
+    html: str = Field(
+        min_length=1,
+        max_length=2 * 1024 * 1024,
+        description=(
+            "One complete HTML document beginning with an html element. Use inline CSS and optional "
+            "inline JavaScript only; do not include Markdown fences or external resources."
+        ),
+    )
+    source_sql_execution_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Optional successful SQL execution from this job that supplied the document's data."
+        ),
+    )

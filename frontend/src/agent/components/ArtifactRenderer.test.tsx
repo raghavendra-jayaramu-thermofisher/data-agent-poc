@@ -66,6 +66,21 @@ describe('ArtifactRenderer', () => {
     expect(screen.getByText('Chart unavailable')).toBeInTheDocument();
     expect(screen.queryByTestId('echarts')).not.toBeInTheDocument();
   });
+
+  it('opens a single-file HTML artifact in a sandboxed iframe on demand', async () => {
+    const html = a('html-report', 'html', { schema_version: 1, file_name: 'index.html', size_bytes: 2048 });
+    render(<MemoryRouter><ArtifactRenderer jobId="j1" artifacts={[html]} sql={sql}/></MemoryRouter>);
+    const user = userEvent.setup();
+
+    expect(screen.queryByTitle('html-report')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    const frame = screen.getByTitle('html-report');
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts');
+    expect(frame.getAttribute('src')).toContain('/api/v1/jobs/j1/artifacts/html-report/html');
+    await user.click(screen.getByRole('button', { name: 'Hide preview' }));
+    expect(screen.queryByTitle('html-report')).not.toBeInTheDocument();
+  });
 });
 
 it('does not silently save only one source from a combined multi-source chart', () => {

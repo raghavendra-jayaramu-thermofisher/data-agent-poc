@@ -101,3 +101,14 @@ class AgentExecutionRepository:
             .order_by(JobArtifact.created_at.asc())
         )
         return list(result.scalars().all())
+
+    async def get_artifact_for_job(
+        self, job_id: uuid.UUID, artifact_id: uuid.UUID
+    ) -> JobArtifact | None:
+        result = await self.session.execute(
+            select(JobArtifact).where(
+                JobArtifact.job_id == job_id,
+                JobArtifact.id == artifact_id,
+            )
+        )
+        return result.scalar_one_or_none()

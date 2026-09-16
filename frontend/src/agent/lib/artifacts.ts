@@ -10,7 +10,7 @@ function object(value: unknown): Record<string, unknown> | null {
 export function parseTextArtifact(artifact: JobArtifact): { markdown: string } | null {
   if (artifact.kind !== 'text') return null;
   const payload = object(artifact.payload);
-  if (!payload) return null;
+  if (!payload || payload.schema_version !== 1) return null;
   const text =
     typeof payload.markdown === 'string'
       ? payload.markdown
@@ -20,6 +20,25 @@ export function parseTextArtifact(artifact: JobArtifact): { markdown: string } |
       ? payload.content
       : null;
   return text != null ? { markdown: text } : null;
+}
+
+export type HtmlArtifactModel = {
+  fileName: 'index.html';
+  sizeBytes: number;
+};
+
+export function parseHtmlArtifact(artifact: JobArtifact): HtmlArtifactModel | null {
+  if (artifact.kind !== 'html') return null;
+  const payload = object(artifact.payload);
+  if (
+    !payload ||
+    payload.schema_version !== 1 ||
+    payload.file_name !== 'index.html' ||
+    typeof payload.size_bytes !== 'number' ||
+    !Number.isInteger(payload.size_bytes) ||
+    payload.size_bytes < 1
+  ) return null;
+  return { fileName: 'index.html', sizeBytes: payload.size_bytes };
 }
 
 export function parseTableArtifact(artifact: JobArtifact): AnalyticalTableModel | null {

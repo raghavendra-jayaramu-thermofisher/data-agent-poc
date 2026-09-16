@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JobArtifact } from '../api/execution-api';
-import { parseTableArtifact, parseTextArtifact } from './artifacts';
+import { parseHtmlArtifact, parseTableArtifact, parseTextArtifact } from './artifacts';
 
 function artifact(kind: string, payload: Record<string, unknown>): JobArtifact {
   return { id: 'a1', job_id: 'j1', kind, name: null, payload, source_sql_execution_id: kind === 'table' ? 's1' : null, created_at: '2026-08-24T12:00:00Z' };
@@ -21,5 +21,11 @@ describe('artifact parsing', () => {
   it('parses versioned Markdown text artifacts only', () => {
     expect(parseTextArtifact(artifact('text', { schema_version: 1, markdown: '**Answer**' }))).toEqual({ markdown: '**Answer**' });
     expect(parseTextArtifact(artifact('text', { markdown: '**Answer**' }))).toBeNull();
+  });
+
+  it('parses only the server-owned single-file HTML contract', () => {
+    expect(parseHtmlArtifact(artifact('html', { schema_version: 1, file_name: 'index.html', size_bytes: 1234 }))).toEqual({ fileName: 'index.html', sizeBytes: 1234 });
+    expect(parseHtmlArtifact(artifact('html', { schema_version: 1, file_name: '../report.html', size_bytes: 1234 }))).toBeNull();
+    expect(parseHtmlArtifact(artifact('html', { schema_version: 1, file_name: 'index.html', size_bytes: 0 }))).toBeNull();
   });
 });
