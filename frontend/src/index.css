@@ -2369,7 +2369,215 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   color: var(--db-text-primary);
 }
 
-/* Forms & Danger Zone */
+/* Forms & Layout Containers */
+.form-container {
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.form-card {
+  background: var(--db-surface-raised, #FFFDFC);
+  border: 1px solid var(--db-border-default, #DAD5CD);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(37, 33, 39, 0.03);
+}
+
+.form-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--db-border-subtle, #E7E3DC);
+}
+
+.form-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 2px;
+}
+
+.form-section-divider span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--db-text-muted, #857F87);
+  white-space: nowrap;
+}
+
+.form-section-divider hr {
+  flex: 1;
+  border: 0;
+  border-top: 1px solid var(--db-border-subtle, #E7E3DC);
+  margin: 0;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-grid-host-port {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .form-grid-2,
+  .form-grid-host-port {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modern Segmented Pill Control */
+.segmented-pill-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--db-surface-muted, #F0EEE9);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--db-border-subtle, #E7E3DC);
+}
+
+.segmented-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  color: var(--db-text-secondary, #625C64);
+  background: transparent;
+  cursor: pointer;
+  transition: all 120ms ease;
+  user-select: none;
+}
+
+.segmented-pill-btn:hover {
+  color: var(--db-text-primary, #252127);
+}
+
+.segmented-pill-btn.is-active {
+  background: var(--db-surface-raised, #FFFDFC);
+  color: var(--db-primary, #4B123F);
+  font-weight: 600;
+  border-color: var(--db-border-default, #DAD5CD);
+  box-shadow: 0 1px 3px rgba(37, 33, 39, 0.06);
+}
+
+/* Drag-and-Drop Dropzone */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: var(--db-surface, #FDFBF7);
+  border: 1.5px dashed var(--db-border-default, #DAD5CD);
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.dropzone:hover,
+.dropzone.is-dragover {
+  border-color: var(--db-primary, #4B123F);
+  background: var(--db-primary-soft, #F4E8F0);
+}
+
+.dropzone-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--db-surface-muted, #F0EEE9);
+  color: var(--db-text-secondary, #625C64);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  transition: transform 150ms ease, color 150ms ease;
+}
+
+.dropzone:hover .dropzone-icon,
+.dropzone.is-dragover .dropzone-icon {
+  transform: translateY(-2px);
+  color: var(--db-primary, #4B123F);
+  background: #FFFDFC;
+}
+
+.dropzone-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--db-text-primary, #252127);
+  margin: 0 0 4px;
+}
+
+.dropzone-hint {
+  font-size: 12px;
+  color: var(--db-text-secondary, #625C64);
+  margin: 0;
+}
+
+/* File Preview Card */
+.file-preview-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--db-surface-muted, #F0EEE9);
+  border: 1px solid var(--db-border-default, #DAD5CD);
+  border-radius: 6px;
+}
+
+.file-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.file-preview-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #E8F5E9;
+  color: #2E7D32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-preview-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--db-text-primary, #252127);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview-size {
+  font-size: 11.5px;
+  color: var(--db-text-secondary, #625C64);
+}
+
 .form-stack {
   display: flex;
   flex-direction: column;

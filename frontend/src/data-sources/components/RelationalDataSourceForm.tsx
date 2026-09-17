@@ -44,19 +44,183 @@ export function RelationalDataSourceForm({ onSubmit }: Props) {
                 setError('root', { message: appError.message ?? 'Unable to save data source.' });
         }
     });
-    return <form className="form-stack form-width" onSubmit={submit} noValidate>
-    <Controller control={control} name="kind" render={({ field }) => <SingleSelect label="Database type" value={field.value} onChange={(next) => { field.onChange(next); const defaults = modelDefaultsByKind[next]; setValue('port', defaults.port); setValue('schemaName', defaults.schemaName); }} options={kindOptions}/>}/>
-    <FormField label="Name" {...register('name')} error={errors.name?.message}/>
-    <div className="form-grid-2"><FormField label="Host" {...register('host')} error={errors.host?.message}/><FormField label="Port" type="number" {...register('port')} error={errors.port?.message}/></div>
-    <FormField label="Database" {...register('database')} error={errors.database?.message}/>
-    {kind !== 'mysql' ? <FormField label="Schema" {...register('schemaName')} error={errors.schemaName?.message}/> : null}
-    <div className="form-grid-2"><FormField label="Username" autoComplete="username" {...register('username')} error={errors.username?.message}/><Controller control={control} name="password" render={({ field }) => <SecretField label="Password" {...field} autoComplete="new-password" error={errors.password?.message}/>}/></div>
-    {kind === 'postgres' ? <Controller control={control} name="sslMode" render={({ field }) => <SingleSelect label="SSL mode" value={field.value ?? 'prefer'} onChange={field.onChange} options={sslModeOptions}/>}/> : null}
-    {kind === 'mysql' ? <Controller control={control} name="ssl" render={({ field }) => <BooleanSwitch label="Use SSL" value={field.value} onChange={field.onChange}/>}/> : null}
-    {kind === 'mssql' ? <><Controller control={control} name="encrypt" render={({ field }) => <BooleanSwitch label="Encrypt connection" value={field.value} onChange={field.onChange}/>}/><Controller control={control} name="trustServerCertificate" render={({ field }) => <BooleanSwitch label="Trust server certificate" value={field.value} onChange={field.onChange}/>}/><FormField label="ODBC driver" {...register('odbcDriver')} error={errors.odbcDriver?.message}/></> : null}
-    {errors.root?.message ? <div className="inline-error" role="alert">{errors.root.message}</div> : null}
-    <div className="form-actions"><Button type="submit" variant="primary" isPending={isSubmitting}>Save data source</Button></div>
-  </form>;
+    return (
+      <form className="form-stack" onSubmit={submit} noValidate>
+        {/* Source Definition */}
+        <div className="form-grid-2">
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <SingleSelect
+                label="Database type"
+                value={field.value}
+                onChange={(next) => {
+                  field.onChange(next);
+                  const defaults = modelDefaultsByKind[next];
+                  setValue('port', defaults.port);
+                  setValue('schemaName', defaults.schemaName);
+                }}
+                options={kindOptions}
+              />
+            )}
+          />
+          <FormField
+            label="Data source name"
+            placeholder="e.g. Analytics DB"
+            {...register('name')}
+            error={errors.name?.message}
+          />
+        </div>
+
+        {/* Connection Parameters */}
+        <div className="form-section-divider">
+          <span>Connection</span>
+          <hr />
+        </div>
+
+        <div className="form-grid-host-port">
+          <FormField
+            label="Host"
+            placeholder="e.g. localhost or db.example.com"
+            {...register('host')}
+            error={errors.host?.message}
+          />
+          <FormField
+            label="Port"
+            type="number"
+            {...register('port', { valueAsNumber: true })}
+            error={errors.port?.message}
+          />
+        </div>
+
+        <div className={kind !== 'mysql' ? 'form-grid-2' : ''}>
+          <FormField
+            label="Database"
+            placeholder="e.g. my_database"
+            {...register('database')}
+            error={errors.database?.message}
+          />
+          {kind !== 'mysql' ? (
+            <FormField
+              label="Schema"
+              placeholder={kind === 'postgres' ? 'public' : 'dbo'}
+              {...register('schemaName')}
+              error={errors.schemaName?.message}
+            />
+          ) : null}
+        </div>
+
+        {/* Authentication */}
+        <div className="form-section-divider">
+          <span>Authentication</span>
+          <hr />
+        </div>
+
+        <div className="form-grid-2">
+          <FormField
+            label="Username"
+            autoComplete="username"
+            placeholder="e.g. postgres"
+            {...register('username')}
+            error={errors.username?.message}
+          />
+          <Controller
+            control={control}
+            name="password"
+            render={({ field }) => (
+              <SecretField
+                label="Password"
+                {...field}
+                autoComplete="new-password"
+                error={errors.password?.message}
+              />
+            )}
+          />
+        </div>
+
+        {/* Security & Protocols */}
+        <div className="form-section-divider">
+          <span>Security</span>
+          <hr />
+        </div>
+
+        {kind === 'postgres' ? (
+          <Controller
+            control={control}
+            name="sslMode"
+            render={({ field }) => (
+              <SingleSelect
+                label="SSL mode"
+                value={field.value ?? 'prefer'}
+                onChange={field.onChange}
+                options={sslModeOptions}
+              />
+            )}
+          />
+        ) : null}
+
+        {kind === 'mysql' ? (
+          <Controller
+            control={control}
+            name="ssl"
+            render={({ field }) => (
+              <BooleanSwitch
+                label="Use SSL connection"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
+        ) : null}
+
+        {kind === 'mssql' ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-6">
+              <Controller
+                control={control}
+                name="encrypt"
+                render={({ field }) => (
+                  <BooleanSwitch
+                    label="Encrypt connection"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="trustServerCertificate"
+                render={({ field }) => (
+                  <BooleanSwitch
+                    label="Trust server certificate"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+            <FormField
+              label="ODBC driver"
+              {...register('odbcDriver')}
+              error={errors.odbcDriver?.message}
+            />
+          </div>
+        ) : null}
+
+        {errors.root?.message ? (
+          <div className="inline-error" role="alert">
+            {errors.root.message}
+          </div>
+        ) : null}
+
+        <div className="form-actions pt-2">
+          <Button type="submit" variant="primary" isPending={isSubmitting}>
+            Save data source
+          </Button>
+        </div>
+      </form>
+    );
 }
 function BooleanSwitch({ label, value, onChange }: {
     label: string;

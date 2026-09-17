@@ -3,7 +3,7 @@ export const relationalDataSourceSchema = z.object({
     kind: z.enum(['postgres', 'mysql', 'mssql']),
     name: z.string().trim().min(1, 'Name is required').max(180),
     host: z.string().trim().min(1, 'Host is required').max(255),
-    port: z.coerce.number().int().min(1).max(65535),
+    port: z.number().int().min(1).max(65535),
     database: z.string().trim().min(1, 'Database is required').max(255),
     schemaName: z.string().trim().max(255).optional(),
     username: z.string().trim().min(1, 'Username is required').max(255),

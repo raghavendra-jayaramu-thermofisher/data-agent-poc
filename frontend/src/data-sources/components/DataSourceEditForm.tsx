@@ -21,7 +21,65 @@ export function DataSourceEditForm({ source, onSubmit }: {
         resetField('password');
     }
     catch (error) {
-        setError('root', { message: (error as AppError).message ?? 'Update failed.' });
-    } });
-    return <form className="form-stack" onSubmit={submit} noValidate><FormField label="Name" {...register('name')} error={errors.name?.message}/><Controller control={control} name="status" render={({ field }) => <SingleSelect label="Status" value={field.value} onChange={field.onChange} options={statuses}/>}/><div className="section-divider"><strong>Replace credentials</strong><p className="muted-copy">Stored credentials are never redisplayed. Leave both fields blank to keep the current secret.</p></div><FormField label="Username" autoComplete="off" {...register('username')} error={errors.username?.message}/><Controller control={control} name="password" render={({ field }) => <SecretField label="New password" {...field} autoComplete="new-password" error={errors.password?.message}/>}/>{errors.root?.message ? <div className="inline-error" role="alert">{errors.root.message}</div> : null}<div className="form-actions"><Button type="submit" variant="primary" isPending={isSubmitting}>Save changes</Button></div></form>;
+      setError('root', { message: (error as AppError).message ?? 'Update failed.' });
+    }
+  });
+
+  return (
+    <form className="form-stack" onSubmit={submit} noValidate>
+        <div className="form-grid-2">
+          <FormField label="Name" {...register('name')} error={errors.name?.message} />
+          <Controller
+            control={control}
+            name="status"
+            render={({ field }) => (
+              <SingleSelect label="Status" value={field.value} onChange={field.onChange} options={statuses} />
+            )}
+          />
+        </div>
+
+        <div className="form-section-divider">
+          <span>Replace credentials</span>
+          <hr />
+        </div>
+        <p className="text-xs text-[var(--db-text-secondary)] -mt-2 mb-1">
+          Stored credentials are never redisplayed. Leave both fields blank to keep the current secret.
+        </p>
+
+        <div className="form-grid-2">
+          <FormField
+            label="Username"
+            autoComplete="off"
+            {...register('username')}
+            error={errors.username?.message}
+          />
+          <Controller
+            control={control}
+            name="password"
+            render={({ field }) => (
+              <SecretField
+                label="New password"
+                {...field}
+                value={field.value ?? ''}
+                autoComplete="new-password"
+                error={errors.password?.message}
+              />
+            )}
+          />
+        </div>
+
+        {errors.root?.message ? (
+          <div className="inline-error" role="alert">
+            {errors.root.message}
+          </div>
+        ) : null}
+
+        <div className="form-actions pt-2">
+          <Button type="submit" variant="primary" isPending={isSubmitting}>
+            Save changes
+          </Button>
+        </div>
+      </form>
+    );
 }
+

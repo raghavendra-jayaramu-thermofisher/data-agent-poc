@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
+import { ArrowLeft } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageState } from '../../components/PageState';
 import { notifications } from '../../components/notifications';
@@ -26,20 +27,37 @@ export function EditDataSourcePage() {
 
   return (
     <section className="page">
-      <div className="page-header">
-        <div><h1>Edit {query.data.name}</h1><p>Saved credentials are never redisplayed. Enter credentials only when replacing them.</p></div>
-      </div>
-      <div className="form-panel">
-        <DataSourceEditForm
-          source={query.data}
-          onSubmit={async (values) => {
-            await api.updateDataSource(query.data.id, values);
-            await queryClient.invalidateQueries({ queryKey: queryKeys.dataSources.all(orgId) });
-            notifications.success('Data source updated');
-            navigate(`/data-sources/${query.data.id}`);
-          }}
-        />
+      <div className="form-container">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--db-text-secondary)] hover:text-[var(--db-text-primary)] mb-4 transition-colors cursor-pointer"
+          onClick={() => navigate(`/data-sources/${query.data.id}`)}
+        >
+          <ArrowLeft size={14} />
+          <span>Back to Data Source</span>
+        </button>
+
+        <div className="form-card">
+          <div className="form-card-header">
+            <div>
+              <h1 className="text-lg font-semibold text-[var(--db-text-primary)] m-0">Edit {query.data.name}</h1>
+              <p className="text-xs text-[var(--db-text-secondary)] mt-1 mb-0">
+                Saved credentials are never redisplayed. Enter credentials only when replacing them.
+              </p>
+            </div>
+          </div>
+          <DataSourceEditForm
+            source={query.data}
+            onSubmit={async (values) => {
+              await api.updateDataSource(query.data.id, values);
+              await queryClient.invalidateQueries({ queryKey: queryKeys.dataSources.all(orgId) });
+              notifications.success('Data source updated');
+              navigate(`/data-sources/${query.data.id}`);
+            }}
+          />
+        </div>
       </div>
     </section>
   );
 }
+
