@@ -23,10 +23,34 @@ const managedJob: ManagedJob = {
     finished_at: null,
   },
   events: [
-    { sequence: 1, event_type: 'job.queued', level: 'info', payload: {}, created_at: '2026-09-16T12:00:00.000Z' },
-    { sequence: 2, event_type: 'job.started', level: 'info', payload: {}, created_at: '2026-09-16T12:00:02.000Z' },
-    { sequence: 3, event_type: 'agent.started', level: 'info', payload: {}, created_at: '2026-09-16T12:00:03.000Z' },
-    { sequence: 4, event_type: 'sql.started', level: 'info', payload: {}, created_at: '2026-09-16T12:00:05.000Z' },
+    {
+      sequence: 1,
+      event_type: 'job.queued',
+      level: 'info',
+      payload: {},
+      created_at: '2026-09-16T12:00:00.000Z',
+    },
+    {
+      sequence: 2,
+      event_type: 'job.started',
+      level: 'info',
+      payload: {},
+      created_at: '2026-09-16T12:00:02.000Z',
+    },
+    {
+      sequence: 3,
+      event_type: 'agent.started',
+      level: 'info',
+      payload: {},
+      created_at: '2026-09-16T12:00:03.000Z',
+    },
+    {
+      sequence: 4,
+      event_type: 'sql.started',
+      level: 'info',
+      payload: {},
+      created_at: '2026-09-16T12:00:05.000Z',
+    },
   ],
   lastSeenSequence: 4,
   connectionState: 'connected',
@@ -59,5 +83,39 @@ describe('AnalysisProgress', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     expect(onCancel).toHaveBeenCalledOnce();
     expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled();
+  });
+
+  it('freezes completed SQL timing and shows answer preparation as the active phase', () => {
+    const completedSqlJob: ManagedJob = {
+      ...managedJob,
+      events: [
+        ...managedJob.events,
+        {
+          sequence: 5,
+          event_type: 'sql.completed',
+          level: 'info',
+          payload: { sql_execution_id: 'sql-1', duration_ms: 53 },
+          created_at: '2026-09-16T12:00:05.100Z',
+        },
+        {
+          sequence: 6,
+          event_type: 'tool.completed',
+          level: 'info',
+          payload: { tool_execution_id: 'tool-1' },
+          created_at: '2026-09-16T12:00:05.200Z',
+        },
+      ],
+      lastSeenSequence: 6,
+    };
+
+    render(<AnalysisProgress managedJob={completedSqlJob} onCancel={() => undefined} />);
+
+    expect(screen.getByText('Preparing answer…')).toBeInTheDocument();
+    expect(screen.getByText('SQL completed').closest('li')).toHaveTextContent('<1s');
+
+    act(() => vi.advanceTimersByTime(5000));
+    expect(screen.getByText('SQL completed').closest('li')).toHaveTextContent('<1s');
+    const preparingStep = screen.getByText('Preparing answer…').closest('li');
+    expect(preparingStep).toHaveTextContent('7s');
   });
 });

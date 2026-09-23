@@ -1563,7 +1563,10 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 .assistant-markdown h1 { margin: 18px 0 8px; font-size: 18px; font-weight: 600; }
 .assistant-markdown h2 { margin: 16px 0 6px; font-size: 16px; font-weight: 600; }
 .assistant-markdown h3 { margin: 14px 0 4px; font-size: 14px; font-weight: 600; }
-.assistant-markdown p { margin: 8px 0; }
+.assistant-markdown p {
+  margin: 8px 0;
+  white-space: pre-line;
+}
 .assistant-markdown ul, .assistant-markdown ol { padding-left: 20px; margin: 8px 0; }
 .assistant-markdown pre {
   background: var(--db-surface-muted);
