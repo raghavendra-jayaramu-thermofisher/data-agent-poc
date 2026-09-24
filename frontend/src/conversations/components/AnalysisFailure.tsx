@@ -68,16 +68,6 @@ function failurePresentation(job: Job): FailurePresentation {
     };
   }
 
-  if (code.startsWith('FINAL_ANSWER_MODEL')) {
-    return {
-      title: 'Final answer model unavailable',
-      description:
-        'Configure a separate enabled final-answer model for this workspace and try again.',
-      icon: TriangleAlert,
-      tone: 'warning',
-    };
-  }
-
   if (code === 'ANALYSIS_EVIDENCE_INSUFFICIENT' || code === 'ARTIFACT_REFERENCE_INVALID') {
     return {
       title: 'The result could not be verified',

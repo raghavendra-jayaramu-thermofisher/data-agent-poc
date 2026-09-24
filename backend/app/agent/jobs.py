@@ -82,25 +82,6 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                 "JOB_INPUT_INVALID", "The analytical job input is invalid."
             ) from exc
 
-        raw_finalizer_id = settings.final_answer_model_profile_id
-        if raw_finalizer_id is None:
-            raise JobFailureError(
-                "FINAL_ANSWER_MODEL_REQUIRED",
-                "A separate final-answer model profile must be configured.",
-            )
-        try:
-            finalizer_profile_id = uuid.UUID(raw_finalizer_id)
-        except (TypeError, ValueError, AttributeError) as exc:
-            raise JobFailureError(
-                "FINAL_ANSWER_MODEL_INVALID",
-                "The final-answer model profile configuration is invalid.",
-            ) from exc
-        if finalizer_profile_id == profile_id:
-            raise JobFailureError(
-                "FINAL_ANSWER_MODEL_INVALID",
-                "The final-answer model profile must differ from the analysis model profile.",
-            )
-
         convo_repo = ConversationRepository(session)
         conversation = await convo_repo.get_for_org(conversation_id, job.organization_id)
         if conversation is None:
@@ -130,16 +111,6 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             raise JobFailureError(
                 exc.code,
                 "The selected analysis model profile is unavailable or disabled.",
-            ) from exc
-        try:
-            finalizer_model = await model_service.get_runtime_configuration(
-                profile_id=finalizer_profile_id,
-                organization_id=job.organization_id,
-            )
-        except AppError as exc:
-            raise JobFailureError(
-                "FINAL_ANSWER_MODEL_INVALID",
-                "The final-answer model profile is unavailable or disabled for this workspace.",
             ) from exc
         organization_id = job.organization_id
 
@@ -189,7 +160,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             raise AgentCancelledError
         answer = await FinalAnswerRuntime(settings=settings).run(
             job_id=job_id,
-            model=finalizer_model,
+            model=runtime_model,
             evidence=evidence,
         )
         if await is_cancel_requested(job_id):
@@ -219,8 +190,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         existing = await repo.message_for_job(job_id, "assistant")
         metadata: dict[str, object] = {
             "runtime": "deepagents+finalizer",
-            "analysis_model_profile_id": str(profile_id),
-            "final_answer_model_profile_id": str(finalizer_profile_id),
+            "model_profile_id": str(profile_id),
         }
         if existing is None:
             message = Message(

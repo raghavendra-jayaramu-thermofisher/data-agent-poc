@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -73,9 +72,7 @@ class Settings(BaseSettings):
     agent_html_artifact_max_bytes: int = Field(default=256 * 1024, ge=1024, le=2 * 1024 * 1024)
     agent_max_history_messages: int = Field(default=50, ge=1, le=200)
 
-    # Final-answer orchestration. The configured profile is resolved inside the worker for the
-    # current organization; keeping it outside the conversation schema avoids a migration.
-    final_answer_model_profile_id: str | None = None
+    # Final-answer orchestration reuses the model profile selected for the conversation.
     final_answer_timeout_seconds: int = Field(default=60, ge=5, le=600)
     final_answer_max_repairs: int = Field(default=1, ge=0, le=3)
     analysis_evidence_retries: int = Field(default=2, ge=0, le=5)
@@ -115,17 +112,6 @@ class Settings(BaseSettings):
             if len(decoded) != 32:
                 raise ValueError(f"Encryption key {version} must decode to exactly 32 bytes")
         return value
-
-    @field_validator("final_answer_model_profile_id", mode="before")
-    @classmethod
-    def normalize_final_answer_model_profile_id(cls, value: object) -> str | None:
-        if value is None or (isinstance(value, str) and not value.strip()):
-            return None
-        text = str(value).strip()
-        try:
-            return str(uuid.UUID(text))
-        except (ValueError, TypeError, AttributeError) as exc:
-            raise ValueError("FINAL_ANSWER_MODEL_PROFILE_ID must be a valid UUID") from exc
 
     @model_validator(mode="after")
     def validate_settings(self) -> Settings:
