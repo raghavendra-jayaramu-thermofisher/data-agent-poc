@@ -98,6 +98,7 @@ function eventIcon(eventType: string): LucideIcon {
   if (eventType.startsWith('sql.')) return Database;
   if (eventType.startsWith('chart.')) return BarChart3;
   if (eventType.startsWith('answer.')) return MessageSquareText;
+  if (eventType.startsWith('finalization.')) return MessageSquareText;
   return PlugZap;
 }
 

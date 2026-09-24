@@ -14,14 +14,19 @@ from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from app.agent.deep_agent import ProductionDeepAgentFactory, ToolBinding
-from app.agent.tool_schemas import CreateChartArgs, ExecuteSQLArgs, ReadKnowledgeIndexArgs, ReadTableSchemaArgs
+from app.agent.tool_schemas import (
+    CreateChartArgs,
+    ExecuteSQLArgs,
+    ReadKnowledgeIndexArgs,
+    ReadTableSchemaArgs,
+)
 from app.models.client import ModelRuntimeConfiguration
 
 
 class MultiStepFakeModel(FakeMessagesListChatModel):
     """Hermetic model that drives a real Deep Agents graph through six tool calls."""
 
-    def bind_tools(self, tools: Any, **kwargs: Any) -> "MultiStepFakeModel":
+    def bind_tools(self, tools: Any, **kwargs: Any) -> MultiStepFakeModel:
         del tools, kwargs
         return self
 
@@ -86,13 +91,14 @@ async def test_production_factory_runs_real_deepagents_multistep_graph(monkeypat
         executed.append("read_table_schema")
         return json.dumps({"columns": ["month", "revenue"]})
 
-    async def execute(data_source_id: str, sql: str) -> str:
+    async def execute(data_source_id: str, sql: str, **presentation: object) -> str:
+        del presentation
         del data_source_id, sql
         executed.append("execute_sql")
         return json.dumps({"sql_execution_id": sql_id, "columns": ["month", "revenue"], "rows": [["Jan", 100]]})
 
     async def chart(**kwargs: object) -> str:
-        assert kwargs["sql_execution_id"] == sql_id
+        assert str(kwargs["sql_execution_id"]) == sql_id
         executed.append("create_chart")
         return json.dumps({"renderer": "frontend", "chart_artifact_id": "chart-1"})
 

@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from app.agent import deep_agent as module
-from app.agent.deep_agent import DeepAgentRuntime, ToolBinding
+from app.agent.deep_agent import (
+    AgentAuditContext,
+    DeepAgentRuntime,
+    ToolBinding,
+    build_model_audit_callback,
+)
 from app.agent.tools import AgentToolContext, build_default_tool_registry
 from app.core.config import Settings
 from app.models.client import ModelRuntimeConfiguration
@@ -83,7 +90,10 @@ class FakeRunnable:
                 *input["messages"],  # type: ignore[misc]
                 {
                     "role": "assistant",
-                    "content": "Revenue increased from January to February. A frontend chart was created.",
+                    "content": (
+                        "Revenue increased from January to February. "
+                        "A frontend chart was created."
+                    ),
                 },
             ]
         }
@@ -103,6 +113,12 @@ class FakeFactory:
 @pytest.mark.asyncio
 async def test_deep_agent_runtime_handles_multi_step_multi_sql_and_chart(monkeypatch) -> None:
     events: list[str] = []
+    audit_flushed = False
+
+    class FakeAudit:
+        async def flush(self) -> None:
+            nonlocal audit_flushed
+            audit_flushed = True
 
     async def fake_event(job_id, event_type, payload, level="info"):
         del job_id, payload, level
@@ -114,7 +130,7 @@ async def test_deep_agent_runtime_handles_multi_step_multi_sql_and_chart(monkeyp
 
     monkeypatch.setattr(module, "append_agent_event", fake_event)
     monkeypatch.setattr(module, "run_cancellable", fake_cancellable)
-    monkeypatch.setattr(module, "build_model_audit_callback", lambda _: None)
+    monkeypatch.setattr(module, "build_model_audit_callback", lambda _: FakeAudit())
 
     executor = FakeToolExecutor()
     factory = FakeFactory()
@@ -138,13 +154,14 @@ async def test_deep_agent_runtime_handles_multi_step_multi_sql_and_chart(monkeyp
         api_key=None,
         settings={},
     )
-    answer = await runtime.run(
+    result = await runtime.run(
         context=context,
         model=model,
         history=[{"role": "user", "content": "Compare revenue and make a chart"}],
     )
 
-    assert "Revenue increased" in answer
+    assert "Revenue increased" in result.notes
+    assert result.messages
     assert [name for name, _ in executor.calls] == [
         "read_knowledge_index",
         "read_table_schema",
@@ -156,9 +173,61 @@ async def test_deep_agent_runtime_handles_multi_step_multi_sql_and_chart(monkeyp
     chart_args = executor.calls[-1][1]
     assert chart_args["sql_execution_id"] == str(executor.sql_ids[0])
     assert chart_args["chart_type"] == "line"
-    assert events == ["agent.started", "answer.generated"]
+    assert events == ["agent.started", "analysis.completed"]
     assert factory.runnable is not None
     assert int(factory.runnable.config["recursion_limit"]) >= 25  # type: ignore[index]
     assert factory.system_prompt is not None
     assert str(source_id) in factory.system_prompt
     assert "Authorized datasource IDs for this conversation" in factory.system_prompt
+    assert audit_flushed
+
+
+@pytest.mark.asyncio
+async def test_model_audit_callback_records_from_langchain_worker_thread(monkeypatch) -> None:
+    recorded = []
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            del exc_type, exc, traceback
+
+        async def commit(self) -> None:
+            return None
+
+    class FakeRepository:
+        def __init__(self, session) -> None:
+            del session
+
+        async def next_model_sequence(self, job_id) -> int:
+            del job_id
+            return len(recorded) + 1
+
+        def add_model(self, item) -> None:
+            recorded.append(item)
+
+    monkeypatch.setattr(module, "get_session_factory", lambda: lambda: FakeSession())
+    monkeypatch.setattr(module, "AgentExecutionRepository", FakeRepository)
+
+    context = AgentAuditContext(
+        job_id=uuid.uuid4(),
+        model_profile_id=uuid.uuid4(),
+        model_name="analysis-model",
+        product_tool_names=frozenset(),
+    )
+    callback = build_model_audit_callback(context)
+    assert callback is not None
+    run_id = uuid.uuid4()
+    await asyncio.to_thread(callback.on_llm_start, {}, [], run_id=run_id)
+    response = SimpleNamespace(
+        llm_output={"usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14}},
+        generations=[],
+    )
+    await asyncio.to_thread(callback.on_llm_end, response, run_id=run_id)
+    await callback.flush()
+
+    assert len(recorded) == 1
+    assert recorded[0].phase == "analysis"
+    assert recorded[0].status == "succeeded"
+    assert recorded[0].total_tokens == 14

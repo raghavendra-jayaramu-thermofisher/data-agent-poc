@@ -5,6 +5,8 @@ import { formatLocalDateTime } from '../../lib/datetime';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDetails';
 import { BRANDING } from '../../lib/branding';
+import type { JobArtifact } from '../../agent/api/execution-api';
+import { formatMarkdownForCopy } from '../../agent/lib/artifact-directives';
 
 export function ConversationMessage({
   message,
@@ -15,9 +17,10 @@ export function ConversationMessage({
 }) {
   const assistant = message.role === 'assistant';
   const [copied, setCopied] = useState(false);
+  const [artifacts, setArtifacts] = useState<JobArtifact[]>([]);
 
   const handleCopy = () => {
-    void navigator.clipboard.writeText(message.content);
+    void navigator.clipboard.writeText(formatMarkdownForCopy(message.content, artifacts));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -34,9 +37,7 @@ export function ConversationMessage({
             {formatLocalDateTime(message.created_at)}
           </time>
         </div>
-        <div className="user-bubble">
-          {message.content}
-        </div>
+        <div className="user-bubble">{message.content}</div>
       </div>
     );
   }
@@ -67,17 +68,18 @@ export function ConversationMessage({
           </div>
         </header>
 
-        <div className="assistant-card-content">
-          <AssistantMarkdown content={message.content} />
-        </div>
-
         {message.job_id ? (
           <MessageAnalysisDetails
             jobId={message.job_id}
             answerMarkdown={message.content}
             onFollowUp={onFollowUp}
+            onArtifactsLoaded={setArtifacts}
           />
-        ) : null}
+        ) : (
+          <div className="assistant-card-content">
+            <AssistantMarkdown content={message.content} />
+          </div>
+        )}
       </article>
     </div>
   );

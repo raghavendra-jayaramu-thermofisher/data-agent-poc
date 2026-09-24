@@ -68,6 +68,35 @@ function failurePresentation(job: Job): FailurePresentation {
     };
   }
 
+  if (code.startsWith('FINAL_ANSWER_MODEL')) {
+    return {
+      title: 'Final answer model unavailable',
+      description:
+        'Configure a separate enabled final-answer model for this workspace and try again.',
+      icon: TriangleAlert,
+      tone: 'warning',
+    };
+  }
+
+  if (code === 'ANALYSIS_EVIDENCE_INSUFFICIENT' || code === 'ARTIFACT_REFERENCE_INVALID') {
+    return {
+      title: 'The result could not be verified',
+      description: 'The analysis did not produce enough consistent evidence for a safe answer.',
+      icon: ShieldAlert,
+      tone: 'warning',
+    };
+  }
+
+  if (code.startsWith('FINAL_ANSWER_')) {
+    return {
+      title: 'The final answer could not be prepared',
+      description:
+        'The analysis completed, but its final response did not pass validation. Try again.',
+      icon: TriangleAlert,
+      tone: 'warning',
+    };
+  }
+
   return {
     title: 'We could not complete this analysis',
     description: 'Try again in a moment. If the problem continues, review the execution details.',

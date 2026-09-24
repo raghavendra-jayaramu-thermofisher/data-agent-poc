@@ -4,8 +4,9 @@ import type { ConversationMessage as Message } from '../api/conversation-api';
 import { ConversationMessage } from './ConversationMessage';
 
 vi.mock('../../agent/components/MessageAnalysisDetails', () => ({
-  MessageAnalysisDetails: () => (
+  MessageAnalysisDetails: ({ answerMarkdown }: { answerMarkdown: string }) => (
     <>
+      <div className="assistant-card-content">{answerMarkdown.replaceAll('**', '')}</div>
       <div className="assistant-card-artifacts">Chart artifact</div>
       <footer className="assistant-card-footer">Compact execution ledger</footer>
     </>

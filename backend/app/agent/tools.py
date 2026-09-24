@@ -61,7 +61,9 @@ class AgentToolContext:
     settings: Settings
 
 
-ToolHandler = Callable[[AgentToolContext, dict[str, object], uuid.UUID], Awaitable[dict[str, object]]]
+ToolHandler = Callable[
+    [AgentToolContext, dict[str, object], uuid.UUID], Awaitable[dict[str, object]]
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +146,9 @@ def _parse_source_id(context: AgentToolContext, arguments: dict[str, object]) ->
     try:
         source_id = uuid.UUID(str(raw))
     except (ValueError, TypeError, AttributeError) as exc:
-        raise AgentToolError("TOOL_ARGUMENT_INVALID", "A valid data_source_id is required.") from exc
+        raise AgentToolError(
+            "TOOL_ARGUMENT_INVALID", "A valid data_source_id is required."
+        ) from exc
     if source_id not in context.allowed_data_source_ids:
         raise AgentToolError(
             "DATASOURCE_NOT_AUTHORIZED",
@@ -300,11 +304,23 @@ async def execute_sql(
             result, max_bytes=context.settings.agent_result_max_bytes
         )
         duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+        preview = model_result_preview(
+            columns=columns,
+            rows=rows,
+            truncated=truncated,
+            max_rows=context.settings.agent_model_result_max_rows,
+            max_bytes=context.settings.agent_model_result_max_bytes,
+        )
+        preview_rows = preview.get("rows")
+        preview_row_count = len(preview_rows) if isinstance(preview_rows, list) else 0
+        preview_truncated = preview.get("truncated") is True
 
         async with get_session_factory()() as session:
             sql_item = await session.get(SQLExecution, sql_execution_id)
             if sql_item is None:
-                raise AgentToolError("SQL_EXECUTION_NOT_FOUND", "SQL execution audit state is unavailable.")
+                raise AgentToolError(
+                    "SQL_EXECUTION_NOT_FOUND", "SQL execution audit state is unavailable."
+                )
             sql_item.status = "succeeded"
             sql_item.columns = columns
             sql_item.row_count = len(rows)
@@ -314,7 +330,11 @@ async def execute_sql(
             sql_item.finished_at = utc_now()
 
             custom_title = arguments.get("title")
-            artifact_name = str(custom_title).strip() if custom_title and str(custom_title).strip() else "Query result"
+            artifact_name = (
+                str(custom_title).strip()
+                if custom_title and str(custom_title).strip()
+                else "Query result"
+            )
             display_mode = str(arguments.get("display") or "auto")
             raw_column_labels = arguments.get("column_labels")
             column_labels = (
@@ -335,6 +355,10 @@ async def execute_sql(
                     "rows": rows,
                     "row_count": len(rows),
                     "truncated": truncated,
+                    "stored_row_count": len(rows),
+                    "stored_result_truncated": truncated,
+                    "model_preview_row_count": preview_row_count,
+                    "model_preview_truncated": preview_truncated,
                     "display": display_mode,
                     "column_labels": column_labels,
                 },
@@ -356,13 +380,6 @@ async def execute_sql(
                 "result_bytes": result_bytes,
             },
         )
-        preview = model_result_preview(
-            columns=columns,
-            rows=rows,
-            truncated=truncated,
-            max_rows=context.settings.agent_model_result_max_rows,
-            max_bytes=context.settings.agent_model_result_max_bytes,
-        )
         return {
             "ok": True,
             "data_source_id": str(source_id),
@@ -370,6 +387,17 @@ async def execute_sql(
             "sql_execution_id": str(sql_execution_id),
             "table_artifact_id": str(artifact_id),
             "table_display": display_mode,
+            "stored_row_count": len(rows),
+            "preview_row_count": preview_row_count,
+            "stored_result_truncated": truncated,
+            "preview_truncated": preview_truncated,
+            "evidence_warning": (
+                "The model received only a partial preview. Do not make totals, percentages, "
+                "rankings, distributions, primary-reason, or whole-population claims from this "
+                "preview. Execute a complete aggregate query for those conclusions."
+                if preview_truncated
+                else None
+            ),
             "presentation_guidance": (
                 "This result is hidden in the UI. Use it only for analysis, or present it once in "
                 "the written answer if the user needs to see it."
@@ -458,7 +486,9 @@ async def create_chart(
     try:
         parsed = CreateChartArgs.model_validate(arguments)
     except ValidationError as exc:
-        raise AgentToolError("CHART_SPEC_INVALID", "The frontend chart specification is invalid.") from exc
+        raise AgentToolError(
+            "CHART_SPEC_INVALID", "The frontend chart specification is invalid."
+        ) from exc
 
     async with get_session_factory()() as session:
         repo = AgentExecutionRepository(session)
@@ -472,7 +502,9 @@ async def create_chart(
             context.job_id, parsed.sql_execution_id
         )
         if table_artifact is None:
-            raise AgentToolError("CHART_SOURCE_NOT_FOUND", "The SQL result is unavailable for charting.")
+            raise AgentToolError(
+                "CHART_SOURCE_NOT_FOUND", "The SQL result is unavailable for charting."
+            )
         payload = table_artifact.payload
         columns = payload.get("columns")
         rows = payload.get("rows")
@@ -516,6 +548,7 @@ async def create_chart(
         "chart_artifact_id": str(artifact_id),
         "chart_type": parsed.chart_type,
         "title": parsed.title,
+        "source_sql_execution_id": str(parsed.sql_execution_id),
         "row_count": len(records),
         "renderer": "frontend",
     }
@@ -844,7 +877,9 @@ class AuditedToolExecutor:
                         "The analytical job exceeded its maximum tool-call limit.",
                     )
                 if name == "execute_sql":
-                    sql_attempts = await repo.count_tools(self.context.job_id, tool_name="execute_sql")
+                    sql_attempts = await repo.count_tools(
+                        self.context.job_id, tool_name="execute_sql"
+                    )
                     if sql_attempts >= self.context.settings.agent_max_sql_attempts:
                         raise AgentLimitError(
                             "AGENT_SQL_ATTEMPT_LIMIT_EXCEEDED",
@@ -877,9 +912,7 @@ class AuditedToolExecutor:
             )
             result = await definition.handler(self.context, safe_arguments, tool_execution_id)
             if name == "read_knowledge_index" and bool(result.get("data_source_id")):
-                self._loaded_knowledge_indexes.add(
-                    uuid.UUID(str(result["data_source_id"]))
-                )
+                self._loaded_knowledge_indexes.add(uuid.UUID(str(result["data_source_id"])))
         except AgentCancelledError:
             await self._finish_tool(
                 tool_execution_id,
@@ -1004,11 +1037,7 @@ def _safe_tool_output(name: str, result: dict[str, object]) -> dict[str, object]
     # Avoid duplicating result rows into the tool audit record. Full bounded rows already live in
     # a table artifact; the Deep Agent receives the bounded tool return directly.
     if name == "execute_sql":
-        return {
-            key: value
-            for key, value in result.items()
-            if key not in {"rows"}
-        }
+        return {key: value for key, value in result.items() if key not in {"rows"}}
     if name in {"read_knowledge_index", "read_table_schema"}:
         return {key: value for key, value in result.items() if not key.endswith("_markdown")}
     return result

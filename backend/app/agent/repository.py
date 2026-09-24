@@ -26,16 +26,19 @@ class AgentExecutionRepository:
 
     async def next_tool_sequence(self, job_id: uuid.UUID) -> int:
         value = await self.session.scalar(
-            select(func.coalesce(func.max(ToolExecution.sequence), 0)).where(ToolExecution.job_id == job_id)
+            select(func.coalesce(func.max(ToolExecution.sequence), 0)).where(
+                ToolExecution.job_id == job_id
+            )
         )
         return int(value or 0) + 1
 
     async def next_model_sequence(self, job_id: uuid.UUID) -> int:
         value = await self.session.scalar(
-            select(func.coalesce(func.max(ModelExecution.sequence), 0)).where(ModelExecution.job_id == job_id)
+            select(func.coalesce(func.max(ModelExecution.sequence), 0)).where(
+                ModelExecution.job_id == job_id
+            )
         )
         return int(value or 0) + 1
-
 
     async def count_tools(self, job_id: uuid.UUID, *, tool_name: str | None = None) -> int:
         statement = select(func.count(ToolExecution.id)).where(ToolExecution.job_id == job_id)
@@ -110,5 +113,18 @@ class AgentExecutionRepository:
                 JobArtifact.job_id == job_id,
                 JobArtifact.id == artifact_id,
             )
+        )
+        return result.scalar_one_or_none()
+
+    async def answer_artifact_for_job(self, job_id: uuid.UUID) -> JobArtifact | None:
+        result = await self.session.execute(
+            select(JobArtifact)
+            .where(
+                JobArtifact.job_id == job_id,
+                JobArtifact.kind == "text",
+                JobArtifact.name == "Answer",
+            )
+            .order_by(JobArtifact.created_at.asc())
+            .limit(1)
         )
         return result.scalar_one_or_none()

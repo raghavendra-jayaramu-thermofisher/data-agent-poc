@@ -1,0 +1,409 @@
+from __future__ import annotations
+
+import uuid
+
+import pytest
+
+from app.agent import final_answer as final_answer_module
+from app.agent.artifact_directives import replace_artifact_directives
+from app.agent.evidence import (
+    ArtifactEvidence,
+    EvidenceBundle,
+    SQLResultEvidence,
+    is_aggregate_sql,
+    mark_visible_artifacts,
+    validate_evidence,
+)
+from app.agent.final_answer import FinalAnswerError, FinalAnswerRuntime
+from app.agent.final_answer_validation import validate_final_answer
+from app.agent.tools import AgentCancelledError
+from app.core.config import Settings
+from app.models.client import ModelCompletion, ModelMessage, ModelRuntimeConfiguration, ModelUsage
+
+JOB_ID = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+SOURCE_ID = uuid.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+DETAIL_ID = uuid.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+AGGREGATE_ID = uuid.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+ARTIFACT_ID = uuid.UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+
+
+def sql_evidence(
+    *,
+    execution_id: uuid.UUID,
+    sequence: int,
+    sql: str,
+    rows: tuple[tuple[object, ...], ...],
+    truncated: bool,
+) -> SQLResultEvidence:
+    return SQLResultEvidence(
+        execution_id=execution_id,
+        tool_sequence=sequence,
+        data_source_id=SOURCE_ID,
+        sql_text=sql,
+        columns=("status", "count"),
+        rows=rows,
+        stored_row_count=len(rows),
+        preview_row_count=min(len(rows), 1),
+        preview_truncated=truncated,
+        stored_result_truncated=False,
+        is_aggregate=is_aggregate_sql(sql),
+        table_artifact_id=None,
+        title="Results",
+        display="hidden",
+    )
+
+
+def artifact(artifact_id: uuid.UUID = ARTIFACT_ID) -> ArtifactEvidence:
+    return ArtifactEvidence(
+        artifact_id=artifact_id,
+        kind="chart",
+        title="Orders by status",
+        source_sql_execution_id=AGGREGATE_ID,
+        payload={"schema_version": 1, "renderer": "frontend", "chart_type": "bar"},
+        valid=True,
+        visible=True,
+    )
+
+
+def bundle(*, unavailable: bool = False) -> EvidenceBundle:
+    aggregate = sql_evidence(
+        execution_id=AGGREGATE_ID,
+        sequence=2,
+        sql="SELECT status, COUNT(*) AS count FROM orders GROUP BY status",
+        rows=(("Open", 12), ("Held", 3)),
+        truncated=False,
+    )
+    return EvidenceBundle(
+        job_id=JOB_ID,
+        question="How many orders are open and show a chart?",
+        analyst_notes="The aggregate query found 12 open orders and 3 held orders.",
+        sql_results=(aggregate,),
+        artifacts=(artifact(),),
+        unavailable_information=unavailable,
+    )
+
+
+def test_sql_classifier_recognizes_aggregates() -> None:
+    assert is_aggregate_sql("SELECT COUNT(*) FROM orders")
+    assert is_aggregate_sql("SELECT status FROM orders GROUP BY status")
+    assert not is_aggregate_sql("SELECT order_id, status FROM orders")
+
+
+def test_truncated_detail_requires_later_complete_aggregate() -> None:
+    detail = sql_evidence(
+        execution_id=DETAIL_ID,
+        sequence=1,
+        sql="SELECT order_id, status FROM orders",
+        rows=(("SO-1", "Open"),),
+        truncated=True,
+    )
+    without_aggregate = bundle()
+    without_aggregate = EvidenceBundle(
+        job_id=without_aggregate.job_id,
+        question=without_aggregate.question,
+        analyst_notes=without_aggregate.analyst_notes,
+        sql_results=(detail,),
+        artifacts=(),
+        unavailable_information=False,
+    )
+    assert any(
+        "no later complete aggregate" in issue for issue in validate_evidence(without_aggregate)
+    )
+
+    with_aggregate = bundle()
+    with_aggregate = EvidenceBundle(
+        job_id=with_aggregate.job_id,
+        question=with_aggregate.question,
+        analyst_notes=with_aggregate.analyst_notes,
+        sql_results=(detail, *with_aggregate.sql_results),
+        artifacts=with_aggregate.artifacts,
+        unavailable_information=False,
+    )
+    assert validate_evidence(with_aggregate) == []
+
+
+def test_duplicate_chart_artifacts_are_rendered_once() -> None:
+    duplicate_id = uuid.UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
+    marked = mark_visible_artifacts([artifact(), artifact(duplicate_id)])
+
+    assert marked[0].visible
+    assert not marked[1].visible
+
+
+def test_final_answer_contract_accepts_grounded_markdown_and_artifact() -> None:
+    markdown = f"""### Objective
+
+Quantify orders by current status and present the supported distribution visually.
+
+### What I understood
+
+Orders are counted at the order level using their current status.
+
+### Answer
+
+There are **12 open orders** and **3 held orders**.
+
+[[artifact:{ARTIFACT_ID}]]
+"""
+    assert validate_final_answer(markdown, bundle()) == []
+
+
+def test_final_answer_contract_rejects_unverified_number_and_unknown_artifact() -> None:
+    unknown_id = uuid.UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
+    markdown = f"""### Objective
+
+Quantify orders by current status.
+
+### What I understood
+
+Orders are counted at order level.
+
+### Answer
+
+There are 99 open orders.
+
+[[artifact:{unknown_id}]]
+"""
+    errors = validate_final_answer(markdown, bundle())
+    assert any("unknown" in error for error in errors)
+    assert any("99" in error for error in errors)
+
+
+def test_final_answer_contract_rejects_duplicate_artifact() -> None:
+    markdown = f"""### Objective
+
+Quantify orders by current status and present the supported distribution visually.
+
+### What I understood
+
+Orders are counted at the order level using their current status.
+
+### Answer
+
+There are 12 open orders and 3 held orders.
+
+[[artifact:{ARTIFACT_ID}]]
+
+[[artifact:{ARTIFACT_ID}]]
+"""
+    assert any("more than once" in error for error in validate_final_answer(markdown, bundle()))
+
+
+def test_unable_to_answer_section_is_strictly_conditional() -> None:
+    markdown = """### Objective
+
+Determine the unavailable delivery reason.
+
+### What I understood
+
+The reason must come from a recorded field.
+
+### Unable to answer
+
+The selected source has no delivery-reason field.
+
+### Answer
+
+The requested reason cannot be established from the available data.
+"""
+    unavailable_bundle = bundle(unavailable=True)
+    unavailable_bundle = EvidenceBundle(
+        job_id=unavailable_bundle.job_id,
+        question=unavailable_bundle.question,
+        analyst_notes=unavailable_bundle.analyst_notes,
+        sql_results=unavailable_bundle.sql_results,
+        artifacts=(),
+        unavailable_information=True,
+    )
+    assert validate_final_answer(markdown, unavailable_bundle) == []
+    assert any("must be omitted" in error for error in validate_final_answer(markdown, bundle()))
+
+
+def test_history_directives_become_descriptive_labels() -> None:
+    markdown = f"Before\n\n[[artifact:{ARTIFACT_ID}]]\n\nAfter"
+    normalized = replace_artifact_directives(
+        markdown,
+        {str(ARTIFACT_ID): "Chart shown: Orders by status"},
+        prefix="",
+    )
+    assert "[[artifact:" not in normalized
+    assert "[Chart shown: Orders by status]" in normalized
+
+
+class FakeFinalAnswerClient:
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = responses
+        self.calls: list[list[ModelMessage]] = []
+
+    async def list_models(self) -> list[str]:
+        return ["writer"]
+
+    async def chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[ModelMessage],
+        settings: dict[str, object] | None = None,
+    ) -> ModelCompletion:
+        del model, settings
+        self.calls.append(messages)
+        return ModelCompletion(
+            text=self.responses.pop(0),
+            model="writer",
+            usage=ModelUsage(input_tokens=10, output_tokens=20, total_tokens=30),
+        )
+
+
+@pytest.mark.asyncio
+async def test_finalizer_repairs_invalid_markdown_once(monkeypatch) -> None:
+    invalid = "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 12 open orders."
+    valid = f"""### Objective
+
+Quantify orders by current status and present the supported distribution visually.
+
+### What I understood
+
+Orders are counted at the order level using current status.
+
+### Answer
+
+There are 12 open orders and 3 held orders.
+
+[[artifact:{ARTIFACT_ID}]]
+"""
+    client = FakeFinalAnswerClient([invalid, valid])
+    events: list[str] = []
+    finishes: list[str] = []
+
+    async def fake_event(job_id, event_type, payload, level="info"):
+        del job_id, payload, level
+        events.append(event_type)
+
+    async def fake_cancellable(job_id, awaitable, timeout_seconds):
+        del job_id, timeout_seconds
+        return await awaitable
+
+    async def fake_start(job_id, model):
+        del job_id, model
+        return uuid.uuid4()
+
+    async def fake_finish(execution_id, *, status, **kwargs):
+        del execution_id, kwargs
+        finishes.append(status)
+
+    monkeypatch.setattr(final_answer_module, "append_agent_event", fake_event)
+    monkeypatch.setattr(final_answer_module, "run_cancellable", fake_cancellable)
+    monkeypatch.setattr(FinalAnswerRuntime, "_start_execution", staticmethod(fake_start))
+    monkeypatch.setattr(FinalAnswerRuntime, "_finish_execution", staticmethod(fake_finish))
+
+    runtime = FinalAnswerRuntime(
+        settings=Settings(final_answer_max_repairs=1),
+        client_factory=lambda _model, _timeout: client,
+    )
+    model = ModelRuntimeConfiguration(
+        profile_id="11111111-1111-4111-8111-111111111111",
+        model_name="writer",
+        base_url="http://model.invalid/v1",
+        api_key=None,
+        settings={},
+    )
+    answer = await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
+
+    assert answer == valid.strip()
+    assert len(client.calls) == 2
+    assert finishes == ["succeeded", "succeeded"]
+    assert events == [
+        "finalization.started",
+        "finalization.repair_started",
+        "finalization.completed",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_finalizer_fails_after_bounded_repair(monkeypatch) -> None:
+    invalid = "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 99 orders."
+    client = FakeFinalAnswerClient([invalid, invalid])
+    events: list[str] = []
+
+    async def fake_event(job_id, event_type, payload, level="info"):
+        del job_id, payload, level
+        events.append(event_type)
+
+    async def fake_cancellable(job_id, awaitable, timeout_seconds):
+        del job_id, timeout_seconds
+        return await awaitable
+
+    async def fake_start(job_id, model):
+        del job_id, model
+        return uuid.uuid4()
+
+    async def fake_finish(execution_id, *, status, **kwargs):
+        del execution_id, status, kwargs
+
+    monkeypatch.setattr(final_answer_module, "append_agent_event", fake_event)
+    monkeypatch.setattr(final_answer_module, "run_cancellable", fake_cancellable)
+    monkeypatch.setattr(FinalAnswerRuntime, "_start_execution", staticmethod(fake_start))
+    monkeypatch.setattr(FinalAnswerRuntime, "_finish_execution", staticmethod(fake_finish))
+
+    runtime = FinalAnswerRuntime(
+        settings=Settings(final_answer_max_repairs=1),
+        client_factory=lambda _model, _timeout: client,
+    )
+    model = ModelRuntimeConfiguration(
+        profile_id="11111111-1111-4111-8111-111111111111",
+        model_name="writer",
+        base_url="http://model.invalid/v1",
+        api_key=None,
+        settings={},
+    )
+
+    with pytest.raises(FinalAnswerError, match="validated safely") as caught:
+        await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
+
+    assert caught.value.code == "FINAL_ANSWER_INVALID"
+    assert len(client.calls) == 2
+    assert events[-1] == "finalization.invalid"
+
+
+@pytest.mark.asyncio
+async def test_finalizer_propagates_cancellation_without_repair(monkeypatch) -> None:
+    client = FakeFinalAnswerClient([])
+    finishes: list[tuple[str, str | None]] = []
+
+    async def fake_event(job_id, event_type, payload, level="info"):
+        del job_id, event_type, payload, level
+
+    async def fake_cancellable(job_id, awaitable, timeout_seconds):
+        del job_id, timeout_seconds
+        awaitable.close()
+        raise AgentCancelledError
+
+    async def fake_start(job_id, model):
+        del job_id, model
+        return uuid.uuid4()
+
+    async def fake_finish(execution_id, *, status, error_code=None, **kwargs):
+        del execution_id, kwargs
+        finishes.append((status, error_code))
+
+    monkeypatch.setattr(final_answer_module, "append_agent_event", fake_event)
+    monkeypatch.setattr(final_answer_module, "run_cancellable", fake_cancellable)
+    monkeypatch.setattr(FinalAnswerRuntime, "_start_execution", staticmethod(fake_start))
+    monkeypatch.setattr(FinalAnswerRuntime, "_finish_execution", staticmethod(fake_finish))
+
+    runtime = FinalAnswerRuntime(
+        settings=Settings(),
+        client_factory=lambda _model, _timeout: client,
+    )
+    model = ModelRuntimeConfiguration(
+        profile_id="11111111-1111-4111-8111-111111111111",
+        model_name="writer",
+        base_url="http://model.invalid/v1",
+        api_key=None,
+        settings={},
+    )
+
+    with pytest.raises(AgentCancelledError):
+        await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
+
+    assert finishes == [("failed", "JOB_CANCELLED")]

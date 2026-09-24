@@ -2,19 +2,66 @@ from __future__ import annotations
 
 import uuid
 
-from app.agent.deep_agent import DeepAgentDependencyError, DeepAgentRuntime
+from app.agent.artifact_directives import replace_artifact_directives
+from app.agent.deep_agent import AnalysisRunResult, DeepAgentDependencyError, DeepAgentRuntime
+from app.agent.evidence import (
+    EvidenceBundle,
+    build_evidence_correction,
+    collect_evidence,
+    validate_evidence,
+)
+from app.agent.final_answer import FinalAnswerError, FinalAnswerRuntime
 from app.agent.models import JobArtifact
 from app.agent.repository import AgentExecutionRepository
-from app.agent.tools import AgentCancelledError, AgentLimitError, AgentToolContext
+from app.agent.tools import (
+    AgentCancelledError,
+    AgentLimitError,
+    AgentToolContext,
+    is_cancel_requested,
+)
 from app.conversations.models import Message
 from app.conversations.repository import ConversationRepository
 from app.core.config import get_settings
 from app.core.database import get_session_factory
+from app.core.errors import AppError
 from app.core.time import utc_now
 from app.jobs.handlers import JobHandlerRegistry
 from app.jobs.repository import JobRepository
 from app.jobs.worker import JobFailureError
 from app.models.service import ModelConfigurationService
+
+
+async def _model_history(
+    messages: list[Message], execution_repo: AgentExecutionRepository
+) -> list[object]:
+    history: list[object] = []
+    for item in messages:
+        content = item.content
+        if item.role == "assistant" and item.job_id is not None and "[[artifact:" in content:
+            artifacts = await execution_repo.list_artifacts(item.job_id)
+            labels = {
+                str(artifact.id): f"{artifact.kind.title()} shown: {artifact.name or 'Output'}"
+                for artifact in artifacts
+                if artifact.kind != "text"
+            }
+            content = replace_artifact_directives(content, labels, prefix="")
+        history.append({"role": item.role, "content": content})
+    return history
+
+
+async def _load_evidence(
+    *,
+    job_id: uuid.UUID,
+    question: str,
+    analysis: AnalysisRunResult,
+) -> EvidenceBundle:
+    async with get_session_factory()() as session:
+        return await collect_evidence(
+            session,
+            job_id=job_id,
+            question=question,
+            analyst_notes=analysis.notes,
+        )
 
 
 async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
@@ -31,7 +78,28 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             conversation_id = uuid.UUID(str(raw_conversation_id))
             profile_id = uuid.UUID(str(raw_profile_id))
         except (TypeError, ValueError, AttributeError) as exc:
-            raise JobFailureError("JOB_INPUT_INVALID", "The analytical job input is invalid.") from exc
+            raise JobFailureError(
+                "JOB_INPUT_INVALID", "The analytical job input is invalid."
+            ) from exc
+
+        raw_finalizer_id = settings.final_answer_model_profile_id
+        if raw_finalizer_id is None:
+            raise JobFailureError(
+                "FINAL_ANSWER_MODEL_REQUIRED",
+                "A separate final-answer model profile must be configured.",
+            )
+        try:
+            finalizer_profile_id = uuid.UUID(raw_finalizer_id)
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise JobFailureError(
+                "FINAL_ANSWER_MODEL_INVALID",
+                "The final-answer model profile configuration is invalid.",
+            ) from exc
+        if finalizer_profile_id == profile_id:
+            raise JobFailureError(
+                "FINAL_ANSWER_MODEL_INVALID",
+                "The final-answer model profile must differ from the analysis model profile.",
+            )
 
         convo_repo = ConversationRepository(session)
         conversation = await convo_repo.get_for_org(conversation_id, job.organization_id)
@@ -39,17 +107,40 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             raise JobFailureError("CONVERSATION_NOT_FOUND", "Conversation not found.")
         source_ids = await convo_repo.source_ids(conversation.id)
         if not source_ids:
-            raise JobFailureError("CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource.")
+            raise JobFailureError(
+                "CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource."
+            )
         messages = await convo_repo.recent_messages(
             conversation.id, settings.agent_max_history_messages
         )
-        history = [{"role": item.role, "content": item.content} for item in messages]
-        runtime_model = await ModelConfigurationService(
-            session, settings
-        ).get_runtime_configuration(
-            profile_id=profile_id,
-            organization_id=job.organization_id,
-        )
+        question = next(
+            (item.content for item in reversed(messages) if item.role == "user"),
+            "",
+        ).strip()
+        if not question:
+            raise JobFailureError("JOB_INPUT_INVALID", "The analytical question is unavailable.")
+        history = await _model_history(messages, AgentExecutionRepository(session))
+        model_service = ModelConfigurationService(session, settings)
+        try:
+            runtime_model = await model_service.get_runtime_configuration(
+                profile_id=profile_id,
+                organization_id=job.organization_id,
+            )
+        except AppError as exc:
+            raise JobFailureError(
+                exc.code,
+                "The selected analysis model profile is unavailable or disabled.",
+            ) from exc
+        try:
+            finalizer_model = await model_service.get_runtime_configuration(
+                profile_id=finalizer_profile_id,
+                organization_id=job.organization_id,
+            )
+        except AppError as exc:
+            raise JobFailureError(
+                "FINAL_ANSWER_MODEL_INVALID",
+                "The final-answer model profile is unavailable or disabled for this workspace.",
+            ) from exc
         organization_id = job.organization_id
 
     context = AgentToolContext(
@@ -60,14 +151,54 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         settings=settings,
     )
     try:
-        answer = await DeepAgentRuntime().run(
+        analysis_runtime = DeepAgentRuntime()
+        analysis = await analysis_runtime.run(
             context=context,
             model=runtime_model,
             history=history,
         )
+        evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
+        evidence_issues = validate_evidence(evidence)
+
+        retries = 0
+        while evidence_issues and retries < settings.analysis_evidence_retries:
+            retries += 1
+            correction = build_evidence_correction(evidence_issues)
+            analysis = await analysis_runtime.run(
+                context=context,
+                model=runtime_model,
+                history=[*analysis.messages, {"role": "user", "content": correction}],
+            )
+            evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
+            evidence_issues = validate_evidence(evidence)
+
+        if evidence_issues:
+            artifact_issue = any(issue.startswith("Artifact ") for issue in evidence_issues)
+            raise JobFailureError(
+                "ARTIFACT_REFERENCE_INVALID"
+                if artifact_issue
+                else "ANALYSIS_EVIDENCE_INSUFFICIENT",
+                (
+                    "The generated outputs could not be validated safely."
+                    if artifact_issue
+                    else "The analysis did not produce sufficient verified evidence."
+                ),
+            )
+
+        if await is_cancel_requested(job_id):
+            raise AgentCancelledError
+        answer = await FinalAnswerRuntime(settings=settings).run(
+            job_id=job_id,
+            model=finalizer_model,
+            evidence=evidence,
+        )
+        if await is_cancel_requested(job_id):
+            raise AgentCancelledError
     except AgentCancelledError as exc:
         raise JobFailureError("JOB_CANCELLED", "The analytical job was cancelled.") from exc
     except AgentLimitError as exc:
+        raise JobFailureError(exc.code, exc.public_message) from exc
+    except FinalAnswerError as exc:
         raise JobFailureError(exc.code, exc.public_message) from exc
     except DeepAgentDependencyError as exc:
         raise JobFailureError(
@@ -86,34 +217,40 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
     async with get_session_factory()() as session:
         repo = ConversationRepository(session)
         existing = await repo.message_for_job(job_id, "assistant")
+        metadata: dict[str, object] = {
+            "runtime": "deepagents+finalizer",
+            "analysis_model_profile_id": str(profile_id),
+            "final_answer_model_profile_id": str(finalizer_profile_id),
+        }
         if existing is None:
             message = Message(
                 conversation_id=conversation_id,
                 role="assistant",
                 content=answer,
                 job_id=job_id,
-                metadata_json={"runtime": "deepagents", "model_profile_id": str(profile_id)},
+                metadata_json=metadata,
                 created_at=utc_now(),
             )
             repo.add_message(message)
         else:
             message = existing
             message.content = answer
-            message.metadata_json = {
-                "runtime": "deepagents",
-                "model_profile_id": str(profile_id),
-            }
+            message.metadata_json = metadata
 
         execution_repo = AgentExecutionRepository(session)
-        text_artifact = JobArtifact(
-            job_id=job_id,
-            kind="text",
-            name="Answer",
-            source_sql_execution_id=None,
-            payload={"schema_version": 1, "markdown": answer},
-            created_at=utc_now(),
-        )
-        execution_repo.add_artifact(text_artifact)
+        text_artifact = await execution_repo.answer_artifact_for_job(job_id)
+        if text_artifact is None:
+            text_artifact = JobArtifact(
+                job_id=job_id,
+                kind="text",
+                name="Answer",
+                source_sql_execution_id=None,
+                payload={"schema_version": 1, "markdown": answer},
+                created_at=utc_now(),
+            )
+            execution_repo.add_artifact(text_artifact)
+        else:
+            text_artifact.payload = {"schema_version": 1, "markdown": answer}
         await session.commit()
         tools = await execution_repo.list_tools(job_id)
         sql = await execution_repo.list_sql(job_id)

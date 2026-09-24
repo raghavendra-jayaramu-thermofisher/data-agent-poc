@@ -16,6 +16,10 @@ x-backend-service: &backend-service
     DATA_DIRECTORY: "/app/runtime-data"
     CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:9080","http://127.0.0.1:9080"]}'
     PASSWORD_RESET_URL_BASE: "${PASSWORD_RESET_URL_BASE:-http://localhost:9080/reset-password}"
+    FINAL_ANSWER_MODEL_PROFILE_ID: "${FINAL_ANSWER_MODEL_PROFILE_ID:-}"
+    FINAL_ANSWER_TIMEOUT_SECONDS: "${FINAL_ANSWER_TIMEOUT_SECONDS:-60}"
+    FINAL_ANSWER_MAX_REPAIRS: "${FINAL_ANSWER_MAX_REPAIRS:-1}"
+    ANALYSIS_EVIDENCE_RETRIES: "${ANALYSIS_EVIDENCE_RETRIES:-2}"
   volumes:
     - application-data:/app/runtime-data
 

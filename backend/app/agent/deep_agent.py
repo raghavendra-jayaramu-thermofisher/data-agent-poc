@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
+from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from app.agent.models import ModelExecution, ToolExecution
+from app.agent.models import ModelExecution
 from app.agent.repository import AgentExecutionRepository
 from app.agent.tools import (
-    AgentCancelledError,
     AgentLimitError,
     AgentToolContext,
     AgentToolDefinition,
@@ -22,7 +22,6 @@ from app.agent.tools import (
 from app.core.database import get_session_factory
 from app.core.time import utc_now
 from app.models.client import ModelRuntimeConfiguration
-
 
 SYSTEM_PROMPT = """You are Data Agent, a senior analytical engineer and database analyst working over authorized business databases.
 
@@ -342,6 +341,39 @@ Correctness → relevance → clarity → appropriate depth → supporting evide
 Answer the question the user actually asked, with no more and no less detail than is useful for that request.
 """
 
+ANALYST_HANDOFF_PROMPT = """
+
+# Internal Analysis Handoff
+
+Your final message is private analyst material for a separate final-answer model. It is not shown
+to the user. Finish with concise Markdown using exactly these headings:
+
+## Analytical objective
+
+State the analytical purpose you established from the request.
+
+## Interpretation decisions
+
+Record only decisions that materially affect the result, such as population, grain, time range,
+filters, null handling, units, or how a follow-up uses prior context. Write `None.` when there are
+no material interpretation decisions.
+
+## Verified findings
+
+Record only findings supported by successful SQL executions from this job. Do not infer totals,
+percentages, rankings, distributions, primary reasons, or all/none claims from a truncated preview.
+
+## Unavailable information
+
+State exactly which requested information cannot be established and why. Write `None.` when all
+requested information is answerable.
+
+## Presentation guidance
+
+Briefly identify which artifacts created in this job are useful to the final answer. Do not invent
+artifact identifiers or copy visible tables into Markdown.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class ToolBinding:
@@ -357,6 +389,12 @@ class AgentAuditContext:
     model_profile_id: uuid.UUID
     model_name: str
     product_tool_names: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisRunResult:
+    notes: str
+    messages: list[object]
 
 
 class DeepAgentRunnable(Protocol):
@@ -418,9 +456,7 @@ class ProductionDeepAgentFactory:
         )
 
 
-def _build_chat_model(
-    model: ModelRuntimeConfiguration, timeout_seconds: float
-) -> Any:
+def _build_chat_model(model: ModelRuntimeConfiguration, timeout_seconds: float) -> Any:
     try:
         from langchain_openai import ChatOpenAI
     except ImportError as exc:
@@ -470,8 +506,8 @@ class DeepAgentRuntime:
         *,
         context: AgentToolContext,
         model: ModelRuntimeConfiguration,
-        history: list[dict[str, str]],
-    ) -> str:
+        history: list[object],
+    ) -> AnalysisRunResult:
         executor = self.tool_executor_factory(context, self.registry)
         bindings = [self._binding(definition, executor) for definition in self.registry.all()]
         authorized = "\n".join(
@@ -479,6 +515,7 @@ class DeepAgentRuntime:
         )
         runtime_prompt = (
             SYSTEM_PROMPT
+            + ANALYST_HANDOFF_PROMPT
             + "\n\nAuthorized datasource IDs for this conversation:\n"
             + authorized
             + "\nUse only these IDs when calling datasource tools."
@@ -523,13 +560,19 @@ class DeepAgentRuntime:
             raise AgentLimitError(
                 "AGENT_JOB_TIMEOUT", "The analytical job exceeded its maximum duration."
             ) from exc
-        answer = extract_final_answer(raw)
-        if not answer:
+        finally:
+            if audit is not None:
+                flush = getattr(audit, "flush", None)
+                if callable(flush):
+                    await flush()
+        notes = extract_final_answer(raw)
+        messages = extract_state_messages(raw)
+        if not notes:
             raise AgentLimitError(
-                "AGENT_EMPTY_RESPONSE", "The analytical agent did not produce a final answer."
+                "AGENT_EMPTY_RESPONSE", "The analytical agent did not produce analysis notes."
             )
-        await append_agent_event(context.job_id, "answer.generated", {})
-        return answer
+        await append_agent_event(context.job_id, "analysis.completed", {})
+        return AnalysisRunResult(notes=notes, messages=messages)
 
     @staticmethod
     def _binding(definition: AgentToolDefinition, executor: ToolExecutor) -> ToolBinding:
@@ -553,11 +596,22 @@ def extract_final_answer(state: object) -> str:
     for message in reversed(messages):
         if not _is_assistant_message(message):
             continue
-        content = message.get("content") if isinstance(message, dict) else getattr(message, "content", None)
+        content = (
+            message.get("content")
+            if isinstance(message, dict)
+            else getattr(message, "content", None)
+        )
         text = _content_text(content)
         if text.strip():
             return text.strip()
     return ""
+
+
+def extract_state_messages(state: object) -> list[object]:
+    if not isinstance(state, dict):
+        return []
+    messages = state.get("messages")
+    return list(messages) if isinstance(messages, list) else []
 
 
 def _is_assistant_message(message: object) -> bool:
@@ -630,7 +684,21 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
         def __init__(self, audit_context: AgentAuditContext) -> None:
             super().__init__()
             self.audit_context = audit_context
+            self._loop = asyncio.get_running_loop()
             self._started_at: dict[str, Any] = {}
+            self._pending_records: list[Future[None]] = []
+            self._record_lock = asyncio.Lock()
+
+        def _schedule(self, coroutine: Coroutine[Any, Any, None]) -> None:
+            self._pending_records.append(
+                asyncio.run_coroutine_threadsafe(coroutine, self._loop)
+            )
+
+        async def flush(self) -> None:
+            pending = self._pending_records
+            self._pending_records = []
+            if pending:
+                await asyncio.gather(*(asyncio.wrap_future(item) for item in pending))
 
         def on_llm_start(
             self,
@@ -651,32 +719,29 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
         ) -> None:
             started = self._started_at.pop(str(run_id), utc_now())
             finished = utc_now()
-            duration_ms = max(0, int((finished - started).total_seconds() * 1000))
             input_tokens, output_tokens, total_tokens = extract_usage(response)
 
             async def _record() -> None:
-                async with get_session_factory()() as session:
-                    repo = AgentExecutionRepository(session)
-                    model_exec = ModelExecution(
-                        job_id=self.audit_context.job_id,
-                        model_profile_id=self.audit_context.model_profile_id,
-                        model_name=self.audit_context.model_name,
-                        status="succeeded",
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                        total_tokens=total_tokens,
-                        duration_ms=duration_ms,
-                        started_at=started,
-                        finished_at=finished,
-                    )
-                    repo.add_model(model_exec)
-                    await session.commit()
+                async with self._record_lock:
+                    async with get_session_factory()() as session:
+                        repo = AgentExecutionRepository(session)
+                        model_exec = ModelExecution(
+                            job_id=self.audit_context.job_id,
+                            sequence=await repo.next_model_sequence(self.audit_context.job_id),
+                            model_profile_id=self.audit_context.model_profile_id,
+                            model_name=self.audit_context.model_name,
+                            phase="analysis",
+                            status="succeeded",
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            total_tokens=total_tokens,
+                            started_at=started,
+                            finished_at=finished,
+                        )
+                        repo.add_model(model_exec)
+                        await session.commit()
 
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(_record())
-            except RuntimeError:
-                pass
+            self._schedule(_record())
 
         def on_llm_error(
             self,
@@ -687,27 +752,24 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
         ) -> None:
             started = self._started_at.pop(str(run_id), utc_now())
             finished = utc_now()
-            duration_ms = max(0, int((finished - started).total_seconds() * 1000))
 
             async def _record_err() -> None:
-                async with get_session_factory()() as session:
-                    repo = AgentExecutionRepository(session)
-                    model_exec = ModelExecution(
-                        job_id=self.audit_context.job_id,
-                        model_profile_id=self.audit_context.model_profile_id,
-                        model_name=self.audit_context.model_name,
-                        status="failed",
-                        duration_ms=duration_ms,
-                        started_at=started,
-                        finished_at=finished,
-                    )
-                    repo.add_model(model_exec)
-                    await session.commit()
+                async with self._record_lock:
+                    async with get_session_factory()() as session:
+                        repo = AgentExecutionRepository(session)
+                        model_exec = ModelExecution(
+                            job_id=self.audit_context.job_id,
+                            sequence=await repo.next_model_sequence(self.audit_context.job_id),
+                            model_profile_id=self.audit_context.model_profile_id,
+                            model_name=self.audit_context.model_name,
+                            phase="analysis",
+                            status="failed",
+                            started_at=started,
+                            finished_at=finished,
+                        )
+                        repo.add_model(model_exec)
+                        await session.commit()
 
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(_record_err())
-            except RuntimeError:
-                pass
+            self._schedule(_record_err())
 
     return ModelAuditCallback(context)
