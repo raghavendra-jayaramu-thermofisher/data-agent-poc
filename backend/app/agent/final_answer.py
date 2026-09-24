@@ -50,9 +50,11 @@ useful positions by placing each selected directive on its own line:
 
 [[artifact:UUID]]
 
-Copy the UUID exactly from the manifest. Do not add an artifact type or URL to the directive. You
-do not need to use every artifact. Do not use raw HTML, fabricate artifact IDs, duplicate artifact
-contents as Markdown tables, or add business numbers that are absent from the verified evidence.
+Copy an entire `ARTIFACT DIRECTIVE` line exactly from the manifest. No other identifier in the
+context is an artifact ID. If the manifest says there are no displayable artifacts, do not emit an
+artifact directive or promise that an output appears below. You do not need to use every artifact.
+Do not use raw HTML, fabricate artifact IDs, duplicate artifact contents as Markdown tables, or add
+business numbers that are absent from the verified evidence.
 """
 
 

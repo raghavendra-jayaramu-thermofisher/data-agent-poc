@@ -1,6 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { BookmarkPlus, Code2, ChevronDown, ChevronUp, Copy, Check, Maximize2, Table as TableIcon } from 'lucide-react';
+import {
+  BookmarkPlus,
+  Code2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+  Maximize2,
+  Table as TableIcon,
+} from 'lucide-react';
 import type { JobArtifact, SqlExecution } from '../api/execution-api';
 import { AnalyticalTable } from '../../analytics/table/AnalyticalTable';
 import { toTsv, type AnalyticalTableModel } from '../../analytics/table/table-domain';
@@ -27,7 +36,11 @@ function SaveEntryPoint({
 }) {
   const navigate = useNavigate();
   if (!sqlExecutionId) return null;
-  const params = new URLSearchParams({ sourceJobId: jobId, sourceSqlExecutionId: sqlExecutionId, artifactId });
+  const params = new URLSearchParams({
+    sourceJobId: jobId,
+    sourceSqlExecutionId: sqlExecutionId,
+    artifactId,
+  });
   return (
     <button
       type="button"
@@ -75,7 +88,10 @@ function ArtifactSource({
         </button>
       </div>
       {sqlVisible ? (
-        <pre className="mt-2 p-2 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed" aria-label="SQL query">
+        <pre
+          className="mt-2 p-2 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed"
+          aria-label="SQL query"
+        >
           {sql.sql_text}
         </pre>
       ) : null}
@@ -102,7 +118,9 @@ function CollapsibleTableArtifact({
   const [copied, setCopied] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [sqlVisible, setSqlVisible] = useState(false);
-  const sourceName = sourceSql ? (dataSourceNames[sourceSql.data_source_id] ?? 'Data source') : null;
+  const sourceName = sourceSql
+    ? (dataSourceNames[sourceSql.data_source_id] ?? 'Data source')
+    : null;
 
   async function handleCopy(e: React.MouseEvent) {
     e.stopPropagation();
@@ -208,7 +226,10 @@ function CollapsibleTableArtifact({
           </div>
 
           {sqlVisible && sourceSql ? (
-            <pre className="p-3 bg-[#F0EEE9] border-t border-[#DAD5CD] text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed" aria-label="SQL query">
+            <pre
+              className="p-3 bg-[#F0EEE9] border-t border-[#DAD5CD] text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed"
+              aria-label="SQL query"
+            >
               {sourceSql.sql_text}
             </pre>
           ) : null}
@@ -230,6 +251,7 @@ export function ArtifactRenderer({
   sql,
   dataSourceNames = {},
   excludeTextMarkdown,
+  renderReferencedHiddenTables = false,
   onFollowUp,
 }: {
   jobId: string;
@@ -237,6 +259,7 @@ export function ArtifactRenderer({
   sql: SqlExecution[];
   dataSourceNames?: Record<string, string>;
   excludeTextMarkdown?: string;
+  renderReferencedHiddenTables?: boolean;
   onFollowUp?(question: string): Promise<void> | void;
 }) {
   const sqlById = new Map(sql.map((item) => [item.id, item]));
@@ -244,25 +267,33 @@ export function ArtifactRenderer({
   const chartArtifacts = artifacts.filter((artifact) => artifact.kind === 'chart');
   const normalizedCharts = chartArtifacts
     .map((artifact) => {
-      const source = artifact.source_sql_execution_id ? sqlById.get(artifact.source_sql_execution_id) : undefined;
+      const source = artifact.source_sql_execution_id
+        ? sqlById.get(artifact.source_sql_execution_id)
+        : undefined;
       return normalizeChartArtifact(
         artifact,
         source,
-        source ? (dataSourceNames[source.data_source_id] ?? 'Data source') : 'Data source'
+        source ? (dataSourceNames[source.data_source_id] ?? 'Data source') : 'Data source',
       );
     })
     .filter((item): item is NormalizedChartModel => item != null);
   const charts = combineCompatibleCharts(normalizedCharts);
   const validChartIds = new Set(
-    normalizedCharts.flatMap((model) => model.provenance.map((item) => item.artifactId).filter((id): id is string => Boolean(id)))
+    normalizedCharts.flatMap((model) =>
+      model.provenance.map((item) => item.artifactId).filter((id): id is string => Boolean(id)),
+    ),
   );
   const invalidCharts = chartArtifacts.filter((item) => !validChartIds.has(item.id));
   const tables = artifacts
     .map((artifact) => ({ artifact, model: parseTableArtifact(artifact) }))
-    .filter((item): item is { artifact: JobArtifact; model: AnalyticalTableModel } => item.model != null);
+    .filter(
+      (item): item is { artifact: JobArtifact; model: AnalyticalTableModel } => item.model != null,
+    );
   const texts = artifacts
     .map((artifact) => ({ artifact, model: parseTextArtifact(artifact) }))
-    .filter((item) => item.model != null && item.model.markdown.trim() !== excludeTextMarkdown?.trim());
+    .filter(
+      (item) => item.model != null && item.model.markdown.trim() !== excludeTextMarkdown?.trim(),
+    );
   const htmlArtifacts = artifacts
     .map((artifact) => ({ artifact, model: parseHtmlArtifact(artifact) }))
     .filter((item) => item.model != null);
@@ -281,7 +312,7 @@ export function ArtifactRenderer({
   const hasCharts = charts.length > 0;
   // Filter out tables marked 'hidden' or 0-row exploratory retries when other successful data exists
   const visibleTables = tables.filter(({ model }) => {
-    if (model.display === 'hidden') return false;
+    if (model.display === 'hidden' && !renderReferencedHiddenTables) return false;
     if (
       model.display === 'auto' &&
       model.rowCount === 0 &&
@@ -295,8 +326,12 @@ export function ArtifactRenderer({
   const entries: Array<{ order: number; key: string; node: ReactNode }> = [];
   for (const chart of charts) {
     const sourceSql = chartSql(chart, sqlById);
-    const sourceIds = chart.provenance.map((item) => item.artifactId).filter((id): id is string => Boolean(id));
-    const order = Math.min(...sourceIds.map((id) => artifactOrder.get(id) ?? Number.MAX_SAFE_INTEGER));
+    const sourceIds = chart.provenance
+      .map((item) => item.artifactId)
+      .filter((id): id is string => Boolean(id));
+    const order = Math.min(
+      ...sourceIds.map((id) => artifactOrder.get(id) ?? Number.MAX_SAFE_INTEGER),
+    );
     entries.push({
       order,
       key: `chart-${chart.id}`,
@@ -327,7 +362,9 @@ export function ArtifactRenderer({
   }
 
   for (const [i, { artifact, model }] of visibleTables.entries()) {
-    const sourceSql = artifact.source_sql_execution_id ? sqlById.get(artifact.source_sql_execution_id) : undefined;
+    const sourceSql = artifact.source_sql_execution_id
+      ? sqlById.get(artifact.source_sql_execution_id)
+      : undefined;
     const isLastTable = i === visibleTables.length - 1;
 
     let defaultOpen: boolean;
@@ -362,7 +399,9 @@ export function ArtifactRenderer({
       key: `text-${artifact.id}`,
       node: (
         <section className="artifact-text mb-4">
-          <h4 className="font-semibold text-xs text-[#252127] mb-2">{artifact.name || 'Text output'}</h4>
+          <h4 className="font-semibold text-xs text-[#252127] mb-2">
+            {artifact.name || 'Text output'}
+          </h4>
           <AssistantMarkdown content={model!.markdown} />
         </section>
       ),
@@ -376,15 +415,21 @@ export function ArtifactRenderer({
     });
   }
   if (invalidCharts.length) {
-    const order = Math.min(...invalidCharts.map((artifact) => artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER));
+    const order = Math.min(
+      ...invalidCharts.map((artifact) => artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER),
+    );
     entries.push({
       order,
       key: 'invalid-charts',
       node: (
-        <div className="p-3 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545] mb-2" role="status">
+        <div
+          className="p-3 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545] mb-2"
+          role="status"
+        >
           <strong>Chart unavailable</strong>
           <p className="mt-1 text-[#625C64]">
-            {invalidCharts.length} chart artifact{invalidCharts.length === 1 ? '' : 's'} could not be rendered because its field encoding or data is invalid.
+            {invalidCharts.length} chart artifact{invalidCharts.length === 1 ? '' : 's'} could not
+            be rendered because its field encoding or data is invalid.
           </p>
         </div>
       ),
@@ -395,7 +440,10 @@ export function ArtifactRenderer({
       order: artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER,
       key: `unsupported-${artifact.id}`,
       node: (
-        <div className="p-3 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-xs text-[#625C64] mb-2" role="status">
+        <div
+          className="p-3 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-xs text-[#625C64] mb-2"
+          role="status"
+        >
           <strong>Unsupported artifact</strong>
           <p className="mt-1">{artifact.kind || 'Unknown'} output cannot be displayed safely.</p>
         </div>
@@ -415,4 +463,3 @@ export function ArtifactRenderer({
     </div>
   );
 }
-

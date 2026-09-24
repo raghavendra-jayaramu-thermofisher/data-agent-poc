@@ -12,6 +12,7 @@ from app.agent.evidence import (
     SQLResultEvidence,
     is_aggregate_sql,
     mark_visible_artifacts,
+    render_evidence_context,
     validate_evidence,
 )
 from app.agent.final_answer import FinalAnswerError, FinalAnswerRuntime
@@ -159,6 +160,30 @@ def test_duplicate_table_artifacts_are_rendered_once_even_with_different_sql_ids
 
     assert marked[0].visible
     assert not marked[1].visible
+
+
+def test_large_hidden_table_is_available_when_no_other_output_can_show_the_detail() -> None:
+    hidden_table = ArtifactEvidence(
+        artifact_id=uuid.uuid4(),
+        kind="table",
+        title="Detailed orders",
+        source_sql_execution_id=DETAIL_ID,
+        payload={"display": "hidden", "row_count": 407},
+        valid=True,
+    )
+
+    marked = mark_visible_artifacts([hidden_table])
+
+    assert marked[0].visible
+
+
+def test_finalizer_context_exposes_only_copy_ready_artifact_directives() -> None:
+    evidence = bundle()
+    context = render_evidence_context(evidence)
+
+    assert f"ARTIFACT DIRECTIVE: [[artifact:{ARTIFACT_ID}]]" in context
+    assert str(AGGREGATE_ID) not in context
+    assert str(SOURCE_ID) not in context
 
 
 def test_final_answer_contract_accepts_grounded_markdown_and_artifact() -> None:

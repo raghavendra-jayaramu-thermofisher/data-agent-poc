@@ -69,6 +69,7 @@ export function AssistantResponseRenderer({
             artifacts={[artifact]}
             sql={sql}
             dataSourceNames={dataSourceNames}
+            renderReferencedHiddenTables
             onFollowUp={onFollowUp}
           />
         );

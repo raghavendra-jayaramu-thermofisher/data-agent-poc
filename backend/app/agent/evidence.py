@@ -287,6 +287,26 @@ def mark_visible_artifacts(
                     seen_renderables.add(signature)
                     visible = True
         visible_artifacts.append(replace(artifact_evidence, visible=visible))
+
+    # A large stored detail result cannot be represented faithfully in the bounded finalizer
+    # context. If analysis hid every output, expose the largest such table as an explicit inline
+    # candidate rather than encouraging the writer to invent a directive from an execution ID.
+    if not any(item.visible for item in visible_artifacts):
+        large_hidden_tables = [
+            (index, item)
+            for index, item in enumerate(visible_artifacts)
+            if item.kind == "table"
+            and item.valid
+            and item.payload.get("display") == "hidden"
+            and isinstance(item.payload.get("row_count"), int)
+            and int(item.payload["row_count"]) > 50
+        ]
+        if large_hidden_tables:
+            index, _ = max(
+                large_hidden_tables,
+                key=lambda pair: int(pair[1].payload["row_count"]),
+            )
+            visible_artifacts[index] = replace(visible_artifacts[index], visible=True)
     return tuple(visible_artifacts)
 
 
@@ -368,8 +388,6 @@ def render_evidence_context(bundle: EvidenceBundle) -> str:
     for sql_result in bundle.sql_results:
         lines = [
             f"SQL EVIDENCE: {sql_result.title}",
-            f"Execution ID: {sql_result.execution_id}",
-            f"Datasource ID: {sql_result.data_source_id}",
             f"Evidence kind: {'aggregate' if sql_result.is_aggregate else 'detail'}",
             f"Stored rows: {sql_result.stored_row_count}",
             f"Model preview rows: {sql_result.preview_row_count}",
@@ -395,20 +413,21 @@ def render_evidence_context(bundle: EvidenceBundle) -> str:
         artifact_blocks.append(
             "\n".join(
                 [
-                    "ARTIFACT",
-                    f"ID: {artifact.artifact_id}",
+                    "DISPLAYABLE ARTIFACT",
+                    f"ARTIFACT DIRECTIVE: [[artifact:{artifact.artifact_id}]]",
                     f"Type: {artifact.kind}",
                     f"Title: {artifact.title}",
-                    "Source SQL: "
-                    + (
-                        str(artifact.source_sql_execution_id)
-                        if artifact.source_sql_execution_id
-                        else "None"
-                    ),
                 ]
             )
         )
-    sections.append("AVAILABLE ARTIFACT MANIFEST\n" + ("\n\n".join(artifact_blocks) or "None."))
+    sections.append(
+        "AVAILABLE ARTIFACT MANIFEST\n"
+        + (
+            "\n\n".join(artifact_blocks)
+            if artifact_blocks
+            else "No displayable artifacts. Do not emit artifact directives."
+        )
+    )
     sections.append(
         "VERIFIED AVAILABILITY STATUS\n"
         + (
