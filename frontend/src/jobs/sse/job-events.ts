@@ -60,6 +60,7 @@ const exactLabels: Record<string, string> = {
   'answer.generated': 'Answer generated',
   'finalization.started': 'Preparing final answer…',
   'finalization.repair_started': 'Refining final answer…',
+  'finalization.quality_warning': 'Answer ready with formatting warnings',
   'finalization.completed': 'Final answer ready',
   'finalization.invalid': 'Final answer validation failed',
   'dashboard.widget.refreshed': 'Dashboard widget refreshed',

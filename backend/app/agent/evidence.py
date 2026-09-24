@@ -265,24 +265,13 @@ def mark_visible_artifacts(
     has_chart = any(item.kind == "chart" and item.valid for item in artifacts)
     has_nonempty_table = any(_is_nonempty_table(item) for item in artifacts)
     visible_artifacts: list[ArtifactEvidence] = []
-    seen_charts: set[str] = set()
+    seen_renderables: set[str] = set()
     for artifact_evidence in artifacts:
         visible = False
         if artifact_evidence.valid and artifact_evidence.kind == "chart":
-            signature = json.dumps(
-                {
-                    "name": artifact_evidence.title,
-                    "source_sql_execution_id": str(
-                        artifact_evidence.source_sql_execution_id or ""
-                    ),
-                    "payload": artifact_evidence.payload,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-                default=str,
-            )
-            if signature not in seen_charts:
-                seen_charts.add(signature)
+            signature = _renderable_signature(artifact_evidence)
+            if signature not in seen_renderables:
+                seen_renderables.add(signature)
                 visible = True
         elif artifact_evidence.valid and artifact_evidence.kind == "html":
             visible = True
@@ -292,9 +281,27 @@ def mark_visible_artifacts(
             exploratory_empty = (
                 display == "auto" and row_count == 0 and (has_chart or has_nonempty_table)
             )
-            visible = display != "hidden" and not exploratory_empty
+            if display != "hidden" and not exploratory_empty:
+                signature = _renderable_signature(artifact_evidence)
+                if signature not in seen_renderables:
+                    seen_renderables.add(signature)
+                    visible = True
         visible_artifacts.append(replace(artifact_evidence, visible=visible))
     return tuple(visible_artifacts)
+
+
+def _renderable_signature(item: ArtifactEvidence) -> str:
+    payload = {
+        key: value
+        for key, value in item.payload.items()
+        if key != "source_sql_execution_id"
+    }
+    return json.dumps(
+        {"kind": item.kind, "title": item.title, "payload": payload},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
 
 
 def _is_nonempty_table(item: ArtifactEvidence) -> bool:

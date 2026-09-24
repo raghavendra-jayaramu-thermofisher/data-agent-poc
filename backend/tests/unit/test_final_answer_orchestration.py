@@ -15,7 +15,7 @@ from app.agent.evidence import (
     validate_evidence,
 )
 from app.agent.final_answer import FinalAnswerError, FinalAnswerRuntime
-from app.agent.final_answer_validation import validate_final_answer
+from app.agent.final_answer_validation import normalize_final_answer, validate_final_answer
 from app.agent.tools import AgentCancelledError
 from app.core.config import Settings
 from app.models.client import ModelCompletion, ModelMessage, ModelRuntimeConfiguration, ModelUsage
@@ -130,6 +130,37 @@ def test_duplicate_chart_artifacts_are_rendered_once() -> None:
     assert not marked[1].visible
 
 
+def test_duplicate_table_artifacts_are_rendered_once_even_with_different_sql_ids() -> None:
+    payload = {
+        "schema_version": 1,
+        "columns": ["order_number"],
+        "rows": [],
+        "row_count": 0,
+        "display": "expanded",
+    }
+    first = ArtifactEvidence(
+        artifact_id=uuid.uuid4(),
+        kind="table",
+        title="Orders requiring action",
+        source_sql_execution_id=uuid.uuid4(),
+        payload=payload,
+        valid=True,
+    )
+    second = ArtifactEvidence(
+        artifact_id=uuid.uuid4(),
+        kind="table",
+        title="Orders requiring action",
+        source_sql_execution_id=uuid.uuid4(),
+        payload=payload,
+        valid=True,
+    )
+
+    marked = mark_visible_artifacts([first, second])
+
+    assert marked[0].visible
+    assert not marked[1].visible
+
+
 def test_final_answer_contract_accepts_grounded_markdown_and_artifact() -> None:
     markdown = f"""### Objective
 
@@ -219,6 +250,11 @@ The requested reason cannot be established from the available data.
     assert any("must be omitted" in error for error in validate_final_answer(markdown, bundle()))
 
 
+def test_normalizer_unwraps_an_outer_markdown_fence() -> None:
+    markdown = "```markdown\n### Answer\n\nThe result is available.\n```"
+    assert normalize_final_answer(markdown) == "### Answer\n\nThe result is available."
+
+
 def test_history_directives_become_descriptive_labels() -> None:
     markdown = f"Before\n\n[[artifact:{ARTIFACT_ID}]]\n\nAfter"
     normalized = replace_artifact_directives(
@@ -255,23 +291,13 @@ class FakeFinalAnswerClient:
 
 
 @pytest.mark.asyncio
-async def test_finalizer_repairs_invalid_markdown_once(monkeypatch) -> None:
-    invalid = "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 12 open orders."
-    valid = f"""### Objective
-
-Quantify orders by current status and present the supported distribution visually.
-
-### What I understood
-
-Orders are counted at the order level using current status.
-
-### Answer
-
-There are 12 open orders and 3 held orders.
-
-[[artifact:{ARTIFACT_ID}]]
-"""
-    client = FakeFinalAnswerClient([invalid, valid])
+async def test_finalizer_returns_imperfect_markdown_with_quality_warning(monkeypatch) -> None:
+    unknown_id = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+    invalid = (
+        "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 12 open orders.\n\n"
+        f"[[artifact:{unknown_id}]]"
+    )
+    client = FakeFinalAnswerClient([invalid])
     events: list[str] = []
     finishes: list[str] = []
 
@@ -297,7 +323,7 @@ There are 12 open orders and 3 held orders.
     monkeypatch.setattr(FinalAnswerRuntime, "_finish_execution", staticmethod(fake_finish))
 
     runtime = FinalAnswerRuntime(
-        settings=Settings(final_answer_max_repairs=1),
+        settings=Settings(),
         client_factory=lambda _model, _timeout: client,
     )
     model = ModelRuntimeConfiguration(
@@ -309,20 +335,19 @@ There are 12 open orders and 3 held orders.
     )
     answer = await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
 
-    assert answer == valid.strip()
-    assert len(client.calls) == 2
-    assert finishes == ["succeeded", "succeeded"]
+    assert answer == invalid
+    assert len(client.calls) == 1
+    assert finishes == ["succeeded"]
     assert events == [
         "finalization.started",
-        "finalization.repair_started",
+        "finalization.quality_warning",
         "finalization.completed",
     ]
 
 
 @pytest.mark.asyncio
-async def test_finalizer_fails_after_bounded_repair(monkeypatch) -> None:
-    invalid = "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 99 orders."
-    client = FakeFinalAnswerClient([invalid, invalid])
+async def test_finalizer_only_fails_when_the_model_returns_no_usable_answer(monkeypatch) -> None:
+    client = FakeFinalAnswerClient([""])
     events: list[str] = []
 
     async def fake_event(job_id, event_type, payload, level="info"):
@@ -346,7 +371,7 @@ async def test_finalizer_fails_after_bounded_repair(monkeypatch) -> None:
     monkeypatch.setattr(FinalAnswerRuntime, "_finish_execution", staticmethod(fake_finish))
 
     runtime = FinalAnswerRuntime(
-        settings=Settings(final_answer_max_repairs=1),
+        settings=Settings(),
         client_factory=lambda _model, _timeout: client,
     )
     model = ModelRuntimeConfiguration(
@@ -357,12 +382,12 @@ async def test_finalizer_fails_after_bounded_repair(monkeypatch) -> None:
         settings={},
     )
 
-    with pytest.raises(FinalAnswerError, match="validated safely") as caught:
+    with pytest.raises(FinalAnswerError, match="empty response") as caught:
         await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
 
     assert caught.value.code == "FINAL_ANSWER_INVALID"
-    assert len(client.calls) == 2
-    assert events[-1] == "finalization.invalid"
+    assert len(client.calls) == 1
+    assert events == ["finalization.started"]
 
 
 @pytest.mark.asyncio

@@ -17,6 +17,20 @@ UUID_PATTERN = re.compile(
 )
 NUMBER_PATTERN = re.compile(r"(?<![\w])[-+]?\d[\d,]*(?:\.\d+)?%?")
 RAW_HTML_PATTERN = re.compile(r"<\s*/?\s*[A-Za-z][^>]*>")
+OUTER_FENCE_PATTERN = re.compile(
+    r"\A\s*```(?:markdown|md)?[ \t]*\r?\n(?P<body>.*)\r?\n```\s*\Z",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def normalize_final_answer(markdown: str) -> str:
+    """Apply deterministic presentation cleanup without changing answer content."""
+
+    stripped = markdown.strip()
+    match = OUTER_FENCE_PATTERN.fullmatch(stripped)
+    if match is not None:
+        return match.group("body").strip()
+    return stripped
 
 
 def _section(markdown: str, heading: str) -> str:

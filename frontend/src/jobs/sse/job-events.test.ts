@@ -29,6 +29,9 @@ describe('job events', () => {
         payload: { sheet_name: 'Orders', secret: 'never' },
       }),
     ).toBe('Importing Orders…');
-    expect(getSafeJobEventLabel(event(5, 'deepagents.private.reasoning'))).toBeNull();
+    expect(getSafeJobEventLabel(event(5, 'finalization.quality_warning'))).toBe(
+      'Answer ready with formatting warnings',
+    );
+    expect(getSafeJobEventLabel(event(6, 'deepagents.private.reasoning'))).toBeNull();
   });
 });
