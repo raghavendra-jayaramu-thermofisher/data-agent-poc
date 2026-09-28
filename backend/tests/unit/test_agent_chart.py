@@ -74,3 +74,92 @@ def test_chart_schema_requires_correct_mapping_for_type() -> None:
             x_field="month",
             series=[ChartSeriesInput(field="revenue")],
         )
+
+
+def test_cartesian_chart_rejects_reused_series_field() -> None:
+    spec = CreateChartArgs(
+        sql_execution_id=uuid.uuid4(),
+        chart_type="bar",
+        title="Hold breakdown",
+        x_field="customer",
+        series=[
+            ChartSeriesInput(field="amount", label="Credit Hold"),
+            ChartSeriesInput(field="amount", label="Customer Hold"),
+        ],
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(
+            spec,
+            ["customer", "category", "amount"],
+            [["Acme", "Credit Hold", 10], ["Acme", "Customer Hold", 20]],
+        )
+    assert error.value.code == "CHART_SERIES_FIELD_REUSED"
+    assert error.value.retryable is True
+
+
+def test_cartesian_chart_requires_one_row_per_dimension_value() -> None:
+    spec = CreateChartArgs(
+        sql_execution_id=uuid.uuid4(),
+        chart_type="bar",
+        title="Revenue by customer",
+        x_field="customer",
+        series=[ChartSeriesInput(field="revenue")],
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(
+            spec,
+            ["customer", "revenue"],
+            [["Acme", 10], ["Acme", 20]],
+        )
+    assert error.value.code == "CHART_DIMENSION_NOT_UNIQUE"
+    assert error.value.retryable is True
+
+
+def test_pie_chart_requires_one_row_per_category() -> None:
+    spec = CreateChartArgs(
+        sql_execution_id=uuid.uuid4(),
+        chart_type="pie",
+        title="Revenue mix",
+        category_field="segment",
+        value_field="revenue",
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(
+            spec,
+            ["segment", "revenue"],
+            [["Enterprise", 10], ["Enterprise", 20]],
+        )
+    assert error.value.code == "CHART_CATEGORY_NOT_UNIQUE"
+
+
+def test_metric_chart_requires_exactly_one_row() -> None:
+    spec = CreateChartArgs(
+        sql_execution_id=uuid.uuid4(),
+        chart_type="metric",
+        title="Revenue",
+        value_field="revenue",
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(
+            spec,
+            ["revenue"],
+            [[10], [20]],
+        )
+    assert error.value.code == "CHART_METRIC_ROW_COUNT_INVALID"
+
+
+def test_chart_rejects_nonfinite_numeric_values() -> None:
+    spec = CreateChartArgs(
+        sql_execution_id=uuid.uuid4(),
+        chart_type="bar",
+        title="Revenue by month",
+        x_field="month",
+        series=[ChartSeriesInput(field="revenue")],
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(
+            spec,
+            ["month", "revenue"],
+            [["Jan", float("nan")]],
+        )
+    assert error.value.code == "CHART_VALUE_NOT_NUMERIC"

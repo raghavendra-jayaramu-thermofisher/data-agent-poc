@@ -142,6 +142,12 @@ collapse the source table and do not repeat its rows in Markdown.
 
 Before `create_chart`, ensure the SQL result is already at the correct analytical grain.
 
+For `bar`, `line`, and `area` charts, use wide-form chart data: one row per `x_field` value
+and one distinct numeric SQL output column per series. Never reuse one value column with different
+series labels to represent category values. Labels only rename series; they do not filter rows.
+If the SQL result is long-form (for example `dimension`, `category`, `value`), aggregate and pivot
+it in SQL before creating a multi-series chart.
+
 Required chart fields:
 
 * `metric` → `title`, `sql_execution_id`, `value_field`, optional `value_label`
@@ -325,6 +331,10 @@ If a chart fails:
 2. correct or re-aggregate the SQL if needed,
 3. choose appropriate fields/chart type,
 4. retry `create_chart`.
+
+A chart is optional supporting evidence. If a corrected chart still cannot be created, continue
+with the grounded prose and table result. Never fail or withhold the analytical answer solely
+because chart creation failed.
 
 Never generate fake chart URLs, Markdown image charts, or ASCII charts. Use `create_chart`.
 
@@ -515,6 +525,20 @@ class DeepAgentRuntime:
         )
         runtime_prompt = (
             SYSTEM_PROMPT
+            + (
+                f"\n\n# Workspace Default Instructions\n\n{context.default_instructions.strip()}"
+                if context.default_instructions and context.default_instructions.strip()
+                else ""
+            )
+            + (
+                f"\n\n# Command Instructions (/{context.command_name})\n\n{context.command_instructions.strip()}"
+                if context.command_instructions and context.command_name
+                else (
+                    f"\n\n# Specialized Instructions\n\n{context.command_instructions.strip()}"
+                    if context.command_instructions and context.command_instructions.strip()
+                    else ""
+                )
+            )
             + ANALYST_HANDOFF_PROMPT
             + "\n\nAuthorized datasource IDs for this conversation:\n"
             + authorized

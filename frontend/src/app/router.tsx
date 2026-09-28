@@ -40,6 +40,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/SettingsOverviewPage')).SettingsOverviewPage }) },
               { path: 'organization', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/OrganizationSettingsPage')).OrganizationSettingsPage }) },
+              { path: 'instructions', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/InstructionsSettingsPage')).InstructionsSettingsPage }) },
               { path: 'audit', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/AuditSettingsPage')).AuditSettingsPage }) },
               { path: 'operations', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/OperationsSettingsPage')).OperationsSettingsPage }) },
             ],

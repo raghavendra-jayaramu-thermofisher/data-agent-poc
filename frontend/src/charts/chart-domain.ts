@@ -20,7 +20,12 @@ export type MultiSourceChartModel = {
   dimension: string;
   dimensionLabel?: string | null;
   series: AnalyticalSeries[];
-  provenance: Array<{ dataSourceId: string; dataSourceName: string; executionId?: string; artifactId?: string }>;
+  provenance: Array<{
+    dataSourceId: string;
+    dataSourceName: string;
+    executionId?: string;
+    artifactId?: string;
+  }>;
   comparisonKey?: string | null;
 };
 export type PieChartModel = {
@@ -77,7 +82,8 @@ function points(value: unknown, numericFields: Set<string>): ChartPoint[] | null
     const point: ChartPoint = {};
     for (const [key, cell] of Object.entries(item)) {
       if (cell == null || typeof cell === 'string' || typeof cell === 'number') {
-        point[key] = numericFields.has(key) && cell != null ? numeric(cell) : (cell as string | number | null);
+        point[key] =
+          numericFields.has(key) && cell != null ? numeric(cell) : (cell as string | number | null);
       }
     }
     if ([...numericFields].some((field) => point[field] == null)) return null;
@@ -89,12 +95,16 @@ function points(value: unknown, numericFields: Set<string>): ChartPoint[] | null
 export function normalizeChartArtifact(
   artifact: JobArtifact,
   sql: SqlExecution | undefined,
-  dataSourceName: string
+  dataSourceName: string,
 ): NormalizedChartModel | null {
   const payload = object(artifact.payload);
   if (!payload || payload.schema_version !== 1 || payload.renderer !== 'frontend') return null;
   const payloadSqlId = text(payload.source_sql_execution_id);
-  if (payloadSqlId && artifact.source_sql_execution_id && payloadSqlId !== artifact.source_sql_execution_id)
+  if (
+    payloadSqlId &&
+    artifact.source_sql_execution_id &&
+    payloadSqlId !== artifact.source_sql_execution_id
+  )
     return null;
   const chartType = text(payload.chart_type) as ChartType | null;
   if (!chartType || !['bar', 'line', 'area', 'pie', 'metric'].includes(chartType)) return null;
@@ -118,6 +128,8 @@ export function normalizeChartArtifact(
     if (!categoryField || !valueField) return null;
     const chartPoints = points(payload.data, new Set([valueField]));
     if (!chartPoints || chartPoints.some((point) => point[categoryField] == null)) return null;
+    const categoryValues = chartPoints.map((point) => String(point[categoryField]));
+    if (new Set(categoryValues).size !== categoryValues.length) return null;
     return {
       id: artifact.id,
       title,
@@ -137,7 +149,7 @@ export function normalizeChartArtifact(
     const valueField = text(value?.field);
     if (!valueField) return null;
     const chartPoints = points(payload.data, new Set([valueField]));
-    if (!chartPoints) return null;
+    if (!chartPoints || chartPoints.length !== 1) return null;
     return {
       id: artifact.id,
       title,
@@ -156,17 +168,21 @@ export function normalizeChartArtifact(
   if (!xField || !rawSeries?.length) return null;
   const seriesSpecs = rawSeries.map(object);
   if (seriesSpecs.some((item) => !item || !text(item.field))) return null;
-  const numericFields = new Set(seriesSpecs.map((item) => text(item!.field)!));
+  const seriesFields = seriesSpecs.map((item) => text(item!.field)!);
+  const numericFields = new Set(seriesFields);
+  // Every series must represent a distinct measure. Labels are presentation-only and cannot
+  // safely turn one repeated value field into separate category-filtered series.
+  if (numericFields.size !== seriesFields.length || numericFields.has(xField)) return null;
   const units = [
     ...new Set(
-      seriesSpecs
-        .map((item) => text(item!.unit))
-        .filter((unit): unit is string => Boolean(unit))
+      seriesSpecs.map((item) => text(item!.unit)).filter((unit): unit is string => Boolean(unit)),
     ),
   ];
   if (units.length > 2) return null;
   const chartPoints = points(payload.data, numericFields);
   if (!chartPoints || chartPoints.some((point) => point[xField] == null)) return null;
+  const dimensionValues = chartPoints.map((point) => String(point[xField]));
+  if (new Set(dimensionValues).size !== dimensionValues.length) return null;
   return {
     id: artifact.id,
     title,
@@ -217,7 +233,9 @@ export function combineCompatibleCharts(models: NormalizedChartModel[]): Normali
       result.push(group[0]!);
       continue;
     }
-    const units = [...new Set(group.flatMap((item) => item.series.map((series) => series.unit ?? 'unknown')))];
+    const units = [
+      ...new Set(group.flatMap((item) => item.series.map((series) => series.unit ?? 'unknown'))),
+    ];
     if (units.length > 2) {
       result.push(...group);
       continue;

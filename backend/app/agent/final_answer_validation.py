@@ -118,61 +118,68 @@ def grounded_numbers(bundle: EvidenceBundle) -> set[str]:
     return allowed
 
 
-def validate_final_answer(markdown: str, bundle: EvidenceBundle) -> list[str]:
+def validate_final_answer(
+    markdown: str,
+    bundle: EvidenceBundle,
+    *,
+    has_custom_instructions: bool = False,
+) -> list[str]:
     errors: list[str] = []
     stripped = markdown.strip()
-    first_line = stripped.splitlines()[0].strip() if stripped else ""
-    if first_line != "### Objective":
-        errors.append("The first non-whitespace heading must be `### Objective`.")
 
-    headings = [match.group(1).strip() for match in HEADING_PATTERN.finditer(markdown)]
-    required = ["Objective", "What I understood", "Answer"]
-    for heading in required:
-        count = headings.count(heading)
-        if count != 1:
-            errors.append(f"Required heading `{heading}` must appear exactly once.")
+    if not has_custom_instructions:
+        first_line = stripped.splitlines()[0].strip() if stripped else ""
+        if first_line != "### Objective":
+            errors.append("The first non-whitespace heading must be `### Objective`.")
 
-    known_order = [
-        heading
-        for heading in headings
-        if heading in {"Objective", "What I understood", "Unable to answer", "Answer"}
-    ]
-    expected_order = ["Objective", "What I understood"]
-    if bundle.unavailable_information:
-        expected_order.append("Unable to answer")
-        if headings.count("Unable to answer") != 1:
+        headings = [match.group(1).strip() for match in HEADING_PATTERN.finditer(markdown)]
+        required = ["Objective", "What I understood", "Answer"]
+        for heading in required:
+            count = headings.count(heading)
+            if count != 1:
+                errors.append(f"Required heading `{heading}` must appear exactly once.")
+
+        known_order = [
+            heading
+            for heading in headings
+            if heading in {"Objective", "What I understood", "Unable to answer", "Answer"}
+        ]
+        expected_order = ["Objective", "What I understood"]
+        if bundle.unavailable_information:
+            expected_order.append("Unable to answer")
+            if headings.count("Unable to answer") != 1:
+                errors.append(
+                    "`### Unable to answer` is required because verified unavailable information "
+                    "exists."
+                )
+        elif "Unable to answer" in headings:
             errors.append(
-                "`### Unable to answer` is required because verified unavailable information "
-                "exists."
+                "`### Unable to answer` must be omitted because no unavailable information was "
+                "verified."
             )
-    elif "Unable to answer" in headings:
-        errors.append(
-            "`### Unable to answer` must be omitted because no unavailable information was "
-            "verified."
-        )
-    expected_order.append("Answer")
-    if known_order != expected_order:
-        errors.append("Required sections are missing, duplicated, or out of order.")
+        expected_order.append("Answer")
+        if known_order != expected_order:
+            errors.append("Required sections are missing, duplicated, or out of order.")
 
-    objective = _section(markdown, "Objective")
-    understood = _section(markdown, "What I understood")
-    answer = _section(markdown, "Answer")
-    if not objective:
-        errors.append("Objective content is empty.")
-    else:
-        normalized_objective = _normalize_prose(objective)
-        normalized_question = _normalize_prose(bundle.question)
-        similarity = SequenceMatcher(None, normalized_objective, normalized_question).ratio()
-        if normalized_objective == normalized_question or similarity >= 0.95:
-            errors.append("The Objective repeats the raw question instead of stating its purpose.")
-        if objective.rstrip().endswith("?"):
-            errors.append("The Objective must be a purpose statement, not a question.")
-    if not understood:
-        errors.append("What I understood content is empty.")
-    if bundle.unavailable_information and not _section(markdown, "Unable to answer"):
-        errors.append("Unable to answer content is empty.")
-    if not answer:
-        errors.append("Answer content is empty.")
+        objective = _section(markdown, "Objective")
+        understood = _section(markdown, "What I understood")
+        answer = _section(markdown, "Answer")
+        if not objective:
+            errors.append("Objective content is empty.")
+        else:
+            normalized_objective = _normalize_prose(objective)
+            normalized_question = _normalize_prose(bundle.question)
+            similarity = SequenceMatcher(None, normalized_objective, normalized_question).ratio()
+            if normalized_objective == normalized_question or similarity >= 0.95:
+                errors.append("The Objective repeats the raw question instead of stating its purpose.")
+            if objective.rstrip().endswith("?"):
+                errors.append("The Objective must be a purpose statement, not a question.")
+        if not understood:
+            errors.append("What I understood content is empty.")
+        if bundle.unavailable_information and not _section(markdown, "Unable to answer"):
+            errors.append("Unable to answer content is empty.")
+        if not answer:
+            errors.append("Answer content is empty.")
 
     directive_ids, directive_errors = _directive_ids(markdown)
     errors.extend(directive_errors)

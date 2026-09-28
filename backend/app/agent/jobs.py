@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.database import get_session_factory
 from app.core.errors import AppError
 from app.core.time import utc_now
+from app.instructions.repository import InstructionRepository
 from app.jobs.handlers import JobHandlerRegistry
 from app.jobs.repository import JobRepository
 from app.jobs.worker import JobFailureError
@@ -45,6 +46,8 @@ async def _model_history(
                 if artifact.kind != "text"
             }
             content = replace_artifact_directives(content, labels, prefix="")
+        elif item.role == "user" and item.metadata_json and "expanded_prompt" in item.metadata_json:
+            content = str(item.metadata_json["expanded_prompt"])
         history.append({"role": item.role, "content": content})
     return history
 
@@ -94,12 +97,34 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         messages = await convo_repo.recent_messages(
             conversation.id, settings.agent_max_history_messages
         )
-        question = next(
-            (item.content for item in reversed(messages) if item.role == "user"),
-            "",
+        user_message = next((item for item in reversed(messages) if item.role == "user"), None)
+        question = (
+            str(user_message.metadata_json.get("expanded_prompt") or user_message.content)
+            if user_message
+            else ""
         ).strip()
         if not question:
             raise JobFailureError("JOB_INPUT_INVALID", "The analytical question is unavailable.")
+
+        instruction_repo = InstructionRepository(session)
+        default_inst = await instruction_repo.get_default(job.organization_id)
+        default_instructions = default_inst.content if default_inst else None
+
+        command_instructions = None
+        command_name = None
+        if user_message and user_message.metadata_json:
+            cmd_instruction_id = user_message.metadata_json.get("instruction_id")
+            if cmd_instruction_id:
+                try:
+                    cmd_inst = await instruction_repo.get(
+                        uuid.UUID(str(cmd_instruction_id)), job.organization_id
+                    )
+                    if cmd_inst and cmd_inst.enabled:
+                        command_instructions = cmd_inst.content
+                        command_name = cmd_inst.command
+                except (ValueError, TypeError):
+                    pass
+
         history = await _model_history(messages, AgentExecutionRepository(session))
         model_service = ModelConfigurationService(session, settings)
         try:
@@ -120,6 +145,9 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         conversation_id=conversation_id,
         allowed_data_source_ids=frozenset(source_ids),
         settings=settings,
+        default_instructions=default_instructions,
+        command_instructions=command_instructions,
+        command_name=command_name,
     )
     try:
         analysis_runtime = DeepAgentRuntime()
@@ -162,6 +190,9 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             job_id=job_id,
             model=runtime_model,
             evidence=evidence,
+            default_instructions=default_instructions,
+            command_instructions=command_instructions,
+            command_name=command_name,
         )
         if await is_cancel_requested(job_id):
             raise AgentCancelledError

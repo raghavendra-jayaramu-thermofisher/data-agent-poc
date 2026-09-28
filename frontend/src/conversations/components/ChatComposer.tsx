@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search } from 'lucide-react';
+import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, Terminal } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
+import { useInstructions } from '../../settings/hooks/useInstructions';
+import type { AgentInstruction } from '../../settings/api/instructions-api';
 
 type ChatComposerProps = {
   question: string;
@@ -44,6 +46,52 @@ export function ChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sourcesPickerRef = useRef<HTMLDivElement>(null);
   const modelsPickerRef = useRef<HTMLDivElement>(null);
+
+  const instructionsQuery = useInstructions();
+  const [autocompleteDismissed, setAutocompleteDismissed] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const availableCommands = (instructionsQuery.data ?? []).filter(
+    (item) => item.enabled && Boolean(item.command)
+  );
+
+  const commandMatch = question.match(/^\/([a-zA-Z0-9_-]*)$/);
+  const isTypingCommand = Boolean(commandMatch);
+  const commandQuery = commandMatch?.[1]?.toLowerCase() ?? '';
+
+  const matchingCommands = availableCommands.filter(
+    (inst) =>
+      (inst.command ?? '').toLowerCase().includes(commandQuery) ||
+      inst.name.toLowerCase().includes(commandQuery) ||
+      (inst.description && inst.description.toLowerCase().includes(commandQuery))
+  );
+
+  const activeCommandMatch = question.match(/^\/([a-zA-Z0-9_-]+)(?:\s+(.*))?$/);
+  const activeCommandName = activeCommandMatch?.[1]?.toLowerCase() ?? null;
+  const activeInstruction = activeCommandName
+    ? availableCommands.find((c) => c.command?.toLowerCase() === activeCommandName)
+    : null;
+
+  useEffect(() => {
+    setSelectedIndex(0);
+    if (!question.startsWith('/')) {
+      setAutocompleteDismissed(false);
+    }
+  }, [commandQuery, question]);
+
+  const selectCommand = (item?: AgentInstruction) => {
+    if (!item?.command) return;
+    onQuestionChange(`/${item.command} `);
+    setAutocompleteDismissed(true);
+    textareaRef.current?.focus();
+  };
+
+  const removeActiveCommand = () => {
+    if (activeCommandMatch) {
+      onQuestionChange(activeCommandMatch[2] ?? '');
+      textareaRef.current?.focus();
+    }
+  };
 
   // Auto-resize textarea
   useEffect(() => {
@@ -97,6 +145,32 @@ export function ChatComposer({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isTypingCommand && !autocompleteDismissed && matchingCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % matchingCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + matchingCommands.length) % matchingCommands.length);
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        const commandToSelect = matchingCommands[selectedIndex];
+        if (commandToSelect) {
+          selectCommand(commandToSelect);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAutocompleteDismissed(true);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (question.trim() && !isSubmitting && !disabled && hasDataSourceScope) {
@@ -108,6 +182,71 @@ export function ChatComposer({
   return (
     <div className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
       <div className="chat-composer-card">
+        {/* Slash Command Autocomplete Popover */}
+        {isTypingCommand && !autocompleteDismissed && (
+          <div
+            className="chat-composer-popover chat-composer-popover--commands"
+            role="listbox"
+            aria-label="Slash command suggestions"
+          >
+            <div className="chat-composer-popover__header">
+              <div>
+                <strong>Slash Commands</strong>
+                <span>Tab or Enter to select</span>
+              </div>
+              <button
+                type="button"
+                className="chat-composer-popover__close"
+                onClick={() => setAutocompleteDismissed(true)}
+                aria-label="Close command suggestions"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="chat-composer-popover__list">
+              {availableCommands.length === 0 ? (
+                <p className="chat-composer-popover__empty">
+                  No slash commands configured in workspace.
+                </p>
+              ) : matchingCommands.length === 0 ? (
+                <p className="chat-composer-popover__empty">
+                  No commands matching &ldquo;/{commandQuery}&rdquo;
+                </p>
+              ) : (
+                matchingCommands.map((item, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
+                      onClick={() => selectCommand(item)}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                    >
+                      <div className="chat-composer-option__label">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-[#4B123F]">/{item.command}</span>
+                          <span className="text-xs text-[#252127] font-medium">{item.name}</span>
+                        </div>
+                        {item.description && (
+                          <small className="text-[#625C64] truncate">{item.description}</small>
+                        )}
+                      </div>
+                      {item.prompt_template && (
+                        <span className="text-[10px] text-[#8B848C] font-mono shrink-0 max-w-[120px] truncate">
+                          template
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           className="chat-composer-textarea"
@@ -122,6 +261,25 @@ export function ChatComposer({
 
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
+            {activeInstruction && (
+              <div
+                className="chat-composer-chip active"
+                title={activeInstruction.description || activeInstruction.name}
+              >
+                <Terminal size={12} />
+                <span className="font-mono font-semibold">/{activeInstruction.command}</span>
+                <button
+                  type="button"
+                  onClick={removeActiveCommand}
+                  className="ml-0.5 p-0.5 hover:bg-black/10 rounded cursor-pointer"
+                  title="Remove slash command"
+                  aria-label="Remove slash command"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            )}
+
             {dataSourceSelection === 'editable' ? (
               <div className="chat-composer-picker" ref={sourcesPickerRef}>
                 <button

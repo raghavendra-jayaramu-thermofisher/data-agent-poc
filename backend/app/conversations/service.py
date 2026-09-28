@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 
 from redis.asyncio import Redis
@@ -12,6 +13,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.time import utc_now
 from app.data_sources.service import DataSourceService
+from app.instructions.repository import InstructionRepository
 from app.jobs.service import JobService
 from app.models.service import ModelConfigurationService
 
@@ -141,11 +143,37 @@ class ConversationService:
 
         # User message and job are both durable. The job contains only identifiers/content and
         # never credentials. JobService performs the queue publish after PostgreSQL commit.
+        metadata: dict[str, object] = {"model_profile_id": str(profile_id)}
+        content = payload.content.strip()
+        match = re.match(r"^/([a-zA-Z0-9_-]+)(?:\s+(.*))?$", content, re.DOTALL)
+        if match:
+            cmd = match.group(1).lower()
+            extra_prompt = (match.group(2) or "").strip()
+            instruction = await InstructionRepository(self.session).get_by_command(
+                organization_id, cmd
+            )
+            if instruction and instruction.enabled:
+                metadata["instruction_id"] = str(instruction.id)
+                metadata["command"] = instruction.command
+                metadata["raw_prompt"] = payload.content
+                if instruction.prompt_template:
+                    if "{prompt}" in instruction.prompt_template:
+                        expanded = instruction.prompt_template.replace("{prompt}", extra_prompt).strip()
+                    else:
+                        expanded = (
+                            f"{instruction.prompt_template}\n\n{extra_prompt}".strip()
+                            if extra_prompt
+                            else instruction.prompt_template.strip()
+                        )
+                else:
+                    expanded = extra_prompt if extra_prompt else (instruction.description or payload.content)
+                metadata["expanded_prompt"] = expanded
+
         message = Message(
             conversation_id=conversation.id,
             role="user",
             content=payload.content,
-            metadata_json={"model_profile_id": str(profile_id)},
+            metadata_json=metadata,
             created_at=utc_now(),
         )
         self.repo.add_message(message)

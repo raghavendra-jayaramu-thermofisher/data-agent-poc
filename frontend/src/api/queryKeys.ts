@@ -39,6 +39,11 @@ export const queryKeys = {
         audit: (orgId: string | null) => ['settings', orgId, 'audit'] as const,
         operations: (orgId: string | null) => ['settings', orgId, 'operations'] as const,
     },
+    instructions: {
+        all: (orgId: string | null) => ['instructions', orgId] as const,
+        list: (orgId: string | null) => ['instructions', orgId, 'list'] as const,
+        detail: (orgId: string | null, id: string) => ['instructions', orgId, 'detail', id] as const,
+    },
     knowledge: {
         all: (orgId: string | null) => ['knowledge', orgId] as const,
         status: (orgId: string | null, dataSourceId: string) => ['knowledge', orgId, dataSourceId, 'status'] as const,

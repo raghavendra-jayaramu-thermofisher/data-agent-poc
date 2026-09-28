@@ -23,6 +23,7 @@ import {
   FileText,
   Wrench,
   Trash2,
+  Terminal,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -352,6 +353,20 @@ export function AppShell() {
                 >
                   <Building2 size={15} />
                   <span>Organization Profile</span>
+                </NavLink>
+
+                <NavLink
+                  to="/settings/instructions"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-3 py-2 rounded text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[#F4E8F0] text-[#4B123F] font-semibold'
+                        : 'text-[#252127] hover:bg-[#EAE7E1]'
+                    }`
+                  }
+                >
+                  <Terminal size={15} />
+                  <span>AI Instructions & Commands</span>
                 </NavLink>
 
                 <NavLink

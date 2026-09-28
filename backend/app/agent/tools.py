@@ -5,6 +5,7 @@ import json
 import math
 import time
 import uuid
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -59,6 +60,9 @@ class AgentToolContext:
     conversation_id: uuid.UUID
     allowed_data_source_ids: frozenset[uuid.UUID]
     settings: Settings
+    default_instructions: str | None = None
+    command_instructions: str | None = None
+    command_name: str | None = None
 
 
 ToolHandler = Callable[
@@ -645,6 +649,34 @@ def build_frontend_chart_payload(
             f"The chart references unavailable SQL result column(s): {', '.join(missing)}.",
         )
 
+    if parsed.chart_type in ("bar", "line", "area"):
+        series_fields = [item.field for item in parsed.series]
+        repeated_fields = sorted(
+            field for field, count in Counter(series_fields).items() if count > 1
+        )
+        if repeated_fields:
+            raise AgentToolError(
+                "CHART_SERIES_FIELD_REUSED",
+                "Each chart series must reference a distinct numeric SQL output column. "
+                "Series labels only rename columns and do not filter category rows. Re-run SQL "
+                "at the chart's final grain, pivoting long-form category/value data into one "
+                "numeric column per series, then retry the chart.",
+                retryable=True,
+            )
+        if parsed.x_field in series_fields:
+            raise AgentToolError(
+                "CHART_FIELD_ROLE_CONFLICT",
+                "The chart x-axis field cannot also be used as a numeric series field. Re-run "
+                "SQL with separate dimension and measure columns, then retry the chart.",
+                retryable=True,
+            )
+    elif parsed.chart_type == "pie" and parsed.category_field == parsed.value_field:
+        raise AgentToolError(
+            "CHART_FIELD_ROLE_CONFLICT",
+            "A pie chart requires different category and numeric value columns.",
+            retryable=True,
+        )
+
     records: list[dict[str, object]] = []
     for raw_row in rows:
         if not isinstance(raw_row, list):
@@ -654,6 +686,62 @@ def build_frontend_chart_payload(
                 column: raw_row[index] if index < len(raw_row) else None
                 for index, column in enumerate(columns)
             }
+        )
+
+    if not records:
+        raise AgentToolError(
+            "CHART_SOURCE_EMPTY",
+            "The SQL result has no rows to chart. Continue with a textual empty-result answer "
+            "instead of creating a chart.",
+        )
+
+    if parsed.chart_type in ("bar", "line", "area"):
+        dimension_field = parsed.x_field or ""
+        dimension_values = [record.get(dimension_field) for record in records]
+        if any(value is None for value in dimension_values):
+            raise AgentToolError(
+                "CHART_DIMENSION_MISSING",
+                f"The chart dimension field {dimension_field!r} contains null values. Aggregate "
+                "or clean the dimension in SQL before retrying the chart.",
+                retryable=True,
+            )
+        dimension_keys = [
+            json.dumps(value, sort_keys=True, default=str) for value in dimension_values
+        ]
+        if len(set(dimension_keys)) != len(dimension_keys):
+            raise AgentToolError(
+                "CHART_DIMENSION_NOT_UNIQUE",
+                "Bar, line, and area chart SQL must return one row per x-axis value. Aggregate or "
+                "pivot repeated dimension rows into distinct numeric series columns, then retry "
+                "the chart.",
+                retryable=True,
+            )
+    elif parsed.chart_type == "pie":
+        category_field = parsed.category_field or ""
+        category_values = [record.get(category_field) for record in records]
+        if any(value is None for value in category_values):
+            raise AgentToolError(
+                "CHART_CATEGORY_MISSING",
+                f"The pie category field {category_field!r} contains null values. Group or label "
+                "null categories in SQL before retrying the chart.",
+                retryable=True,
+            )
+        category_keys = [
+            json.dumps(value, sort_keys=True, default=str) for value in category_values
+        ]
+        if len(set(category_keys)) != len(category_keys):
+            raise AgentToolError(
+                "CHART_CATEGORY_NOT_UNIQUE",
+                "Pie chart SQL must return one aggregated row per category. Aggregate repeated "
+                "categories in SQL, then retry the chart.",
+                retryable=True,
+            )
+    elif parsed.chart_type == "metric" and len(records) != 1:
+        raise AgentToolError(
+            "CHART_METRIC_ROW_COUNT_INVALID",
+            "A metric card requires SQL that returns exactly one aggregate row. Aggregate the "
+            "result to one row, then retry the metric.",
+            retryable=True,
         )
 
     chart_payload: dict[str, object] = {
@@ -670,6 +758,7 @@ def build_frontend_chart_payload(
         else [item.field for item in parsed.series]
     )
     for field in numeric_fields:
+        has_numeric_value = False
         for record in records:
             value = record.get(field)
             if value is None:
@@ -680,7 +769,9 @@ def build_frontend_chart_payload(
                     f"Chart value field {field!r} contains non-numeric values.",
                 )
             if isinstance(value, (int, float)):
-                continue
+                if math.isfinite(float(value)):
+                    has_numeric_value = True
+                    continue
             if isinstance(value, str):
                 cleaned = value.replace(",", "").replace("$", "").replace(" ", "").strip()
                 try:
@@ -688,10 +779,16 @@ def build_frontend_chart_payload(
                 except ValueError:
                     number = float("nan")
                 if math.isfinite(number):
+                    has_numeric_value = True
                     continue
             raise AgentToolError(
                 "CHART_VALUE_NOT_NUMERIC",
                 f"Chart value field {field!r} contains non-numeric values.",
+            )
+        if not has_numeric_value:
+            raise AgentToolError(
+                "CHART_VALUE_EMPTY",
+                f"Chart value field {field!r} contains no numeric values.",
             )
 
     if parsed.chart_type == "pie":
@@ -784,8 +881,10 @@ def build_default_tool_registry() -> AgentToolRegistry:
                 "Use metric for one headline value, line or area for an ordered trend, bar for category "
                 "comparison, and pie only for a small part-to-whole result. Reference exact output "
                 "fields; this tool reads persisted rows and never accepts invented values. The SQL must "
-                "already have the final grain, ordering, and manageable category count. Do not create a "
-                "chart when a table or sentence communicates the result more clearly."
+                "already have the final grain, ordering, and manageable category count. For bar, line, "
+                "and area charts, return one row per x-axis value and one distinct numeric output column "
+                "per series. A series label never filters long-form category rows. Do not create a chart "
+                "when a table or sentence communicates the result more clearly."
             ),
             args_schema=CreateChartArgs,
             handler=create_chart,

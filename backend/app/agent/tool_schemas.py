@@ -74,7 +74,11 @@ class ChartSeriesInput(BaseModel):
     field: str = Field(
         min_length=1,
         max_length=255,
-        description="Exact numeric output column from the referenced successful SQL result.",
+        description=(
+            "Exact numeric output column from the referenced successful SQL result. Each series "
+            "must use a different output column; a label only renames a series and never filters "
+            "rows or selects a category value."
+        ),
     )
     label: str | None = Field(
         default=None,
@@ -121,8 +125,9 @@ class CreateChartArgs(BaseModel):
         default_factory=list,
         max_length=8,
         description=(
-            "One or more numeric output columns for bar, line, or area charts; omit for pie and "
-            "metric presentations."
+            "One or more distinct numeric output columns for bar, line, or area charts; omit for "
+            "pie and metric presentations. Multi-series data must be wide-form with one row per "
+            "x_field value. Labels are presentation-only and do not filter long-form rows."
         ),
     )
     category_field: str | None = Field(

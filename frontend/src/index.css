@@ -1061,6 +1061,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 }
 
 .chat-composer-card {
+  position: relative;
   pointer-events: auto;
   width: 100%;
   max-width: 1180px;
@@ -1152,7 +1153,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  z-index: 50;
+  z-index: 100;
   width: 280px;
   padding: 6px;
   overflow: hidden;
@@ -1165,6 +1166,11 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   box-shadow:
     0 14px 36px rgba(37, 33, 39, 0.14),
     0 3px 10px rgba(37, 33, 39, 0.08);
+}
+
+.chat-composer-popover--commands {
+  width: 100%;
+  max-width: 460px;
 }
 
 .chat-composer-popover--models {

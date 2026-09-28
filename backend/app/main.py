@@ -23,6 +23,8 @@ from app.core.logging import configure_logging
 from app.core.redis import close_redis
 from app.core.request_id import RequestIdMiddleware
 from app.health import router as health_router
+from app.instructions import models as instruction_models  # noqa: F401
+from app.instructions.router import router as instructions_router
 from app.jobs import models as job_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
 from app.knowledge.router import router as knowledge_router
@@ -60,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix=settings.api_v1_prefix)
     app.include_router(organizations_router, prefix=settings.api_v1_prefix)
     app.include_router(data_sources_router, prefix=settings.api_v1_prefix)
+    app.include_router(instructions_router, prefix=settings.api_v1_prefix)
     app.include_router(models_router, prefix=settings.api_v1_prefix)
     app.include_router(knowledge_router, prefix=settings.api_v1_prefix)
     app.include_router(conversations_router, prefix=settings.api_v1_prefix)

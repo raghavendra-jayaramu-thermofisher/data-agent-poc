@@ -14,6 +14,7 @@ from app.conversations import models as conversation_models  # noqa: F401
 from app.core.config import get_settings
 from app.data_sources import models as data_source_models  # noqa: F401
 from app.core.database import Base
+from app.instructions import models as instruction_models  # noqa: F401
 from app.jobs import models as jobs_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
 from app.models import models as model_config_models  # noqa: F401
