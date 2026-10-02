@@ -1,8 +1,25 @@
 .env
+.env.*
+!.env.example
 
 # Python runtime caches
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Editor & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
 # Local scratch workspace
 space/
