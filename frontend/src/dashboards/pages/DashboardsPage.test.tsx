@@ -20,8 +20,8 @@ describe('DashboardsPage', () => {
   beforeEach(() => {
     dashboards = [];
     server.use(
-      http.get('http://localhost:8000/api/v1/dashboards', () => HttpResponse.json(dashboards)),
-      http.post('http://localhost:8000/api/v1/dashboards', async ({ request }) => {
+      http.get('http://localhost:12201/api/v1/dashboards', () => HttpResponse.json(dashboards)),
+      http.post('http://localhost:12201/api/v1/dashboards', async ({ request }) => {
         const body = await request.json() as { title: string; description?: string | null };
         const created = { id: 'd1', organization_id: 'org-1', title: body.title, description: body.description ?? null, created_by: 'u1', widget_count: 0, created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z' };
         dashboards = [created];

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { authSession } from '../auth/session-storage';
 import { server } from '../test/server';
 import { apiClient, withAuthRefresh } from './client';
-const base = 'http://localhost:8000';
+const base = 'http://localhost:12201';
 const refreshed = {
     access_token: 'new-access',
     refresh_token: 'n'.repeat(32),

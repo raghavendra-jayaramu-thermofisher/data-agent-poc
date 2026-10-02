@@ -12,7 +12,7 @@ beforeEach(() => {
 
 describe('conversation API', () => {
   it('creates a conversation with multiple datasource identities intact', async () => {
-    server.use(http.post('http://localhost:8000/api/v1/conversations', async ({ request }) => {
+    server.use(http.post('http://localhost:12201/api/v1/conversations', async ({ request }) => {
       expect(request.headers.get('x-organization-id')).toBe('org-1');
       const body = await request.json() as { data_source_ids: string[]; model_profile_id: string | null };
       expect(body.data_source_ids).toEqual(['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222']);
@@ -27,7 +27,7 @@ describe('conversation API', () => {
   });
 
   it('submits a question as an immediate durable message/job pair', async () => {
-    server.use(http.post('http://localhost:8000/api/v1/conversations/c1/messages', async ({ request }) => {
+    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
       expect(await request.json()).toEqual({ content: 'Why did revenue fall?', model_profile_id: null });
       return HttpResponse.json({ message_id: 'm1', job_id: 'j1' }, { status: 202 });
     }));
@@ -35,7 +35,7 @@ describe('conversation API', () => {
   });
 
   it('loads durable messages independently of browser job state', async () => {
-    server.use(http.get('http://localhost:8000/api/v1/conversations/c1/messages', () => HttpResponse.json([
+    server.use(http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json([
       { id: 'm1', conversation_id: 'c1', role: 'user', content: 'Question', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' },
       { id: 'm2', conversation_id: 'c1', role: 'assistant', content: '**Answer**', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:03Z' },
     ])));

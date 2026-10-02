@@ -121,8 +121,8 @@ docker compose ps
 Default local endpoints are:
 
 ```text
-PostgreSQL: localhost:5432
-Redis:      localhost:6379
+PostgreSQL: localhost:12202
+Redis:      localhost:12203
 ```
 
 ### 3.5 Create and activate a virtual environment
@@ -186,23 +186,23 @@ alembic current
 Development:
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 12201
 ```
 
 Production-style local process:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 12201
 ```
 
 Useful URLs:
 
 ```text
-API:               http://localhost:8000
-Health:            http://localhost:8000/health
-Readiness:         http://localhost:8000/ready
-Swagger UI:        http://localhost:8000/docs
-OpenAPI JSON:      http://localhost:8000/openapi.json
+API:               http://localhost:12201
+Health:            http://localhost:12201/health
+Readiness:         http://localhost:12201/ready
+Swagger UI:        http://localhost:12201/docs
+OpenAPI JSON:      http://localhost:12201/openapi.json
 ```
 
 ### 3.9 Start at least one worker
@@ -253,10 +253,10 @@ All settings are read from environment variables and, by default, a local `.env`
 | `APP_ENV` | `development` | `development`, `test`, or `production` |
 | `APP_NAME` | `DB Assistant API` | FastAPI application name |
 | `API_V1_PREFIX` | `/api/v1` | Versioned API prefix |
-| `DATABASE_URL` | `postgresql+asyncpg://dbassistant:dbassistant@localhost:5432/dbassistant` | Durable application PostgreSQL |
-| `REDIS_URL` | `redis://localhost:6379/0` | Queue/realtime Redis |
+| `DATABASE_URL` | `postgresql+asyncpg://dbassistant:dbassistant@localhost:12202/dbassistant` | Durable application PostgreSQL |
+| `REDIS_URL` | `redis://localhost:12203/0` | Queue/realtime Redis |
 | `LOG_LEVEL` | `INFO` | Application logging level |
-| `CORS_ORIGINS` | `["http://localhost:5173"]` | Allowed frontend origins; JSON list |
+| `CORS_ORIGINS` | `["http://localhost:12200"]` | Allowed frontend origins; JSON list |
 
 ### 4.2 Authentication and email
 
@@ -267,7 +267,7 @@ All settings are read from environment variables and, by default, a local `.env`
 | `ACCESS_TOKEN_TTL_MINUTES` | `15` | JWT lifetime |
 | `REFRESH_TOKEN_TTL_DAYS` | `30` | Opaque refresh-token lifetime |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | Reset-token lifetime |
-| `PASSWORD_RESET_URL_BASE` | `http://localhost:5173/reset-password` | Frontend reset-password page |
+| `PASSWORD_RESET_URL_BASE` | `http://localhost:12200/reset-password` | Frontend reset-password page |
 | `EMAIL_BACKEND` | `console` | Must be `smtp` in production |
 | `SMTP_HOST` | empty | Required when `EMAIL_BACKEND=smtp` |
 | `SMTP_PORT` | `587` | SMTP port |
@@ -339,7 +339,7 @@ These limits are enforced server-side. The frontend must not assume an LLM-provi
 The provided `docker-compose.yml` is intentionally limited to PostgreSQL and Redis. For production, run the application image as at least two services/processes:
 
 ```text
-api      -> uvicorn app.main:app --host 0.0.0.0 --port 8000
+api      -> uvicorn app.main:app --host 0.0.0.0 --port 8000 (container-internal)
 worker   -> python -m app.worker
 ```
 
@@ -377,7 +377,7 @@ After deployment:
 ### API liveness
 
 ```bash
-curl -s http://localhost:8000/health
+curl -s http://localhost:12201/health
 ```
 
 Expected:
@@ -389,7 +389,7 @@ Expected:
 ### Dependency readiness
 
 ```bash
-curl -i http://localhost:8000/ready
+curl -i http://localhost:12201/ready
 ```
 
 Expected HTTP `200` when PostgreSQL and Redis are available:

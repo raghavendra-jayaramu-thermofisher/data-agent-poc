@@ -43,7 +43,7 @@ async def wait_for_job(
 
 @pytest.mark.asyncio
 async def test_task2_real_api_excel_materialization_flow() -> None:
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:12201")
     unique = uuid.uuid4().hex[:10]
     email = f"task2-{unique}@example.com"
     async with httpx.AsyncClient(base_url=base_url, timeout=15) as client:

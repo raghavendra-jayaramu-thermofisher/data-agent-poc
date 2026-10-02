@@ -17,4 +17,4 @@ dependencies:
 
 scripts:
   excel-to-mysql: "excel_to_mysql:main"
-  mysql-generator-ui: "streamlit run app.py"
+  mysql-generator-ui: "streamlit run app.py --server.address 127.0.0.1 --server.port 12204"

@@ -5,7 +5,7 @@ import { normalizeApiError, type AppError } from './errors';
 import type { components, paths } from './generated/schema';
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const API_BASE_URL = configuredApiBaseUrl
-    || (import.meta.env.PROD ? window.location.origin : 'http://localhost:8000');
+    || (import.meta.env.PROD ? window.location.origin : 'http://localhost:12201');
 const baseUrl = API_BASE_URL;
 export const apiClient = createClient<paths>({ baseUrl });
 const headersMiddleware: Middleware = {

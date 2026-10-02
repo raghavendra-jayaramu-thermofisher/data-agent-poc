@@ -20,7 +20,7 @@ function Probe() {
 }
 
 describe('OrganizationProvider workspace isolation', () => {
-  beforeEach(() => server.use(http.get('http://localhost:8000/api/v1/organizations', () => HttpResponse.json(organizations))));
+  beforeEach(() => server.use(http.get('http://localhost:12201/api/v1/organizations', () => HttpResponse.json(organizations))));
 
   it('updates the request scope and clears organization-owned cached data on switch', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

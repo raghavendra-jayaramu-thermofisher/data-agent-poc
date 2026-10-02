@@ -19,9 +19,9 @@ if os.getenv("RUN_INTEGRATION_TESTS") != "1":
 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault(
-    "DATABASE_URL", "postgresql+asyncpg://dbassistant:dbassistant@localhost:5432/dbassistant"
+    "DATABASE_URL", "postgresql+asyncpg://dbassistant:dbassistant@localhost:12202/dbassistant"
 )
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
+os.environ.setdefault("REDIS_URL", "redis://localhost:12203/15")
 os.environ.setdefault("JWT_SECRET", "integration-test-secret-that-is-long-enough-123456789")
 os.environ.setdefault("DATA_DIRECTORY", "/tmp/dbassistant-task6-integration")
 

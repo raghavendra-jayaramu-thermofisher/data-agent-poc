@@ -7,7 +7,7 @@ This document is the frontend/API contract guide for the current backend impleme
 Default local base URL:
 
 ```text
-http://localhost:8000
+http://localhost:12201
 ```
 
 Versioned application API prefix:

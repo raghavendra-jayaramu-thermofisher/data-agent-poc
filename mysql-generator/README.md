@@ -58,7 +58,7 @@ pip install streamlit openpyxl
 To launch the interactive web application:
 
 ```bash
-streamlit run app.py
+streamlit run app.py --server.address 127.0.0.1 --server.port 12204
 ```
 
 ### Features in the Web UI:

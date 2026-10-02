@@ -25,8 +25,8 @@ function renderPage() {
 }
 function handlers() {
   server.use(
-    http.get('http://localhost:8000/api/v1/dashboards/d1', () => HttpResponse.json(detail)),
-    http.get('http://localhost:8000/api/v1/data-sources', () => HttpResponse.json([source])),
+    http.get('http://localhost:12201/api/v1/dashboards/d1', () => HttpResponse.json(detail)),
+    http.get('http://localhost:12201/api/v1/data-sources', () => HttpResponse.json([source])),
   );
 }
 
@@ -34,7 +34,7 @@ describe('DashboardDetailPage', () => {
   beforeEach(() => { manager.jobs = []; manager.registerJob.mockClear(); detail = { ...detail, title: 'Executive' }; handlers(); });
 
   it('edits dashboard metadata and refetches the durable dashboard', async () => {
-    server.use(http.patch('http://localhost:8000/api/v1/dashboards/d1', async ({ request }) => {
+    server.use(http.patch('http://localhost:12201/api/v1/dashboards/d1', async ({ request }) => {
       const body = await request.json() as { title: string; description: string | null };
       detail = { ...detail, title: body.title, description: body.description };
       return HttpResponse.json(detail);
@@ -48,7 +48,7 @@ describe('DashboardDetailPage', () => {
   });
 
   it('registers widget refresh jobs globally while retaining the previous visualization', async () => {
-    server.use(http.post('http://localhost:8000/api/v1/dashboards/widgets/w1/refresh', () => HttpResponse.json({ job_id: 'jr1' }, { status: 202 })));
+    server.use(http.post('http://localhost:12201/api/v1/dashboards/widgets/w1/refresh', () => HttpResponse.json({ job_id: 'jr1' }, { status: 202 })));
     renderPage();
     expect(await screen.findByText('100')).toBeInTheDocument();
     await userEvent.setup().click(screen.getAllByRole('button', { name: 'Refresh' })[0]!);

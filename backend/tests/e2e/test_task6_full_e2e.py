@@ -210,7 +210,7 @@ async def wait_for_job(
 
 @pytest.mark.asyncio
 async def test_task6_complete_product_flow_with_deepagents_and_reporting() -> None:
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:12201")
     unique = uuid.uuid4().hex[:10]
     with FakeProvider() as model_url:
         async with httpx.AsyncClient(base_url=base_url, timeout=20) as client:

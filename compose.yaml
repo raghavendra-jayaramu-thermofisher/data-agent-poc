@@ -14,8 +14,8 @@ x-backend-service: &backend-service
     DATABASE_URL: "${CONTAINER_DATABASE_URL:-postgresql+asyncpg://dbassistant:dbassistant@postgres:5432/dbassistant}"
     REDIS_URL: "redis://redis:6379/0"
     DATA_DIRECTORY: "/app/runtime-data"
-    CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:9080","http://127.0.0.1:9080"]}'
-    PASSWORD_RESET_URL_BASE: "${PASSWORD_RESET_URL_BASE:-http://localhost:9080/reset-password}"
+    CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:12200","http://127.0.0.1:12200"]}'
+    PASSWORD_RESET_URL_BASE: "${PASSWORD_RESET_URL_BASE:-http://localhost:12200/reset-password}"
     FINAL_ANSWER_TIMEOUT_SECONDS: "${FINAL_ANSWER_TIMEOUT_SECONDS:-60}"
     ANALYSIS_EVIDENCE_RETRIES: "${ANALYSIS_EVIDENCE_RETRIES:-2}"
   volumes:
@@ -61,7 +61,7 @@ services:
     <<: *backend-service
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-9000}:8000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-12201}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -94,7 +94,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-9080}:80"
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-12200}:80"
     depends_on:
       api:
         condition: service_healthy

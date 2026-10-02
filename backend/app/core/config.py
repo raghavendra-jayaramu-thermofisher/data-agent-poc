@@ -21,15 +21,15 @@ class Settings(BaseSettings):
     app_name: str = "DB Assistant API"
     api_v1_prefix: str = "/api/v1"
 
-    database_url: str = "postgresql+asyncpg://dbassistant:dbassistant@localhost:5432/dbassistant"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: str = "postgresql+asyncpg://dbassistant:dbassistant@localhost:12202/dbassistant"
+    redis_url: str = "redis://localhost:12203/0"
 
     jwt_secret: str = Field(default="development-only-change-me-please-32chars")
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=1440)
     refresh_token_ttl_days: int = Field(default=30, ge=1, le=365)
     password_reset_ttl_minutes: int = Field(default=30, ge=5, le=1440)
-    password_reset_url_base: str = "http://localhost:5173/reset-password"
+    password_reset_url_base: str = "http://localhost:12200/reset-password"
 
     email_backend: Literal["console", "smtp"] = "console"
     smtp_host: str | None = None
@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     secret_encryption_current_version: str = "v1"
     secret_encryption_keys: dict[str, str] = {"v1": "IKDwaOIvGQ2d1pLXE8RAauWa7Cw3j8yL_XOYe-dfy9c="}
 
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:12200", "http://127.0.0.1:12200"]
     log_level: str = "INFO"
 
     @field_validator("jwt_secret")

@@ -40,24 +40,24 @@ if not exist "%FRONTEND_DIR%\dist\index.html" (
 
 echo.
 echo ===================================================
-echo   Launching All Services on Ports 9000 and 9080
+echo   Launching All Services on Ports 12201 and 12200
 echo ===================================================
 echo.
 
-:: Launch FastAPI Server on port 9000
-start "Data Agent - API Server (Port 9000)" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 9000"
+:: Launch FastAPI Server on port 12201
+start "Data Agent - API Server (Port 12201)" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && uvicorn app.main:app --host 127.0.0.1 --port 12201"
 
 :: Launch Background Agent Worker
 start "Data Agent - Worker Service" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && python -m app.worker"
 
-:: Launch Frontend Web UI on port 9080 (with automatic API proxy to port 9000)
-start "Data Agent - Frontend UI (Port 9080)" cmd /k "cd /d "%FRONTEND_DIR%" && npm run preview -- --port 9080 --host 0.0.0.0"
+:: Launch Frontend Web UI on port 12200 (with automatic API proxy to port 12201)
+start "Data Agent - Frontend UI (Port 12200)" cmd /k "cd /d "%FRONTEND_DIR%" && npm run preview -- --port 12200 --host 127.0.0.1"
 
 echo.
 echo ===================================================
 echo   Data Agent is now live!
-echo   Web App URL: http://localhost:9080
-echo   API URL:     http://localhost:9000
+echo   Web App URL: http://localhost:12200
+echo   API URL:     http://localhost:12201
 echo ===================================================
 echo.
 pause

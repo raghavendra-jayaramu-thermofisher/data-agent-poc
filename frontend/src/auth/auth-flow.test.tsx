@@ -12,7 +12,7 @@ import { ProtectedRoute } from '../app/route-guards/ProtectedRoute';
 import { OrganizationProvider, useOrganization } from '../organizations/OrganizationProvider';
 import { authSession } from './session-storage';
 import { server } from '../test/server';
-const base = 'http://localhost:8000';
+const base = 'http://localhost:12201';
 const tokens = { access_token: 'access-1', refresh_token: 'r'.repeat(32), token_type: 'bearer', expires_in: 900 };
 const user = { id: 'user-1', email: 'user@example.com', display_name: 'Alex', is_active: true, email_verified_at: null, created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z' };
 const org = { id: 'org-1', name: 'Acme', slug: 'acme', created_by: 'user-1', created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z', role: 'owner' };

@@ -24,11 +24,11 @@ function renderPage(state?: object) {
 
 function baseHandlers(messageProvider: () => unknown[] = () => []) {
   server.use(
-    http.get('http://localhost:8000/api/v1/conversations/c1', () => HttpResponse.json({ ...conversation, messages: [] })),
-    http.get('http://localhost:8000/api/v1/conversations/c1/messages', () => HttpResponse.json(messageProvider())),
-    http.get('http://localhost:8000/api/v1/conversations', () => HttpResponse.json([conversation])),
-    http.get('http://localhost:8000/api/v1/data-sources', () => HttpResponse.json([source])),
-    http.get('http://localhost:8000/api/v1/jobs/:jobId/execution', () => HttpResponse.json({ tools: [], sql: [], models: [], artifacts: [] })),
+    http.get('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ ...conversation, messages: [] })),
+    http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json(messageProvider())),
+    http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([conversation])),
+    http.get('http://localhost:12201/api/v1/data-sources', () => HttpResponse.json([source])),
+    http.get('http://localhost:12201/api/v1/jobs/:jobId/execution', () => HttpResponse.json({ tools: [], sql: [], models: [], artifacts: [] })),
   );
 }
 
@@ -38,7 +38,7 @@ describe('durable conversation workspace', () => {
   it('submits the pending first question once, renders the durable user ID immediately, and registers its global job', async () => {
     baseHandlers();
     let submissions = 0;
-    server.use(http.post('http://localhost:8000/api/v1/conversations/c1/messages', async ({ request }) => {
+    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
       submissions += 1;
       expect(await request.json()).toEqual({ content: 'Why did revenue fall?', model_profile_id: null });
       return HttpResponse.json({ message_id: 'm-durable', job_id: 'j-chat' }, { status: 202 });
@@ -72,7 +72,7 @@ describe('durable conversation workspace', () => {
 
   it('creates an independent durable job for a follow-up without waiting for an earlier answer', async () => {
     baseHandlers(() => [{ id: 'm1', conversation_id: 'c1', role: 'user', content: 'Initial question', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' }]);
-    server.use(http.post('http://localhost:8000/api/v1/conversations/c1/messages', async ({ request }) => {
+    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
       expect(await request.json()).toEqual({ content: 'Now compare enterprise customers.', model_profile_id: null });
       return HttpResponse.json({ message_id: 'm-follow', job_id: 'j-follow' }, { status: 202 });
     }));

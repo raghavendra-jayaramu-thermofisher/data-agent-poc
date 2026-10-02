@@ -8,7 +8,7 @@ const clientMocks = vi.hoisted(() => ({
 
 vi.mock('@microsoft/fetch-event-source', () => ({ fetchEventSource: fetchEventSourceMock }));
 vi.mock('../../api/client', () => ({
-  API_BASE_URL: 'http://localhost:8000',
+  API_BASE_URL: 'http://localhost:12201',
   getAuthenticatedHeaders: (extra?: HeadersInit) => {
     const headers = new Headers(clientMocks.headers);
     if (extra) new Headers(extra).forEach((value, key) => headers.set(key, value));

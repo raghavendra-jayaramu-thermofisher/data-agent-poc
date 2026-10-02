@@ -63,7 +63,7 @@ Use **Node 22.22.2 or newer** (or a newer current/LTS release compatible with th
 The backend normally runs at:
 
 ```text
-http://localhost:8000
+http://localhost:12201
 ```
 
 The frontend expects the current DB Assistant backend OpenAPI contract at `/openapi.json`.
@@ -86,7 +86,7 @@ The project is then available at the URL printed by Vite.
 `.env.example` defines the only required frontend environment value today:
 
 ```text
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:12201
 ```
 
 `VITE_API_BASE_URL` is the backend origin only; do **not** include `/api/v1`.

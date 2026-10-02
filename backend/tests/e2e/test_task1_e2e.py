@@ -8,7 +8,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_task1_real_api_auth_and_workspace_flow() -> None:
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:12201")
     async with httpx.AsyncClient(base_url=base_url, timeout=10) as client:
         health = await client.get("/health")
         assert health.status_code == 200
