@@ -513,6 +513,26 @@ mypy app
 python -m compileall -q app migrations tests
 ```
 
+## Migration troubleshooting and checks
+
+From `space/poc`, inspect migration failures with
+`docker compose logs --no-color migrate`. After fixing the migration, run
+`docker compose up --build -d` again. Keep the database volume; deleting volumes
+or stamping Alembic to head is not a repair for failed schema changes.
+
+The check-constraint convention is `ck_%(table_name)s_%(constraint_name)s`.
+Use a logical name such as `valid_kind`, or wrap an already-expanded name in
+`op.f("ck_job_artifacts_valid_kind")`. Migration 0005 historically created
+`ck_job_artifacts_ck_job_artifacts_valid_kind`; migration 0008 handles both that
+legacy name and the canonical name, then creates the canonical constraint.
+
+Before releasing migrations, test `alembic upgrade head` on a disposable
+PostgreSQL database, an upgrade from the previous release, and a downgrade then
+re-upgrade where supported. Run `pytest tests/unit/test_html_artifact_migration.py`
+from `backend` with development dependencies installed. DDL tests supplement
+actual PostgreSQL migration tests; text-only contract tests cannot establish
+that an upgrade works.
+
 ## Configuration
 
 See `.env.example`. Important settings include:
