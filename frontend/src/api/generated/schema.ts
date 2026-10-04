@@ -941,6 +941,25 @@ export interface components {
             /** Nullable */
             nullable: boolean | null;
         };
+        /** ConnectionDiagnostics */
+        ConnectionDiagnostics: {
+            /** Category */
+            category: string;
+            /** Driver Message */
+            driver_message: string;
+            /** Error Number */
+            error_number?: number | null;
+            /** Job Id */
+            job_id?: string | null;
+            /** Message */
+            message: string;
+            /** Next Steps */
+            next_steps: string[];
+            /** Sqlstate */
+            sqlstate?: string | null;
+            /** Stage */
+            stage: string;
+        };
         /** ConversationCreate */
         ConversationCreate: {
             /** Data Source Ids */
@@ -1279,6 +1298,7 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            last_connection_diagnostics?: components["schemas"]["ConnectionDiagnostics"] | null;
             /** Last Error Code */
             last_error_code: string | null;
             /** Last Tested At */

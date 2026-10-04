@@ -54,6 +54,7 @@ class DataSource(TimestampMixin, Base):
     )
     last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_connection_diagnostics: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
 
 
 class DataSourceFile(TimestampMixin, Base):

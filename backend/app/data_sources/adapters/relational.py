@@ -10,6 +10,7 @@ from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.data_sources.errors import DataSourceOperationError
+from app.data_sources.diagnostics import connection_error
 from app.data_sources.types import (
     ColumnMetadata,
     ConnectionTestResult,
@@ -41,50 +42,48 @@ class SQLAlchemyAsyncAdapter:
                 connect_args=self.connect_args,
             )
         except (ImportError, ModuleNotFoundError) as exc:
-            raise DataSourceOperationError(
-                "DATASOURCE_DRIVER_UNAVAILABLE",
-                "The required database driver is not installed on this server.",
-            ) from exc
+            raise connection_error(exc, stage="driver initialization", secrets=self._diagnostic_secrets()) from exc
         except Exception as exc:
             raise DataSourceOperationError(
                 "DATASOURCE_CONFIGURATION_INVALID",
                 "The datasource configuration is invalid.",
             ) from exc
 
-    async def _with_engine(self, operation: Callable[[AsyncEngine], Any]) -> Any:
+    def _diagnostic_secrets(self) -> tuple[str, ...]:
+        return (self.url.username or "", self.url.password or "")
+
+    async def _with_engine(self, operation: Callable[[AsyncEngine], Any], *, stage: str = "database operation") -> Any:
         engine = self._create_engine()
         try:
             return await operation(engine)
         except DataSourceOperationError:
             raise
-        except SQLAlchemyError as exc:
-            raise DataSourceOperationError(
-                "DATASOURCE_CONNECTION_FAILED",
-                "Unable to connect to the datasource.",
-                retryable=True,
-            ) from exc
         except Exception as exc:
-            raise DataSourceOperationError(
-                "DATASOURCE_OPERATION_FAILED",
-                "The datasource operation failed.",
-            ) from exc
+            raise connection_error(exc, stage=stage, secrets=self._diagnostic_secrets()) from exc
         finally:
             await engine.dispose()
 
     async def test_connection(self) -> ConnectionTestResult:
         async def operation(engine: AsyncEngine) -> ConnectionTestResult:
-            async with engine.connect() as connection:
-                await connection.execute(text("SELECT 1"))
+            stage = "opening database connection"
+            try:
+                async with engine.connect() as connection:
+                    stage = "connection probe (SELECT 1)"
+                    await connection.execute(text("SELECT 1"))
+            except DataSourceOperationError:
+                raise
+            except Exception as exc:
+                raise connection_error(exc, stage=stage, secrets=self._diagnostic_secrets()) from exc
             return ConnectionTestResult(ok=True)
 
-        return await self._with_engine(operation)
+        return await self._with_engine(operation, stage="connection test (connect and SELECT 1)")
 
     async def introspect(self) -> SchemaMetadata:
         async def operation(engine: AsyncEngine) -> SchemaMetadata:
             async with engine.connect() as connection:
                 return await connection.run_sync(self._inspect_sync)
 
-        return await self._with_engine(operation)
+        return await self._with_engine(operation, stage="schema inspection")
 
     def _inspect_sync(self, sync_connection: Any) -> SchemaMetadata:
         inspector = inspect(sync_connection)

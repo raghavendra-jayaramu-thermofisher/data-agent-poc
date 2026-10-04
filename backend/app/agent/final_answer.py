@@ -19,6 +19,7 @@ from app.models.client import (
     OpenAICompatibleClient,
 )
 from app.models.errors import ModelProviderError
+from app.models.diagnostics import diagnostic_message
 
 FINALIZER_SYSTEM_PROMPT = """You are the final-answer writer for a business data assistant.
 
@@ -188,7 +189,7 @@ class FinalAnswerRuntime:
                 execution_id,
                 status="failed",
                 error_code="FINAL_ANSWER_TIMEOUT",
-                error_message="The final-answer model timed out.",
+                error_message=f"The final-answer model timed out after {self.settings.final_answer_timeout_seconds} seconds.",
             )
             raise FinalAnswerError(
                 "FINAL_ANSWER_TIMEOUT", "The final answer took too long to generate."
@@ -198,7 +199,7 @@ class FinalAnswerRuntime:
                 execution_id,
                 status="failed",
                 error_code="FINAL_ANSWER_PROVIDER_FAILED",
-                error_message=exc.public_message,
+                error_message=diagnostic_message(exc.public_message, exc.diagnostics),
             )
             raise FinalAnswerError(
                 "FINAL_ANSWER_PROVIDER_FAILED",

@@ -21,6 +21,7 @@ import { safeDisplayEntries, safeJsonStringify } from '../../lib/security';
 import { useJobManager } from '../../jobs/JobManagerProvider';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/data-source-api';
+import { ConnectionDiagnosticsPanel } from '../components/ConnectionDiagnosticsPanel';
 
 export function DataSourceDetailPage() {
   const { dataSourceId = '' } = useParams();
@@ -52,6 +53,7 @@ export function DataSourceDetailPage() {
       await jobs.registerJob(job_id);
       notifications.info('Connection test started');
     },
+    onError: (error) => notifications.error('Unable to start connection test', error instanceof Error ? error.message : undefined),
   });
 
   if (sourceQuery.isLoading) return <PageState title="Loading data source…" loading />;
@@ -112,6 +114,7 @@ export function DataSourceDetailPage() {
         </div>
       </div>
 
+      <ConnectionDiagnosticsPanel diagnostics={source.last_connection_diagnostics} code={source.last_error_code} sourceId={source.id} canManage={canManage} testing={test.isPending} onTest={() => test.mutate()} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Configuration Panel */}
         <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg p-5 shadow-xs">
@@ -164,7 +167,11 @@ export function DataSourceDetailPage() {
           </p>
           {showSchema && (
             <div className="flex-1">
-              <SchemaView loading={schemaQuery.isLoading} tables={schemaQuery.data?.tables ?? []} />
+              {schemaQuery.isError ? <div role="alert" className="text-xs text-[#A84545]">
+                <p className="font-semibold">Unable to load schema</p>
+                <p>{schemaQuery.error?.message || 'Database schema inspection failed. Review the connection diagnostics and retry.'}</p>
+                <button type="button" className="underline mt-2" onClick={() => void schemaQuery.refetch()}>Retry Schema Inspection</button>
+              </div> : <SchemaView loading={schemaQuery.isLoading} tables={schemaQuery.data?.tables ?? []} />}
             </div>
           )}
         </div>

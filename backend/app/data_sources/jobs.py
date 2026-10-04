@@ -10,6 +10,7 @@ from app.core.database import get_session_factory
 from app.core.redis import get_redis
 from app.core.time import utc_now
 from app.data_sources.errors import DataSourceOperationError
+from app.data_sources.diagnostics import connection_error
 from app.data_sources.excel import ExcelMaterializer, unique_identifiers
 from app.data_sources.repository import DataSourceRepository
 from app.data_sources.service import DataSourceService
@@ -55,7 +56,11 @@ async def datasource_test_handler(job_id: uuid.UUID) -> dict[str, object]:
         data_source = await service.require_for_org(data_source_id, job.organization_id)
         if data_source.status == "disabled":
             raise JobFailureError("DATASOURCE_DISABLED", "The datasource is disabled.")
-        adapter = await service.resolve_adapter(data_source)
+        try:
+            adapter = await service.resolve_adapter(data_source)
+        except DataSourceOperationError as error:
+            await _mark_test_failure(job_id, data_source_id, error)
+            raise JobFailureError(error.code, error.public_message) from error
 
     await _append_event(job_id, "datasource.test.started", {"data_source_id": str(data_source_id)})
     try:
@@ -66,11 +71,7 @@ async def datasource_test_handler(job_id: uuid.UUID) -> dict[str, object]:
                 "DATASOURCE_CONNECTION_FAILED", "Unable to connect to the datasource."
             )
     except TimeoutError as exc:
-        error = DataSourceOperationError(
-            "DATASOURCE_CONNECTION_TIMEOUT",
-            "The datasource connection test timed out.",
-            retryable=True,
-        )
+        error = connection_error(exc, stage="connection test")
         await _mark_test_failure(job_id, data_source_id, error)
         raise JobFailureError(error.code, error.public_message, retryable=True) from exc
     except DataSourceOperationError as error:
@@ -100,11 +101,15 @@ async def _mark_test_failure(
         if job is not None:
             service = DataSourceService(session, settings, redis=redis)
             data_source = await service.require_for_org(data_source_id, job.organization_id)
-            await service.mark_test_failed(data_source, error.code)
+            diagnostics = {**(error.diagnostics or {
+                "category": "unknown", "stage": "connection test", "message": error.public_message,
+                "driver_message": "No further driver details were provided.", "next_steps": ["Review the error code and server logs."],
+            }), "job_id": str(job_id)}
+            await service.mark_test_failed(data_source, error.code, diagnostics)
     await _append_event(
         job_id,
         "datasource.test.failed",
-        {"data_source_id": str(data_source_id), "code": error.code},
+        {"data_source_id": str(data_source_id), "code": error.code, "diagnostics": error.diagnostics or {}},
     )
 
 

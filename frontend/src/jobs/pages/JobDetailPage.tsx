@@ -4,7 +4,6 @@ import {
   Activity,
   ArrowLeft,
   XCircle,
-  RotateCcw,
   Layers,
   Terminal,
 } from 'lucide-react';
@@ -21,6 +20,7 @@ import { useJobManager } from '../JobManagerProvider';
 import { useJob } from '../hooks/useJobs';
 import { getSafeJobEventLabel } from '../sse/job-events';
 import { isActiveJobStatus } from '../types';
+import { JobDiagnosticsPanel } from '../components/JobDiagnosticsPanel';
 
 export function JobDetailPage() {
   const { jobId = '' } = useParams();
@@ -87,6 +87,7 @@ export function JobDetailPage() {
       </div>
 
       {/* Durable State & Event Timeline Grid */}
+      <JobDiagnosticsPanel job={job} trace={trace.data} unavailable={trace.isError} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg p-5 shadow-xs">
           <h2 className="text-sm font-semibold text-[#252127] pb-2 mb-3 border-b border-[#E7E3DC]">
@@ -158,16 +159,7 @@ export function JobDetailPage() {
               Persisted operational records only. Private model reasoning and hidden prompts are never displayed.
             </p>
           </div>
-          {trace.isError && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-semibold"
-              onClick={() => void trace.refetch()}
-            >
-              <RotateCcw size={12} />
-              <span>Retry Trace</span>
-            </button>
-          )}
+          {trace.isError && <p role="alert" className="text-xs text-[#A84545]">Unable to load execution details.</p>}
         </div>
 
         {trace.isLoading ? (

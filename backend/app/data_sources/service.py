@@ -30,6 +30,7 @@ from app.data_sources.secrets import SecretService
 from app.data_sources.storage import LocalDataSourceStorage
 from app.data_sources.types import SchemaMetadata
 from app.jobs.service import JobService
+from app.knowledge.repository import KnowledgeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -257,9 +258,28 @@ class DataSourceService:
                     parsed = self.adapters.validate_config(data_source.kind, payload.config)
                 except DataSourceConfigurationError as exc:
                     raise AppError(exc.code, exc.public_message, 400) from exc
-                data_source.config = parsed.model_dump(mode="json")
+                next_config = parsed.model_dump(mode="json")
+                location_fields = ("host", "port", "database", "schema_name")
+                if any(data_source.config.get(key) != next_config.get(key) for key in location_fields):
+                    knowledge_repo = KnowledgeRepository(self.session)
+                    base = await knowledge_repo.get_base_for_source(data_source.id, organization_id)
+                    if base is not None:
+                        base = await knowledge_repo.lock_base(base.id)
+                        if base is not None:
+                            if base.status == "generating":
+                                raise AppError(
+                                    "KNOWLEDGE_GENERATION_IN_PROGRESS",
+                                    "Wait for knowledge generation to finish before changing the database connection.",
+                                    409,
+                                )
+                            base.current_version_id = None
+                            base.status = "empty"
+                            base.last_error_code = None
+                data_source.config = next_config
                 data_source.status = "pending"
                 data_source.last_error_code = None
+                data_source.last_connection_diagnostics = None
+                data_source.last_tested_at = None
         if payload.credentials is not None:
             if data_source.kind == "duckdb":
                 raise AppError(
@@ -284,6 +304,8 @@ class DataSourceService:
                 await self.secrets.replace(secret, credential_payload)
             data_source.status = "pending"
             data_source.last_error_code = None
+            data_source.last_connection_diagnostics = None
+            data_source.last_tested_at = None
         if payload.status is not None:
             if payload.status == "active" and data_source.status == "disabled":
                 if (
@@ -396,12 +418,14 @@ class DataSourceService:
         data_source.status = "active"
         data_source.last_tested_at = utc_now()
         data_source.last_error_code = None
+        data_source.last_connection_diagnostics = None
         await self.session.commit()
 
-    async def mark_test_failed(self, data_source: DataSource, code: str) -> None:
+    async def mark_test_failed(self, data_source: DataSource, code: str, diagnostics: dict[str, object] | None = None) -> None:
         data_source.status = "error"
         data_source.last_tested_at = utc_now()
         data_source.last_error_code = code[:100]
+        data_source.last_connection_diagnostics = diagnostics
         await self.session.commit()
 
     async def _ensure_name_available(self, organization_id: uuid.UUID, name: str) -> None:

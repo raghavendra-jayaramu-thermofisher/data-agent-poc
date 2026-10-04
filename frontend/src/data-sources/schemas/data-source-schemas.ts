@@ -25,6 +25,7 @@ export const dataSourceEditSchema = z.object({
     status: z.enum(['active', 'disabled']),
     username: z.string().trim().max(255).optional(),
     password: z.string().max(4096).optional(),
+    connection: relationalDataSourceSchema.omit({ kind: true, name: true, username: true, password: true }).optional(),
 }).superRefine((value, context) => {
     if ((value.username && !value.password) || (!value.username && value.password)) {
         context.addIssue({ code: 'custom', path: ['password'], message: 'Enter both username and password to replace credentials.' });

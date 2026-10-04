@@ -145,6 +145,75 @@
         "title": "ColumnMetadataResponse",
         "type": "object"
       },
+      "ConnectionDiagnostics": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "driver_message": {
+            "title": "Driver Message",
+            "type": "string"
+          },
+          "error_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Number"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "sqlstate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sqlstate"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "stage",
+          "message",
+          "driver_message",
+          "next_steps"
+        ],
+        "title": "ConnectionDiagnostics",
+        "type": "object"
+      },
       "ConversationCreate": {
         "additionalProperties": false,
         "properties": {
@@ -905,6 +974,16 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "last_connection_diagnostics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionDiagnostics"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "last_error_code": {
             "anyOf": [
@@ -1839,8 +1918,8 @@
           },
           "port": {
             "default": 1433,
-            "maximum": 65535.0,
-            "minimum": 1.0,
+            "maximum": 65535,
+            "minimum": 1,
             "title": "Port",
             "type": "integer"
           },
@@ -2473,8 +2552,8 @@
           },
           "port": {
             "default": 3306,
-            "maximum": 65535.0,
-            "minimum": 1.0,
+            "maximum": 65535,
+            "minimum": 1,
             "title": "Port",
             "type": "integer"
           },
@@ -2606,8 +2685,8 @@
           },
           "port": {
             "default": 5432,
-            "maximum": 65535.0,
-            "minimum": 1.0,
+            "maximum": 65535,
+            "minimum": 1,
             "title": "Port",
             "type": "integer"
           },

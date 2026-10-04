@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 import httpx
 
 from app.models.errors import ModelProviderError
+from app.models.diagnostics import provider_diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +55,7 @@ class OpenAICompatibleClient:
     """Small, provider-agnostic OpenAI-compatible HTTP client.
 
     `base_url` is the API root, for example `https://api.openai.com/v1`.
-    Provider response bodies are never included in public exceptions.
+    Only sanitized structured error fields are retained; response bodies and prompts are not exposed.
 
     """
 
@@ -93,17 +95,20 @@ class OpenAICompatibleClient:
             raise ModelProviderError(
                 "MODEL_PROVIDER_TIMEOUT",
                 "The model provider did not respond in time.",
+                diagnostics={"exception_type": type(exc).__name__, "timeout_seconds": self.timeout_seconds},
             ) from exc
         except httpx.RequestError as exc:
             raise ModelProviderError(
                 "MODEL_PROVIDER_UNAVAILABLE",
                 "Unable to reach the model provider.",
+                diagnostics={"exception_type": type(exc).__name__},
             ) from exc
 
         if response.status_code >= 400:
             raise ModelProviderError(
                 "MODEL_PROVIDER_REJECTED_REQUEST",
                 "The model provider rejected the request.",
+                diagnostics=provider_diagnostics(response, api_key=self.api_key, request_payload=kwargs.get("json")),
             )
         return response
 
@@ -137,6 +142,13 @@ class OpenAICompatibleClient:
             for key, value in settings.items():
                 if key not in {"model", "messages"}:
                     payload[key] = value
+
+        # Saved profiles currently use max_tokens. OpenAI's newer models require
+        # max_completion_tokens; keep this translation scoped to its official API.
+        if urlsplit(self.base_url).hostname == "api.openai.com" and "max_tokens" in payload:
+            token_limit = payload.pop("max_tokens")
+            if payload.get("max_completion_tokens") is None:
+                payload["max_completion_tokens"] = token_limit
 
         response = await self._request("POST", "chat/completions", json=payload)
         try:

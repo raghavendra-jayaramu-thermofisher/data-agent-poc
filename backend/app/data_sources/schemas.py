@@ -102,6 +102,17 @@ class DataSourceFileResponse(BaseModel):
     updated_at: datetime
 
 
+class ConnectionDiagnostics(BaseModel):
+    category: str
+    stage: str
+    message: str
+    driver_message: str
+    sqlstate: str | None = None
+    error_number: int | None = None
+    next_steps: list[str]
+    job_id: str | None = None
+
+
 class DataSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -115,6 +126,7 @@ class DataSourceResponse(BaseModel):
     created_by: uuid.UUID
     last_tested_at: datetime | None
     last_error_code: str | None
+    last_connection_diagnostics: ConnectionDiagnostics | None = None
     created_at: datetime
     updated_at: datetime
     active_file: DataSourceFileResponse | None = None
