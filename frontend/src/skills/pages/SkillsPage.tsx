@@ -5,29 +5,26 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Check,
   Star,
   X,
   AlertCircle,
-  HelpCircle,
 } from 'lucide-react';
 import type { AppError } from '../../api/errors';
-import { FormField } from '../../auth/components/FormField';
-import { PageError, PageLoading, PageState } from '../../components/PageState';
+import { PageError, PageLoading } from '../../components/PageState';
 import { notifications } from '../../components/notifications';
 import { useOrganization } from '../../organizations/OrganizationProvider';
-import { hasAdminRole } from '../components/AdminSettingsGate';
+import { hasAdminRole } from '../../settings/components/AdminSettingsGate';
 import {
   useCreateInstruction,
   useDeleteInstruction,
   useInstructions,
   useUpdateInstruction,
-} from '../hooks/useInstructions';
+} from '../../settings/hooks/useInstructions';
 import type {
   AgentInstruction,
   InstructionCreate,
   InstructionUpdate,
-} from '../api/instructions-api';
+} from '../../settings/api/instructions-api';
 
 type FormState = {
   name: string;
@@ -49,7 +46,7 @@ const emptyFormState: FormState = {
   enabled: true,
 };
 
-export function InstructionsSettingsPage() {
+export function SkillsPage() {
   const { activeOrganization } = useOrganization();
   const canManage = hasAdminRole(activeOrganization?.role);
   const query = useInstructions();
@@ -62,11 +59,11 @@ export function InstructionsSettingsPage() {
   const [formData, setFormData] = useState<FormState>(emptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (query.isLoading) return <PageLoading label="Loading AI instructions…" />;
+  if (query.isLoading) return <PageLoading label="Loading skills…" />;
   if (query.isError) {
     return (
       <PageError
-        title="Unable to load AI instructions"
+        title="Unable to load skills"
         message={(query.error as Error).message}
         retry={() => void query.refetch()}
       />
@@ -104,9 +101,9 @@ export function InstructionsSettingsPage() {
         id: item.id,
         body: { is_default: true, enabled: true },
       });
-      notifications.success(`"${item.name}" is now the workspace default instruction.`);
+      notifications.success(`"${item.name}" is now the workspace default skill.`);
     } catch (err) {
-      notifications.error((err as AppError).message || 'Failed to update default instruction');
+      notifications.error((err as AppError).message || 'Failed to update default skill');
     }
   };
 
@@ -114,16 +111,16 @@ export function InstructionsSettingsPage() {
     if (!canManage) return;
     if (
       !window.confirm(
-        `Are you sure you want to delete instruction "${item.name}"? This action cannot be undone.`
+        `Are you sure you want to delete skill "${item.name}"? This action cannot be undone.`
       )
     ) {
       return;
     }
     try {
       await deleteMutation.mutateAsync(item.id);
-      notifications.success(`Instruction "${item.name}" deleted.`);
+      notifications.success(`Skill "${item.name}" deleted.`);
     } catch (err) {
-      notifications.error((err as AppError).message || 'Failed to delete instruction');
+      notifications.error((err as AppError).message || 'Failed to delete skill');
     }
   };
 
@@ -137,11 +134,11 @@ export function InstructionsSettingsPage() {
     const trimmedCommand = formData.command.trim().replace(/^\/+/, '').toLowerCase();
 
     if (!trimmedName) {
-      setFormError('Instruction name is required.');
+      setFormError('Skill name is required.');
       return;
     }
     if (!trimmedContent) {
-      setFormError('Instructions content is required.');
+      setFormError('Skill instructions are required.');
       return;
     }
 
@@ -157,7 +154,7 @@ export function InstructionsSettingsPage() {
           enabled: formData.enabled,
         };
         await updateMutation.mutateAsync({ id: editingItem.id, body });
-        notifications.success(`Instruction "${trimmedName}" updated.`);
+        notifications.success(`Skill "${trimmedName}" updated.`);
       } else {
         const body: InstructionCreate = {
           name: trimmedName,
@@ -169,22 +166,22 @@ export function InstructionsSettingsPage() {
           enabled: formData.enabled,
         };
         await createMutation.mutateAsync(body);
-        notifications.success(`Instruction "${trimmedName}" created.`);
+        notifications.success(`Skill "${trimmedName}" created.`);
       }
       setModalOpen(false);
     } catch (err) {
-      setFormError((err as AppError).message || 'Failed to save instruction.');
+      setFormError((err as AppError).message || 'Failed to save skill.');
     }
   };
 
   return (
-    <div>
+    <div className="p-6 max-w-5xl mx-auto">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-[#DAD5CD] gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-[#252127]">AI Instructions & Slash Commands</h2>
+          <h1 className="text-xl font-semibold text-[#252127]">Skills</h1>
           <p className="text-xs text-[#625C64]">
-            Set default instructions that the AI model always follows, and define slash commands (e.g.{' '}
+            Set an always-on workspace skill, or create command skills invoked with slash commands (e.g.{' '}
             <code className="text-[#4B123F] font-mono font-semibold">/retention</code>) for on-demand
             specialized analysis.
           </p>
@@ -196,7 +193,7 @@ export function InstructionsSettingsPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors shrink-0"
           >
             <Plus size={14} />
-            <span>New Instruction</span>
+            <span>New Skill</span>
           </button>
         )}
       </div>
@@ -205,7 +202,7 @@ export function InstructionsSettingsPage() {
       {instructions.length === 0 ? (
         <div className="p-8 text-center bg-[#FBFAF7] border border-[#DAD5CD] rounded-lg">
           <Terminal size={28} className="mx-auto mb-2 text-[#8B848C]" />
-          <h3 className="text-sm font-semibold text-[#252127] mb-1">No AI instructions configured</h3>
+          <h3 className="text-sm font-semibold text-[#252127] mb-1">No skills configured</h3>
           <p className="text-xs text-[#625C64] max-w-md mx-auto mb-4">
             Add custom instructions to guide the data assistant on company-wide metric definitions,
             fiscal calendar rules, or create slash commands for quick analytical tasks.
@@ -217,7 +214,7 @@ export function InstructionsSettingsPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors"
             >
               <Plus size={14} />
-              <span>Create First Instruction</span>
+              <span>Create First Skill</span>
             </button>
           )}
         </div>
@@ -239,7 +236,7 @@ export function InstructionsSettingsPage() {
 
                     {item.is_default && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
-                        <Star size={11} className="fill-current" /> Workspace Default
+                        <Star size={11} className="fill-current" /> Always-on · Workspace Default
                       </span>
                     )}
 
@@ -269,7 +266,7 @@ export function InstructionsSettingsPage() {
                   <div className="mt-1">
                     <details className="text-xs text-[#625C64] group">
                       <summary className="cursor-pointer text-[#4B123F] hover:underline font-medium list-none flex items-center gap-1 select-none">
-                        <span>View Instructions Content</span>
+                        <span>View Skill Instructions</span>
                       </summary>
                       <pre className="mt-2 p-3 bg-[#FBFAF7] border border-[#DAD5CD] rounded text-xs font-mono text-[#252127] whitespace-pre-wrap max-h-48 overflow-y-auto">
                         {item.content}
@@ -293,7 +290,7 @@ export function InstructionsSettingsPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(item)}
-                      title="Edit instruction"
+                      title="Edit skill"
                       className="p-1.5 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded transition-colors"
                     >
                       <Edit2 size={13} />
@@ -301,7 +298,7 @@ export function InstructionsSettingsPage() {
                     <button
                       type="button"
                       onClick={() => handleDelete(item)}
-                      title="Delete instruction"
+                      title="Delete skill"
                       className="p-1.5 text-[#8B848C] hover:text-[#A84545] hover:bg-[#F7E7E5] rounded transition-colors"
                     >
                       <Trash2 size={13} />
@@ -327,7 +324,7 @@ export function InstructionsSettingsPage() {
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[#4B123F]" />
                 <h3 id="instruction-modal-title" className="text-sm font-semibold text-[#252127]">
-                  {editingItem ? 'Edit AI Instruction' : 'New AI Instruction'}
+                  {editingItem ? 'Edit Skill' : 'New Skill'}
                 </h3>
               </div>
               <button
@@ -353,7 +350,7 @@ export function InstructionsSettingsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Instruction Name <span className="text-[#A84545]">*</span>
+                  Skill Name <span className="text-[#A84545]">*</span>
                 </label>
                 <input
                   type="text"
@@ -424,7 +421,7 @@ export function InstructionsSettingsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Instructions Content <span className="text-[#A84545]">*</span>
+                  Skill Instructions <span className="text-[#A84545]">*</span>
                 </label>
                 <textarea
                   required
@@ -454,9 +451,9 @@ export function InstructionsSettingsPage() {
                     className="rounded border-[#DAD5CD] text-[#4B123F] focus:ring-[#4B123F]"
                   />
                   <div className="text-xs">
-                    <span className="font-semibold text-[#252127]">Set as Workspace Default</span>
+                    <span className="font-semibold text-[#252127]">Set as Workspace Default (always-on)</span>
                     <span className="text-[#625C64] block">
-                      Always applied to every query asked in this workspace. Only one instruction can be default.
+                      Always applied to every query asked in this workspace. Only one skill can be the workspace default.
                     </span>
                   </div>
                 </label>
@@ -470,7 +467,7 @@ export function InstructionsSettingsPage() {
                     className="rounded border-[#DAD5CD] text-[#4B123F] focus:ring-[#4B123F]"
                   />
                   <span className="text-xs font-medium text-[#252127]">
-                    Instruction Enabled
+                    Skill Enabled
                   </span>
                 </label>
               </div>
@@ -488,7 +485,7 @@ export function InstructionsSettingsPage() {
                   disabled={createMutation.isPending || updateMutation.isPending}
                   className="px-4 py-1.5 text-xs font-semibold bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded transition-colors disabled:opacity-50"
                 >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save Instruction'}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save Skill'}
                 </button>
               </div>
             </form>
@@ -498,3 +495,4 @@ export function InstructionsSettingsPage() {
     </div>
   );
 }
+

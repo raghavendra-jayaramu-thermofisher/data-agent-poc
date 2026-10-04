@@ -25,6 +25,8 @@ export const router = createBrowserRouter([
           { path: '/data-sources/:dataSourceId', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../data-sources/pages/DataSourceDetailPage')).DataSourceDetailPage }) },
           { path: '/data-sources/:dataSourceId/edit', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../data-sources/pages/EditDataSourcePage')).EditDataSourcePage }) },
           { path: '/knowledge', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../knowledge/pages/KnowledgePage')).KnowledgePage }) },
+          { path: '/skills', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../skills/pages/SkillsPage')).SkillsPage }) },
+          { path: '/settings/instructions', element: <Navigate to="/skills" replace /> },
           { path: '/knowledge/:dataSourceId', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../knowledge/pages/KnowledgeDetailPage')).KnowledgeDetailPage }) },
           { path: '/models', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../models/pages/ModelsPage')).ModelsPage }) },
           { path: '/models/connections/new', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../models/pages/NewModelConnectionPage')).NewModelConnectionPage }) },
@@ -40,7 +42,6 @@ export const router = createBrowserRouter([
             children: [
               { index: true, errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/SettingsOverviewPage')).SettingsOverviewPage }) },
               { path: 'organization', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/OrganizationSettingsPage')).OrganizationSettingsPage }) },
-              { path: 'instructions', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/InstructionsSettingsPage')).InstructionsSettingsPage }) },
               { path: 'audit', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/AuditSettingsPage')).AuditSettingsPage }) },
               { path: 'operations', errorElement: <ErrorBoundary />, lazy: async () => ({ Component: (await import('../settings/pages/OperationsSettingsPage')).OperationsSettingsPage }) },
             ],

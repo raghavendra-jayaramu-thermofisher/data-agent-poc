@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 
 const createConversation = vi.hoisted(() => vi.fn());
+vi.mock('../../settings/hooks/useInstructions', () => ({ useInstructions: () => ({ data: [] }) }));
 
 vi.mock('../../auth/AuthProvider', () => ({
   useAuth: () => ({ user: { display_name: 'Alex', email: 'alex@example.com' } }),
@@ -58,8 +59,7 @@ describe('new analysis screen', () => {
     ).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox', { name: 'Ask a question' }), 'Show revenue');
-    await user.click(screen.getByRole('button', { name: /select data source/i }));
-    await user.click(screen.getByRole('button', { name: /warehouse/i }));
+    expect(screen.getByRole('button', { name: /warehouse/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send question' }));
 
     await waitFor(() =>

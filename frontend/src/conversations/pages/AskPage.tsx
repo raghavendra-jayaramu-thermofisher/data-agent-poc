@@ -33,7 +33,10 @@ export function AskPage() {
   });
 
   const [question, setQuestion] = useState('');
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const sourceScope = JSON.stringify([user?.id, orgId]);
+  const [sourceSelections, setSourceSelections] = useState<Record<string, string[]>>(() =>
+    preferences.get('askDataSourceIdsByScope') ?? {},
+  );
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(() => {
     return preferences.get('lastSelectedModelProfileId') ?? null;
   });
@@ -59,6 +62,16 @@ export function AskPage() {
   }
 
   const activeSources = (dataSources.data ?? []).filter((source) => source.status === 'active');
+  const rememberedSourceIds = sourceSelections[sourceScope] ?? [];
+  const soleSource = activeSources.length === 1 ? activeSources[0] : undefined;
+  const selectedSourceIds = soleSource
+    ? [soleSource.id]
+    : rememberedSourceIds.filter((id) => activeSources.some((source) => source.id === id)).slice(0, 10);
+  const handleSourceChange = (ids: string[]) => {
+    const next = { ...sourceSelections, [sourceScope]: ids };
+    setSourceSelections(next);
+    preferences.set('askDataSourceIdsByScope', next);
+  };
   const enabledProfiles = (profiles.data ?? []).filter((profile) => profile.enabled);
   const effectiveProfileId = enabledProfiles.some((profile) => profile.id === selectedProfileId)
     ? selectedProfileId
@@ -70,6 +83,7 @@ export function AskPage() {
     setSubmitError(null);
 
     try {
+      handleSourceChange(selectedSourceIds);
       const conversation = await api.createConversation({
         data_source_ids: selectedSourceIds,
         model_profile_id: effectiveProfileId,
@@ -116,7 +130,7 @@ export function AskPage() {
           onSubmit={handleSubmit}
           dataSources={activeSources}
           selectedDataSourceIds={selectedSourceIds}
-          onDataSourceIdsChange={setSelectedSourceIds}
+          onDataSourceIdsChange={handleSourceChange}
           profiles={enabledProfiles}
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}

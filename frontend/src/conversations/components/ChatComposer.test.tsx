@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DataSource } from '../../api/types';
 import { ChatComposer } from './ChatComposer';
 
+vi.mock('../../settings/hooks/useInstructions', () => ({ useInstructions: () => ({ data: [] }) }));
+
 const source: DataSource = {
   id: 'ds1',
   organization_id: 'org1',
@@ -50,7 +52,7 @@ describe('ChatComposer data-source scope', () => {
     expect(send).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /select data source/i }));
     await user.click(screen.getByRole('button', { name: /warehouse/i }));
-    expect(screen.getByRole('button', { name: /1 source/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /warehouse/i })).toHaveLength(2);
     expect(send).toBeEnabled();
     await user.click(send);
     expect(onSubmit).toHaveBeenCalledOnce();

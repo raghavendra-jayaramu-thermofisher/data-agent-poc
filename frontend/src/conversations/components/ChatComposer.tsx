@@ -191,7 +191,7 @@ export function ChatComposer({
           >
             <div className="chat-composer-popover__header">
               <div>
-                <strong>Slash Commands</strong>
+                  <strong>Skills</strong>
                 <span>Tab or Enter to select</span>
               </div>
               <button
@@ -206,7 +206,7 @@ export function ChatComposer({
             <div className="chat-composer-popover__list">
               {availableCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
-                  No slash commands configured in workspace.
+                  No command skills configured. Add them in Skills.
                 </p>
               ) : matchingCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
@@ -296,7 +296,9 @@ export function ChatComposer({
                 <span>
                   {selectedDataSourceIds.length === 0
                     ? 'Select data source'
-                    : `${selectedDataSourceIds.length} source${selectedDataSourceIds.length === 1 ? '' : 's'}`}
+                    : selectedDataSourceIds.length === 1
+                      ? dataSources.find((source) => source.id === selectedDataSourceIds[0])?.name ?? '1 source'
+                      : `${selectedDataSourceIds.length} sources`}
                 </span>
                 <ChevronDown size={11} />
                 </button>

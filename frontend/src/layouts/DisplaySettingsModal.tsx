@@ -10,6 +10,7 @@ import {
   Activity,
   Settings,
   Lock,
+  Terminal,
 } from 'lucide-react';
 import {
   ALL_SIDEBAR_TABS,
@@ -22,6 +23,7 @@ const TAB_ICONS: Record<SidebarTabKey, typeof MessageSquarePlus> = {
   '/dashboards': LayoutDashboard,
   '/data-sources': Database,
   '/knowledge': BrainCircuit,
+  '/skills': Terminal,
   '/models': Cpu,
   '/jobs': Activity,
   '/settings': Settings,
@@ -32,6 +34,7 @@ const TAB_DESCRIPTIONS: Record<SidebarTabKey, string> = {
   '/dashboards': 'Saved interactive dashboards and analytical widget grids.',
   '/data-sources': 'Connected database connections and data sync configurations.',
   '/knowledge': 'Business domain glossaries, verified SQL metrics, and table indices.',
+  '/skills': 'Reusable AI instructions and slash commands for analysis.',
   '/models': 'AI model providers and reasoning configurations.',
   '/jobs': 'Real-time asynchronous job executions and audit traces.',
   '/settings': 'Organization settings, memberships, and security policies.',
