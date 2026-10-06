@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.repository import ConversationRepository
-from app.conversations.schemas import ConversationCreate, ConversationResponse, MessageCreate
+from app.conversations.schemas import (
+    ConversationCreate,
+    ConversationRename,
+    ConversationResponse,
+    MessageCreate,
+)
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.time import utc_now
@@ -94,6 +99,18 @@ class ConversationService:
         await self.session.delete(item)
         await self.session.commit()
 
+    async def rename(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        payload: ConversationRename,
+    ) -> Conversation:
+        item = await self.require_for_org(conversation_id, organization_id)
+        item.title = payload.title
+        item.updated_at = utc_now()
+        await self.session.commit()
+        return item
+
     async def resolve_model_profile_id(
         self,
         *,
@@ -158,7 +175,9 @@ class ConversationService:
                 metadata["raw_prompt"] = payload.content
                 if instruction.prompt_template:
                     if "{prompt}" in instruction.prompt_template:
-                        expanded = instruction.prompt_template.replace("{prompt}", extra_prompt).strip()
+                        expanded = instruction.prompt_template.replace(
+                            "{prompt}", extra_prompt
+                        ).strip()
                     else:
                         expanded = (
                             f"{instruction.prompt_template}\n\n{extra_prompt}".strip()
@@ -166,7 +185,9 @@ class ConversationService:
                             else instruction.prompt_template.strip()
                         )
                 else:
-                    expanded = extra_prompt if extra_prompt else (instruction.description or payload.content)
+                    expanded = extra_prompt if extra_prompt else (
+                        instruction.description or payload.content
+                    )
                 metadata["expanded_prompt"] = expanded
 
         message = Message(

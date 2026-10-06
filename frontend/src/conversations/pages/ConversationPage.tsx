@@ -15,6 +15,7 @@ import { AnalysisFailure } from '../components/AnalysisFailure';
 import { AnalysisProgress } from '../components/AnalysisProgress';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { ChatComposer } from '../components/ChatComposer';
+import { RenameConversationModal } from '../components/RenameConversationModal';
 import { useConversation, useConversationMessages, useDeleteConversation } from '../hooks/useConversations';
 
 type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
@@ -203,6 +204,7 @@ export function ConversationPage() {
           <h1 className="text-sm font-semibold text-[#252127] truncate shrink-0 max-w-[320px] md:max-w-[460px]">
             {conversation.data?.title?.trim() || 'Analysis'}
           </h1>
+          <RenameConversationModal key={conversationId} id={conversationId} title={conversation.data?.title ?? null} />
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#625C64] min-w-0">
             <span className="text-[#DAD5CD]">•</span>
             <span className="flex items-center gap-1 text-[11px] text-[#625C64] shrink-0">

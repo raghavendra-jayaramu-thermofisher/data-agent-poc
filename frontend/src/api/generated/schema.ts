@@ -168,7 +168,8 @@ export interface paths {
         delete: operations["delete_conversation_api_v1_conversations__conversation_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_v1_conversations__conversation_id__patch"];
         trace?: never;
     };
     "/api/v1/conversations/{conversation_id}/messages": {
@@ -1004,6 +1005,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ConversationRename */
+        ConversationRename: {
+            /** Title */
+            title: string;
         };
         /** ConversationResponse */
         ConversationResponse: {
@@ -2620,6 +2626,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_v1_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

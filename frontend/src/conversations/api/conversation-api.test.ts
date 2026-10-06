@@ -1,9 +1,15 @@
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authSession } from '../../auth/session-storage';
 import { setApiOrganizationId } from '../../organizations/organization-store';
 import { server } from '../../test/server';
-import { createConversation, listMessages, submitMessage } from './conversation-api';
+import { createConversation, listMessages, renameConversation, submitMessage } from './conversation-api';
+
+// Resolve fetch after MSW starts instead of capturing the original fetch during imports.
+vi.mock('openapi-fetch', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('openapi-fetch')>();
+  return { ...actual, default: (options: Parameters<typeof actual.default>[0]) => actual.default({ ...options, fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) }) };
+});
 
 beforeEach(() => {
   authSession.write({ access_token: 'a', refresh_token: 'r', token_type: 'bearer', expires_in: 900 });
@@ -11,6 +17,14 @@ beforeEach(() => {
 });
 
 describe('conversation API', () => {
+  it('saves only the chat title through the scoped conversation endpoint', async () => {
+    server.use(http.patch('http://localhost:12201/api/v1/conversations/c1', async ({ request }) => {
+      expect(request.headers.get('x-organization-id')).toBe('org-1');
+      expect(await request.json()).toEqual({ title: 'Saved analysis' });
+      return HttpResponse.json({ id: 'c1', title: 'Saved analysis' });
+    }));
+    await expect(renameConversation('c1', 'Saved analysis')).resolves.toMatchObject({ id: 'c1', title: 'Saved analysis' });
+  });
   it('creates a conversation with multiple datasource identities intact', async () => {
     server.use(http.post('http://localhost:12201/api/v1/conversations', async ({ request }) => {
       expect(request.headers.get('x-organization-id')).toBe('org-1');

@@ -23,6 +23,13 @@ export function getConversation(id: string, messageLimit = 200): Promise<Convers
   }));
 }
 
+export function renameConversation(id: string, title: string): Promise<Conversation> {
+  return withAuthRefresh(() => apiClient.PATCH('/api/v1/conversations/{conversation_id}', {
+    params: { path: { conversation_id: id } },
+    body: { title },
+  }));
+}
+
 export function listMessages(id: string, limit = 200): Promise<ConversationMessage[]> {
   return withAuthRefresh(() => apiClient.GET('/api/v1/conversations/{conversation_id}/messages', {
     params: { path: { conversation_id: id }, query: { limit } },

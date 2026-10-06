@@ -11,6 +11,7 @@ from app.auth.models import User
 from app.conversations.schemas import (
     ConversationCreate,
     ConversationDetailResponse,
+    ConversationRename,
     ConversationResponse,
     MessageAcceptedResponse,
     MessageCreate,
@@ -72,6 +73,20 @@ async def get_conversation(
         **base.model_dump(),
         messages=[MessageResponse.model_validate(message) for message in messages],
     )
+
+
+@router.patch("/{conversation_id}", response_model=ConversationResponse)
+async def rename_conversation(
+    conversation_id: uuid.UUID,
+    payload: ConversationRename,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ConversationResponse:
+    organization, _ = context
+    service = ConversationService(session, settings)
+    item = await service.rename(conversation_id, organization.id, payload)
+    return await service.to_response(item)
 
 
 @router.delete("/{conversation_id}", status_code=204)

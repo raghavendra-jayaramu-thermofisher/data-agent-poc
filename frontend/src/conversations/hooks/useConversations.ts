@@ -33,6 +33,27 @@ export function useConversationMessages(conversationId: string | undefined) {
   });
 }
 
+export function useRenameConversation() {
+  const queryClient = useQueryClient();
+  const { activeOrganization } = useOrganization();
+  const orgId = activeOrganization?.id ?? null;
+
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => api.renameConversation(id, title),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<api.ConversationDetail>(
+        queryKeys.conversations.detail(orgId, updated.id),
+        (current) => current ? { ...current, ...updated } : undefined,
+      );
+      queryClient.setQueryData<api.Conversation[]>(
+        queryKeys.conversations.list(orgId),
+        (current) => current?.map((item) => item.id === updated.id ? updated : item),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
+    },
+  });
+}
+
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
   const { activeOrganization } = useOrganization();

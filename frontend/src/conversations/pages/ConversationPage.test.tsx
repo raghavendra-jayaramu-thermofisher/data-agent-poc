@@ -8,17 +8,29 @@ import { server } from '../../test/server';
 import type { ManagedJob } from '../../jobs/types';
 
 const manager = vi.hoisted(() => ({ jobs: [] as ManagedJob[], registerJob: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined) }));
+// Resolve fetch after MSW starts instead of capturing the original fetch during imports.
+vi.mock('openapi-fetch', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('openapi-fetch')>();
+  return { ...actual, default: (options: Parameters<typeof actual.default>[0]) => actual.default({ ...options, fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) }) };
+});
 vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { id: 'org-1', name: 'Org', role: 'owner' } }) }));
 vi.mock('../../jobs/JobManagerProvider', () => ({ useJobManager: () => ({ ...manager, activeJobs: manager.jobs.filter((entry) => entry.job.status === 'running' || entry.job.status === 'queued'), latestEvent: () => undefined, currentLabel: () => null, isLoading: false }) }));
 
 import { ConversationPage } from './ConversationPage';
+import { RecentConversations } from '../components/RecentConversations';
+import { useConversationList } from '../hooks/useConversations';
 
 const conversation = { id: 'c1', organization_id: 'org-1', title: 'Revenue analysis', created_by: 'u1', model_profile_id: null, data_source_ids: ['ds1'], created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z' };
 const source = { id: 'ds1', organization_id: 'org-1', name: 'Warehouse', kind: 'postgres', display_type: 'postgres', status: 'active', config: {}, created_by: 'u1', last_tested_at: null, last_error_code: null, created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z', active_file: null };
 
-function renderPage(state?: object) {
+function RecentChats() {
+  const chats = useConversationList();
+  return <RecentConversations conversations={chats.data ?? []} />;
+}
+
+function renderPage(state?: object, withRecent = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[{ pathname: '/conversations/c1', state }]}><Routes><Route path="/conversations/:conversationId" element={<ConversationPage/>}/><Route path="/ask" element={<div>Ask page</div>}/></Routes></MemoryRouter></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[{ pathname: '/conversations/c1', state }]}>{withRecent ? <RecentChats/> : null}<Routes><Route path="/conversations/:conversationId" element={<ConversationPage/>}/><Route path="/ask" element={<div>Ask page</div>}/></Routes></MemoryRouter></QueryClientProvider>);
   return client;
 }
 
@@ -28,12 +40,82 @@ function baseHandlers(messageProvider: () => unknown[] = () => []) {
     http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json(messageProvider())),
     http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([conversation])),
     http.get('http://localhost:12201/api/v1/data-sources', () => HttpResponse.json([source])),
+    http.get('http://localhost:12201/api/v1/models/profiles', () => HttpResponse.json([])),
+    http.get('http://localhost:12201/api/v1/instructions', () => HttpResponse.json([])),
     http.get('http://localhost:12201/api/v1/jobs/:jobId/execution', () => HttpResponse.json({ tools: [], sql: [], models: [], artifacts: [] })),
   );
 }
 
 describe('durable conversation workspace', () => {
-  beforeEach(() => { manager.jobs = []; manager.registerJob.mockClear(); manager.cancel.mockClear(); });
+  beforeEach(() => {
+    manager.jobs = []; manager.registerJob.mockClear(); manager.cancel.mockClear();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  });
+
+  it('renames the chat in the header and recent list without submitting an analysis', async () => {
+    baseHandlers();
+    let saved = { ...conversation };
+    server.use(
+      http.get('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ ...saved, messages: [] })),
+      http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([saved])),
+      http.patch('http://localhost:12201/api/v1/conversations/c1', async ({ request }) => {
+        expect(await request.json()).toEqual({ title: 'Monthly revenue review' });
+        saved = { ...saved, title: 'Monthly revenue review' };
+        return HttpResponse.json(saved);
+      }),
+    );
+    const client = renderPage(undefined, true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    const input = screen.getByRole('textbox', { name: 'Chat title' });
+    expect(input).toHaveValue('Revenue analysis');
+    await user.clear(input);
+    await user.type(input, '  Monthly revenue review  ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { name: 'Monthly revenue review' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Monthly revenue review/ })).toBeInTheDocument();
+    await client.invalidateQueries({ queryKey: ['conversations', 'org-1'] });
+    expect(screen.getByRole('heading', { name: 'Monthly revenue review' })).toBeInTheDocument();
+    expect(manager.registerJob).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Rename chat' }));
+    expect(screen.getByRole('textbox', { name: 'Chat title' })).toHaveValue('Monthly revenue review');
+  });
+
+  it('cancels a rename and rejects a blank title without saving', async () => {
+    baseHandlers();
+    const patch = vi.fn();
+    server.use(http.patch('http://localhost:12201/api/v1/conversations/c1', patch));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Chat title' }));
+    await user.type(screen.getByRole('textbox', { name: 'Chat title' }), 'Other title');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('heading', { name: 'Revenue analysis' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Rename chat' }));
+    const input = screen.getByRole('textbox', { name: 'Chat title' });
+    expect(input).toHaveValue('Revenue analysis');
+    await user.clear(input);
+    await user.type(input, '   ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a chat title.');
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the old title and editable draft when a rename fails', async () => {
+    baseHandlers();
+    server.use(http.patch('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ error: { code: 'RENAME_FAILED', message: 'Unable to save the title.' } }, { status: 503 })));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    const input = screen.getByRole('textbox', { name: 'Chat title' });
+    await user.clear(input);
+    await user.type(input, 'New title');
+    await user.type(input, '{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to save the title.');
+    expect(input).toHaveValue('New title');
+    expect(screen.getByRole('heading', { name: 'Revenue analysis', hidden: true })).toBeInTheDocument();
+  });
 
   it('submits the pending first question once, renders the durable user ID immediately, and registers its global job', async () => {
     baseHandlers();
@@ -80,7 +162,7 @@ describe('durable conversation workspace', () => {
     const user = userEvent.setup();
     const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
     await user.type(input, 'Now compare enterprise customers.');
-    await user.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
     expect(await screen.findByText('Now compare enterprise customers.')).toBeInTheDocument();
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-follow'));
   });
@@ -95,7 +177,7 @@ describe('durable conversation workspace', () => {
     }];
     renderPage();
     expect(await screen.findByText('Executing SQL…')).toBeInTheDocument();
-    expect(screen.getByText(/backend job is still running/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Stop/i })).toBeEnabled();
     expect(screen.queryByText(/analysis failed/i)).not.toBeInTheDocument();
   });
 
@@ -108,7 +190,7 @@ describe('durable conversation workspace', () => {
       connectionState: 'closed',
     }];
     renderPage();
-    expect(await screen.findByText('Query timed out')).toBeInTheDocument();
+    expect(await screen.findByText('This analysis took too long')).toBeInTheDocument();
     expect(screen.queryByText('SECRET_REASONING')).not.toBeInTheDocument();
   });
 });
