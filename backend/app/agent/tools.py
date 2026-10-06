@@ -904,6 +904,42 @@ def build_default_tool_registry() -> AgentToolRegistry:
             handler=create_html_artifact,
         )
     )
+    from app.agent.management_tools import (
+        read_saved_context,
+        save_knowledge,
+        save_skill,
+    )
+    from app.agent.tool_schemas import (
+        ReadSavedContextArgs,
+        SaveKnowledgeArgs,
+        SaveSkillArgs,
+    )
+
+    for name, description, schema, handler in (
+        (
+            "read_saved_context",
+            "Read existing business knowledge or workspace skills. Lists IDs and summaries; pass item_id to read an item in full before updating it.",
+            ReadSavedContextArgs,
+            read_saved_context,
+        ),
+        (
+            "save_knowledge",
+            "Create or update a business definition, mapping, or rule only when the current user explicitly requests saving it. Supply their exact authorization quote. Use annotation_id only after reading the existing note; omit it to create one.",
+            SaveKnowledgeArgs,
+            save_knowledge,
+        ),
+        (
+            "save_skill",
+            "Save the user's approved format or approach as a reusable workspace skill only on an explicit current user save request. Create by default; update only a specifically requested existing skill. It does not change the workspace default.",
+            SaveSkillArgs,
+            save_skill,
+        ),
+    ):
+        registry.register(
+            AgentToolDefinition(
+                name=name, description=description, args_schema=schema, handler=handler
+            )
+        )
     return registry
 
 
@@ -1117,6 +1153,8 @@ class AuditedToolExecutor:
 
 
 def _safe_tool_input(name: str, arguments: dict[str, object]) -> dict[str, object]:
+    if name in {"save_knowledge", "save_skill"}:
+        return {key: value for key, value in arguments.items() if key != "content"}
     if name == "execute_sql":
         return {
             "data_source_id": arguments.get("data_source_id"),
@@ -1137,6 +1175,8 @@ def _safe_tool_output(name: str, result: dict[str, object]) -> dict[str, object]
     # a table artifact; the Deep Agent receives the bounded tool return directly.
     if name == "execute_sql":
         return {key: value for key, value in result.items() if key not in {"rows"}}
+    if name == "read_saved_context":
+        return {"kind": result.get("kind"), "item_count": len(result.get("items", []))}
     if name in {"read_knowledge_index", "read_table_schema"}:
         return {key: value for key, value in result.items() if not key.endswith("_markdown")}
     return result

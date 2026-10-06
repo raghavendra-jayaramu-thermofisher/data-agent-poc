@@ -207,3 +207,20 @@ This uses the Windows account running the backend, regardless of who signs into 
 The API and worker must run directly on Windows for this mode. For the project's Linux Docker API/worker, select **SQL Authentication** and enter SQL Server credentials. Existing MSSQL connections continue using SQL authentication unless you change the selection.
 
 Switching to Windows authentication deletes the saved SQL credentials and clears the connection test and knowledge version. Switching back requires a new SQL username/password. Test the connection and regenerate knowledge after changing modes. No additional `.env` setting or database migration is required.
+
+
+## Managing knowledge and skills through chat
+
+Workspace owners and admins can request these changes in a conversation with a selected datasource:
+
+- `Remember that backlog values are measured in planning dollars.` saves business knowledge.
+- `Update the backlog knowledge note to use the latest definition.` updates an existing note.
+- `Save this format as a skill named Weekly Backlog Summary.` creates a reusable skill in Skills.
+- `Update the Weekly Backlog Summary skill with this format.` edits the named existing skill.
+
+Saved business notes appear in Knowledge and are available to future analyses. Schema refresh
+remains a manual action in Knowledge. Saved skills are selectable templates and do not change
+the workspace default. `Use this format` guides the current answer without saving
+it. Ambiguous save requests require an explicit instruction; members can read but cannot save.
+
+After updating the code, restart the backend worker to load these chat tools.

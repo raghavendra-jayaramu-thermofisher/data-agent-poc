@@ -4,7 +4,10 @@ from app.agent.tool_schemas import (
     CreateHtmlArtifactArgs,
     ExecuteSQLArgs,
     ReadKnowledgeIndexArgs,
+    ReadSavedContextArgs,
     ReadTableSchemaArgs,
+    SaveKnowledgeArgs,
+    SaveSkillArgs,
 )
 from app.agent.tools import build_default_tool_registry
 
@@ -18,6 +21,9 @@ def test_agent_tool_surface_contains_frontend_chart_tool() -> None:
         "execute_sql",
         "create_chart",
         "create_html_artifact",
+        "read_saved_context",
+        "save_knowledge",
+        "save_skill",
     ]
     descriptions = {item.name: item.description for item in tools}
     assert "Start data discovery" in descriptions["read_knowledge_index"]
@@ -31,6 +37,9 @@ def test_every_agent_tool_argument_has_a_clear_description() -> None:
     schemas = (
         ReadKnowledgeIndexArgs,
         ReadTableSchemaArgs,
+        ReadSavedContextArgs,
+        SaveKnowledgeArgs,
+        SaveSkillArgs,
         ExecuteSQLArgs,
         ChartSeriesInput,
         CreateChartArgs,

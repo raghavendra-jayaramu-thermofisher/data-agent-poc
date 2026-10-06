@@ -79,6 +79,10 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
             if (job.job_type === 'dashboard_refresh') {
                 await queryClient.invalidateQueries({ queryKey: queryKeys.dashboards.all(orgId) });
             }
+            if (job.job_type === 'chat_query') {
+                await queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all(orgId) });
+                await queryClient.invalidateQueries({ queryKey: queryKeys.instructions.list(orgId) });
+            }
             if (job.job_type === 'chat_query' && job.conversation_id) {
                 await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(orgId, job.conversation_id) });
                 await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(orgId, job.conversation_id) });

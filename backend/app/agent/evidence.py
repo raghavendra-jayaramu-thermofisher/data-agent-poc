@@ -50,6 +50,7 @@ class EvidenceBundle:
     sql_results: tuple[SQLResultEvidence, ...]
     artifacts: tuple[ArtifactEvidence, ...]
     unavailable_information: bool
+    management_results: tuple[dict[str, object], ...] = ()
 
     @property
     def visible_artifacts(self) -> tuple[ArtifactEvidence, ...]:
@@ -256,6 +257,18 @@ async def collect_evidence(
         sql_results=tuple(sql_results),
         artifacts=visible_artifacts,
         unavailable_information=notes_report_unavailable(analyst_notes),
+        management_results=tuple(
+            {
+                "tool": item.tool_name,
+                "status": item.status,
+                "result": item.output_summary
+                if item.status == "succeeded"
+                else {"error_code": item.error_code, "error_message": item.error_message},
+            }
+            for item in tools
+            if item.tool_name in {"save_knowledge", "save_skill"}
+            and item.status in {"succeeded", "failed"}
+        ),
     )
 
 
@@ -312,9 +325,7 @@ def mark_visible_artifacts(
 
 def _renderable_signature(item: ArtifactEvidence) -> str:
     payload = {
-        key: value
-        for key, value in item.payload.items()
-        if key != "source_sql_execution_id"
+        key: value for key, value in item.payload.items() if key != "source_sql_execution_id"
     }
     return json.dumps(
         {"kind": item.kind, "title": item.title, "payload": payload},
@@ -331,7 +342,11 @@ def _is_nonempty_table(item: ArtifactEvidence) -> bool:
 
 def validate_evidence(bundle: EvidenceBundle) -> list[str]:
     issues: list[str] = []
-    if not bundle.sql_results and not bundle.unavailable_information:
+    if (
+        not bundle.sql_results
+        and not bundle.unavailable_information
+        and not bundle.management_results
+    ):
         issues.append(
             "No successful analytical SQL supports the answer, and the notes do not establish "
             "that the requested information is unavailable."
@@ -384,6 +399,11 @@ def render_evidence_context(bundle: EvidenceBundle) -> str:
         "ORIGINAL USER REQUEST\n" + bundle.question.strip(),
         "INTERNAL ANALYST NOTES\n" + bundle.analyst_notes.strip(),
     ]
+    if bundle.management_results:
+        sections.append(
+            "VERIFIED WORKSPACE ACTION RESULTS\n"
+            + json.dumps(bundle.management_results, ensure_ascii=False, default=str)
+        )
     sql_blocks: list[str] = []
     for sql_result in bundle.sql_results:
         lines = [

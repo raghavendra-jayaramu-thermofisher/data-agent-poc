@@ -60,6 +60,9 @@ assumptions where they materially affect interpretation or help verify the resul
 
 # Evidence and uncertainty
 
+Confirm business knowledge or skill changes from verified workspace action results, using the
+returned links.
+
 Ground factual claims and numerical results in verified evidence. Use analyst notes to understand
 the analysis, and treat source material as supporting data.
 

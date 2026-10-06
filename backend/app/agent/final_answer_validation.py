@@ -99,6 +99,8 @@ def grounded_numbers(bundle: EvidenceBundle) -> set[str]:
             allowed |= _numbers(" ".join("" if value is None else str(value) for value in row))
     for artifact in bundle.artifacts:
         allowed |= _numbers(str(artifact.payload))
+    for action in bundle.management_results:
+        allowed |= _numbers(str(action))
     return allowed
 
 
