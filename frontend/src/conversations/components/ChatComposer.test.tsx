@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DataSource } from '../../api/types';
 import { ChatComposer } from './ChatComposer';
 
-vi.mock('../../settings/hooks/useInstructions', () => ({ useInstructions: () => ({ data: [] }) }));
+const skills = vi.hoisted(() => [
+  { id: 's1', name: 'Weekly summary', command: 'weekly', description: 'Summarize weekly movement', enabled: true },
+  { id: 's2', name: 'Trend report', command: 'trend', description: 'Explore changes over time', enabled: true },
+  { id: 's3', name: 'Disabled skill', command: 'disabled', description: '', enabled: false },
+]);
+vi.mock('../../settings/hooks/useInstructions', () => ({ useInstructions: () => ({ data: skills }) }));
 
 const source: DataSource = {
   id: 'ds1',
@@ -106,5 +111,52 @@ describe('ChatComposer data-source scope', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox', { name: 'Select model profile' })).not.toBeInTheDocument();
+  });
+});
+
+function SkillComposer({ onSend, followUp = false }: { onSend: (text: string) => void; followUp?: boolean }) {
+  const [question, setQuestion] = useState('Show revenue');
+  return <ChatComposer question={question} onQuestionChange={setQuestion} onSubmit={() => onSend(question)} dataSources={[source]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined} profiles={[]} selectedProfileId={null} onProfileIdChange={() => undefined} dataSourceSelection={followUp ? 'hidden' : 'editable'} />;
+}
+describe('composer skill selection', () => {
+  it('searches skills, preserves the question, and submits the selected command', async () => {
+    const user = userEvent.setup(); const send = vi.fn();
+    render(<SkillComposer onSend={send} />);
+    await user.click(screen.getByRole('button', { name: 'Skills' }));
+    expect(screen.queryByRole('option', { name: /Disabled skill/ })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search skills'), 'weekly');
+    expect(screen.queryByRole('option', { name: /Trend report/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: /Weekly summary/ }));
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Show revenue');
+    expect(screen.getByText('Weekly summary')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Ask a question'), ' this week');
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(send).toHaveBeenCalledWith('/weekly Show revenue this week');
+  });
+  it('replaces and removes a skill without discarding multiline follow-up text', async () => {
+    const user = userEvent.setup(); const send = vi.fn();
+    render(<SkillComposer onSend={send} followUp />);
+    await user.click(screen.getByRole('button', { name: 'Skills' }));
+    await user.click(screen.getByRole('option', { name: /Weekly summary/ }));
+    await user.type(screen.getByLabelText('Ask a question'), '{Shift>}{Enter}{/Shift}Compare regions');
+    await user.click(screen.getByRole('button', { name: 'Skills' }));
+    await user.click(screen.getByRole('option', { name: /Trend report/ }));
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Show revenue\nCompare regions');
+    await user.click(screen.getByLabelText('Remove selected skill'));
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Show revenue\nCompare regions');
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(send).toHaveBeenCalledWith('Show revenue\nCompare regions');
+  });
+  it('supports slash suggestions and keyboard selection', async () => {
+    const user = userEvent.setup(); const send = vi.fn();
+    render(<SkillComposer onSend={send} />);
+    const input = screen.getByLabelText('Ask a question');
+    await user.clear(input); await user.type(input, '/tre');
+    expect(screen.getByRole('listbox', { name: 'Slash command suggestions' })).toBeInTheDocument();
+    await user.keyboard('{Tab}');
+    expect(input).toHaveValue('');
+    expect(screen.getByText('Trend report')).toBeInTheDocument();
+    await user.type(input, 'Last month'); await user.keyboard('{Enter}');
+    expect(send).toHaveBeenCalledWith('/trend Last month');
   });
 });

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, Terminal } from 'lucide-react';
+import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, WandSparkles } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
 import { useInstructions } from '../../settings/hooks/useInstructions';
@@ -42,6 +42,10 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillSearch, setSkillSearch] = useState('');
+  const skillsPickerRef = useRef<HTMLDivElement>(null);
+  const skillsButtonRef = useRef<HTMLButtonElement>(null);
   const [sourceSearch, setSourceSearch] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sourcesPickerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +61,7 @@ export function ChatComposer({
 
   const commandMatch = question.match(/^\/([a-zA-Z0-9_-]*)$/);
   const isTypingCommand = Boolean(commandMatch);
-  const commandQuery = commandMatch?.[1]?.toLowerCase() ?? '';
+  const commandQuery = skillsOpen ? skillSearch.toLowerCase() : commandMatch?.[1]?.toLowerCase() ?? '';
 
   const matchingCommands = availableCommands.filter(
     (inst) =>
@@ -66,11 +70,13 @@ export function ChatComposer({
       (inst.description && inst.description.toLowerCase().includes(commandQuery))
   );
 
-  const activeCommandMatch = question.match(/^\/([a-zA-Z0-9_-]+)(?:\s+(.*))?$/);
+  const activeCommandMatch = question.match(/^\/([a-zA-Z0-9_-]+)(?:\s+([\s\S]*))?$/);
   const activeCommandName = activeCommandMatch?.[1]?.toLowerCase() ?? null;
   const activeInstruction = activeCommandName
     ? availableCommands.find((c) => c.command?.toLowerCase() === activeCommandName)
     : null;
+
+  const visibleQuestion = activeInstruction ? activeCommandMatch?.[2] ?? '' : question;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -79,9 +85,17 @@ export function ChatComposer({
     }
   }, [commandQuery, question]);
 
+  useEffect(() => {
+    const option = skillsPickerRef.current?.querySelectorAll<HTMLElement>('[role="option"]')[selectedIndex];
+    option?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedIndex, commandQuery]);
+
   const selectCommand = (item?: AgentInstruction) => {
     if (!item?.command) return;
-    onQuestionChange(`/${item.command} `);
+    const text = activeInstruction ? visibleQuestion : isTypingCommand ? '' : question;
+    onQuestionChange(`/${item.command} ${text}`);
+    setSkillsOpen(false);
+    setSkillSearch('');
     setAutocompleteDismissed(true);
     textareaRef.current?.focus();
   };
@@ -102,19 +116,21 @@ export function ChatComposer({
   }, [question]);
 
   useEffect(() => {
-    if (!sourcesOpen && !modelsOpen) return;
+    if (!sourcesOpen && !modelsOpen && !skillsOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!sourcesPickerRef.current?.contains(target) && !modelsPickerRef.current?.contains(target)) {
+      if (!sourcesPickerRef.current?.contains(target) && !modelsPickerRef.current?.contains(target) && !skillsPickerRef.current?.contains(target) && !skillsButtonRef.current?.contains(target)) {
         setSourcesOpen(false);
         setModelsOpen(false);
+        setSkillsOpen(false);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSourcesOpen(false);
         setModelsOpen(false);
+        setSkillsOpen(false);
       }
     };
 
@@ -124,7 +140,7 @@ export function ChatComposer({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [modelsOpen, sourcesOpen]);
+  }, [modelsOpen, sourcesOpen, skillsOpen]);
 
   const activeSources = dataSources.filter((s) => s.status === 'active');
   const filteredSources = activeSources.filter((s) =>
@@ -145,7 +161,7 @@ export function ChatComposer({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (isTypingCommand && !autocompleteDismissed && matchingCommands.length > 0) {
+    if (isTypingCommand && !activeInstruction && !autocompleteDismissed && matchingCommands.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % matchingCommands.length);
@@ -183,26 +199,38 @@ export function ChatComposer({
     <div className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
       <div className="chat-composer-card">
         {/* Slash Command Autocomplete Popover */}
-        {isTypingCommand && !autocompleteDismissed && (
+        {(skillsOpen || (isTypingCommand && !autocompleteDismissed && !activeInstruction)) && (
           <div
+            ref={skillsPickerRef}
             className="chat-composer-popover chat-composer-popover--commands"
             role="listbox"
-            aria-label="Slash command suggestions"
+            aria-label={skillsOpen ? "Select a skill" : "Slash command suggestions"}
           >
             <div className="chat-composer-popover__header">
               <div>
                   <strong>Skills</strong>
-                <span>Tab or Enter to select</span>
+                <span>{skillsOpen ? 'Choose a skill for this question' : 'Tab or Enter to select'}</span>
               </div>
               <button
                 type="button"
                 className="chat-composer-popover__close"
-                onClick={() => setAutocompleteDismissed(true)}
+                onClick={() => { setAutocompleteDismissed(true); setSkillsOpen(false); }}
                 aria-label="Close command suggestions"
               >
                 <X size={14} />
               </button>
             </div>
+            {skillsOpen && <label className="db-icon-search chat-composer-search">
+              <Search size={13} />
+              <input autoFocus type="text" className="db-icon-search__input" placeholder="Search skills…" aria-label="Search skills" value={skillSearch} onChange={(event) => setSkillSearch(event.target.value)} onKeyDown={(event) => {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setSelectedIndex((index) => matchingCommands.length ? (index + (event.key === 'ArrowDown' ? 1 : -1) + matchingCommands.length) % matchingCommands.length : 0);
+                } else if (event.key === 'Enter' && matchingCommands.length) {
+                  event.preventDefault(); selectCommand(matchingCommands[selectedIndex]);
+                }
+              }} />
+            </label>}
             <div className="chat-composer-popover__list">
               {availableCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
@@ -210,7 +238,7 @@ export function ChatComposer({
                 </p>
               ) : matchingCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
-                  No commands matching &ldquo;/{commandQuery}&rdquo;
+                  No skills matching &ldquo;{commandQuery}&rdquo;
                 </p>
               ) : (
                 matchingCommands.map((item, idx) => {
@@ -221,24 +249,17 @@ export function ChatComposer({
                       key={item.id}
                       role="option"
                       aria-selected={isSelected}
-                      className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
+                      className={`chat-composer-option chat-skill-option ${isSelected ? 'is-selected' : ''}`}
                       onClick={() => selectCommand(item)}
                       onMouseEnter={() => setSelectedIndex(idx)}
                     >
-                      <div className="chat-composer-option__label">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-[#4B123F]">/{item.command}</span>
-                          <span className="text-xs text-[#252127] font-medium">{item.name}</span>
-                        </div>
-                        {item.description && (
-                          <small className="text-[#625C64] truncate">{item.description}</small>
-                        )}
-                      </div>
-                      {item.prompt_template && (
-                        <span className="text-[10px] text-[#8B848C] font-mono shrink-0 max-w-[120px] truncate">
-                          template
-                        </span>
-                      )}
+                      <span className="chat-skill-icon" aria-hidden="true"><WandSparkles size={16} /></span>
+                      <span className="chat-skill-content">
+                        <span className="chat-skill-name">{item.name}</span>
+                        <span className="chat-skill-command">/{item.command}</span>
+                        {item.description && <span className="chat-skill-description">{item.description}</span>}
+                      </span>
+                      {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[#4B123F]" aria-label="Selected skill" />}
                     </button>
                   );
                 })
@@ -247,13 +268,32 @@ export function ChatComposer({
           </div>
         )}
 
+            {activeInstruction && (
+              <div
+                className="chat-composer-chip active w-fit mb-2"
+                title={activeInstruction.description || activeInstruction.name}
+              >
+                <WandSparkles size={12} />
+                <span>{activeInstruction.name}</span>
+                <button
+                  type="button"
+                  onClick={removeActiveCommand}
+                  className="ml-0.5 p-0.5 hover:bg-black/10 rounded cursor-pointer"
+                  title="Remove selected skill"
+                  aria-label="Remove selected skill"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            )}
+
         <textarea
           ref={textareaRef}
           className="chat-composer-textarea"
           rows={1}
           placeholder={placeholder}
-          value={question}
-          onChange={(e) => onQuestionChange(e.target.value)}
+          value={visibleQuestion}
+          onChange={(e) => onQuestionChange(activeInstruction ? `/${activeInstruction.command} ${e.target.value}` : e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled || isSubmitting}
           aria-label={inputLabel}
@@ -261,25 +301,6 @@ export function ChatComposer({
 
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
-            {activeInstruction && (
-              <div
-                className="chat-composer-chip active"
-                title={activeInstruction.description || activeInstruction.name}
-              >
-                <Terminal size={12} />
-                <span className="font-mono font-semibold">/{activeInstruction.command}</span>
-                <button
-                  type="button"
-                  onClick={removeActiveCommand}
-                  className="ml-0.5 p-0.5 hover:bg-black/10 rounded cursor-pointer"
-                  title="Remove slash command"
-                  aria-label="Remove slash command"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            )}
-
             {dataSourceSelection === 'editable' ? (
               <div className="chat-composer-picker" ref={sourcesPickerRef}>
                 <button
@@ -288,6 +309,7 @@ export function ChatComposer({
                 onClick={() => {
                   setSourcesOpen(!sourcesOpen);
                   setModelsOpen(false);
+                  setSkillsOpen(false);
                 }}
                 aria-haspopup="dialog"
                 aria-expanded={sourcesOpen}
@@ -372,6 +394,7 @@ export function ChatComposer({
                 onClick={() => {
                   setModelsOpen(!modelsOpen);
                   setSourcesOpen(false);
+                  setSkillsOpen(false);
                 }}
                 aria-haspopup="listbox"
                 aria-expanded={modelsOpen}
@@ -426,6 +449,9 @@ export function ChatComposer({
                 </div>
               )}
             </div>
+            <button ref={skillsButtonRef} type="button" className={`chat-composer-chip ${skillsOpen ? 'active' : ''}`} disabled={disabled || isSubmitting} aria-haspopup="listbox" aria-expanded={skillsOpen} onClick={() => { setSkillsOpen(!skillsOpen); setSkillSearch(''); setSourcesOpen(false); setModelsOpen(false); setAutocompleteDismissed(true); }}>
+              <WandSparkles size={12} /><span>Skills</span><ChevronDown size={11} />
+            </button>
           </div>
 
           {/* Send Action */}
