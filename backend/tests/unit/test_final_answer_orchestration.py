@@ -272,7 +272,10 @@ The requested reason cannot be established from the available data.
         unavailable_information=True,
     )
     assert validate_final_answer(markdown, unavailable_bundle) == []
-    assert any("must be omitted" in error for error in validate_final_answer(markdown, bundle()))
+    assert not any(
+        "heading" in error or "section" in error
+        for error in validate_final_answer(markdown, bundle())
+    )
 
 
 def test_normalizer_unwraps_an_outer_markdown_fence() -> None:
@@ -457,3 +460,8 @@ async def test_finalizer_propagates_cancellation_without_repair(monkeypatch) -> 
         await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
 
     assert finishes == [("failed", "JOB_CANCELLED")]
+
+
+def test_final_answer_accepts_direct_answer_without_fixed_sections() -> None:
+    markdown = f"There are **12 open orders** and **3 held orders**.\n\n[[artifact:{ARTIFACT_ID}]]"
+    assert validate_final_answer(markdown, bundle()) == []
