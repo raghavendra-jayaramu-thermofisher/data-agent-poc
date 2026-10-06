@@ -112,7 +112,13 @@ def _valid_chart_artifact(payload: dict[str, object], source: SQLExecution | Non
     ):
         return False
     chart_type = payload.get("chart_type")
-    if chart_type not in {"bar", "line", "area", "pie", "metric"}:
+    if chart_type not in {"bar", "line", "area", "pie", "donut", "metric"}:
+        return False
+    orientation = payload.get("orientation", "vertical")
+    stacked = payload.get("stacked", False)
+    if orientation not in ("vertical", "horizontal") or not isinstance(stacked, bool):
+        return False
+    if chart_type != "bar" and (orientation != "vertical" or stacked):
         return False
     data = payload.get("data")
     encoding = payload.get("encoding")
@@ -128,7 +134,7 @@ def _valid_chart_artifact(payload: dict[str, object], source: SQLExecution | Non
         return field if isinstance(field, str) and field else None
 
     fields: list[str]
-    if chart_type == "pie":
+    if chart_type in {"pie", "donut"}:
         category = encoded_field(encoding.get("category"))
         value = encoded_field(encoding.get("value"))
         if category is None or value is None:

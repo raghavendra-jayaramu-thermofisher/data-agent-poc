@@ -97,11 +97,25 @@ class CreateChartArgs(BaseModel):
             "Exact sql_execution_id returned by a successful execute_sql call in this same job."
         )
     )
-    chart_type: Literal["bar", "line", "area", "pie", "metric"] = Field(
+    chart_type: Literal["bar", "line", "area", "pie", "donut", "metric"] = Field(
         description=(
             "Presentation type: metric for one headline value, line or area for ordered trends, "
-            "bar for category comparisons, and pie only for a small part-to-whole breakdown."
+            "bar for category comparisons, and pie or donut for a small part-to-whole breakdown."
         )
+    )
+    orientation: Literal["vertical", "horizontal"] = Field(
+        default="vertical",
+        description=(
+            "Bar charts only: vertical renders columns; horizontal renders bars with category "
+            "labels on the vertical axis. Use horizontal for rankings with long labels."
+        ),
+    )
+    stacked: bool = Field(
+        default=False,
+        description=(
+            "Bar charts only: stack the numeric series within each category instead of grouping "
+            "them side by side. Stack additive components measured in the same unit."
+        ),
     )
     title: str = Field(
         min_length=1,
@@ -113,7 +127,7 @@ class CreateChartArgs(BaseModel):
         max_length=255,
         description=(
             "Exact category or ordered-time output column for bar, line, or area charts; omit for "
-            "pie and metric presentations."
+            "pie, donut and metric presentations."
         ),
     )
     x_label: str | None = Field(
@@ -126,20 +140,21 @@ class CreateChartArgs(BaseModel):
         max_length=8,
         description=(
             "One or more distinct numeric output columns for bar, line, or area charts; omit for "
-            "pie and metric presentations. Multi-series data must be wide-form with one row per "
+            "pie, donut and metric presentations. Multi-series data must be wide-form with "
+            "one row per "
             "x_field value. Labels are presentation-only and do not filter long-form rows."
         ),
     )
     category_field: str | None = Field(
         default=None,
         max_length=255,
-        description="Exact category output column for a pie chart; omit for all other chart types.",
+        description="Exact category output column for pie or donut; omit for other chart types.",
     )
     value_field: str | None = Field(
         default=None,
         max_length=255,
         description=(
-            "Exact numeric output column for a pie chart or metric card; omit for bar, line, and "
+            "Exact numeric output column for pie, donut or metric; omit for bar, line, and "
             "area charts."
         ),
     )
@@ -151,11 +166,13 @@ class CreateChartArgs(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "CreateChartArgs":
-        if self.chart_type == "pie":
+        if self.chart_type != "bar" and (self.orientation != "vertical" or self.stacked):
+            raise ValueError("orientation and stacking options apply only to bar charts")
+        if self.chart_type in ("pie", "donut"):
             if not self.category_field or not self.value_field:
-                raise ValueError("pie charts require category_field and value_field")
+                raise ValueError("pie and donut charts require category_field and value_field")
             if self.x_field is not None or self.series:
-                raise ValueError("pie charts must not define x_field or series")
+                raise ValueError("pie and donut charts must not define x_field or series")
         elif self.chart_type == "metric":
             if not self.value_field:
                 raise ValueError("metric cards require value_field")

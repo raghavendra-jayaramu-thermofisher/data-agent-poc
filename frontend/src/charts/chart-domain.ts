@@ -1,7 +1,7 @@
 import type { JobArtifact, SqlExecution } from '../agent/api/execution-api';
 
-export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'metric';
-export type CartesianChartType = Exclude<ChartType, 'pie' | 'metric'>;
+export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'metric';
+export type CartesianChartType = Exclude<ChartType, 'pie' | 'donut' | 'metric'>;
 export type ChartPoint = Record<string, string | number | null>;
 export type AnalyticalSeries = {
   id: string;
@@ -17,6 +17,8 @@ export type MultiSourceChartModel = {
   id: string;
   title: string;
   chartType: CartesianChartType;
+  orientation?: 'vertical' | 'horizontal';
+  stacked?: boolean;
   dimension: string;
   dimensionLabel?: string | null;
   series: AnalyticalSeries[];
@@ -31,7 +33,7 @@ export type MultiSourceChartModel = {
 export type PieChartModel = {
   id: string;
   title: string;
-  chartType: 'pie';
+  chartType: 'pie' | 'donut';
   category: string;
   value: string;
   valueLabel: string;
@@ -52,9 +54,13 @@ export type MetricChartModel = {
   dataSourceName: string;
   provenance: MultiSourceChartModel['provenance'];
 };
-/** Chart types rendered by AnalyticalChart (bar/line/area/pie) — excludes the metric card. */
+/** Chart types rendered by AnalyticalChart — excludes the metric card. */
 export type ChartableModel = MultiSourceChartModel | PieChartModel;
 export type NormalizedChartModel = ChartableModel | MetricChartModel;
+
+export function isCircularChart(model: NormalizedChartModel): model is PieChartModel {
+  return model.chartType === 'pie' || model.chartType === 'donut';
+}
 
 function object(value: unknown): Record<string, unknown> | null {
   return value != null && typeof value === 'object' && !Array.isArray(value)
@@ -107,7 +113,18 @@ export function normalizeChartArtifact(
   )
     return null;
   const chartType = text(payload.chart_type) as ChartType | null;
-  if (!chartType || !['bar', 'line', 'area', 'pie', 'metric'].includes(chartType)) return null;
+  if (!chartType || !['bar', 'line', 'area', 'pie', 'donut', 'metric'].includes(chartType))
+    return null;
+  if (
+    payload.orientation !== undefined &&
+    (typeof payload.orientation !== 'string' ||
+      !['vertical', 'horizontal'].includes(payload.orientation))
+  )
+    return null;
+  if (payload.stacked !== undefined && typeof payload.stacked !== 'boolean') return null;
+  const orientation = payload.orientation === 'horizontal' ? 'horizontal' : 'vertical';
+  const stacked = payload.stacked === true;
+  if (chartType !== 'bar' && (orientation !== 'vertical' || stacked)) return null;
   const sourceId = sql?.data_source_id ?? text(payload.data_source_id) ?? 'datasource';
   const encoding = object(payload.encoding);
   if (!encoding) return null;
@@ -120,7 +137,7 @@ export function normalizeChartArtifact(
       artifactId: artifact.id,
     },
   ];
-  if (chartType === 'pie') {
+  if (chartType === 'pie' || chartType === 'donut') {
     const category = object(encoding.category);
     const value = object(encoding.value);
     const categoryField = text(category?.field);
@@ -128,6 +145,12 @@ export function normalizeChartArtifact(
     if (!categoryField || !valueField) return null;
     const chartPoints = points(payload.data, new Set([valueField]));
     if (!chartPoints || chartPoints.some((point) => point[categoryField] == null)) return null;
+    if (
+      chartType === 'donut' &&
+      (chartPoints.some((point) => Number(point[valueField]) < 0) ||
+        !chartPoints.some((point) => Number(point[valueField]) > 0))
+    )
+      return null;
     const categoryValues = chartPoints.map((point) => String(point[categoryField]));
     if (new Set(categoryValues).size !== categoryValues.length) return null;
     return {
@@ -178,7 +201,7 @@ export function normalizeChartArtifact(
       seriesSpecs.map((item) => text(item!.unit)).filter((unit): unit is string => Boolean(unit)),
     ),
   ];
-  if (units.length > 2) return null;
+  if (units.length > 2 || (stacked && units.length > 1)) return null;
   const chartPoints = points(payload.data, numericFields);
   if (!chartPoints || chartPoints.some((point) => point[xField] == null)) return null;
   const dimensionValues = chartPoints.map((point) => String(point[xField]));
@@ -187,6 +210,7 @@ export function normalizeChartArtifact(
     id: artifact.id,
     title,
     chartType,
+    ...(chartType === 'bar' ? { orientation, stacked } : {}),
     dimension: xField,
     dimensionLabel: text(x?.label),
     comparisonKey: text(payload.comparison_key),
@@ -211,7 +235,7 @@ export function combineCompatibleCharts(models: NormalizedChartModel[]): Normali
   const result: NormalizedChartModel[] = [];
   const grouped = new Map<string, MultiSourceChartModel[]>();
   for (const model of models) {
-    if (model.chartType === 'pie' || model.chartType === 'metric' || !model.comparisonKey) {
+    if (isCircularChart(model) || model.chartType === 'metric' || !model.comparisonKey) {
       result.push(model);
       continue;
     }
@@ -224,6 +248,8 @@ export function combineCompatibleCharts(models: NormalizedChartModel[]): Normali
       model.comparisonKey,
       model.chartType,
       model.dimension,
+      model.orientation ?? 'vertical',
+      String(model.stacked ?? false),
       model.series.map((series) => series.metric).join('|'),
     ].join('::');
     grouped.set(key, [...(grouped.get(key) ?? []), model]);
@@ -236,7 +262,7 @@ export function combineCompatibleCharts(models: NormalizedChartModel[]): Normali
     const units = [
       ...new Set(group.flatMap((item) => item.series.map((series) => series.unit ?? 'unknown'))),
     ];
-    if (units.length > 2) {
+    if (units.length > 2 || (group[0]!.stacked && units.length > 1)) {
       result.push(...group);
       continue;
     }

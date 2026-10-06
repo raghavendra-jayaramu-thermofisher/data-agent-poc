@@ -20,7 +20,7 @@ Task 5 deliberately keeps infrastructure and security outside the agent harness:
 - persisted `tool_executions`, `sql_executions`, and `model_executions`
 - provider-reported token usage only; missing usage is never fabricated
 - bounded table artifacts persisted from SQL results
-- grounded frontend chart artifacts (`bar`, `line`, `area`, `pie`) created from a prior successful SQL execution
+- grounded frontend chart artifacts (`bar`, `line`, `area`, `pie`, `donut`, `metric`) created from a prior successful SQL execution
 - chart values are read from persisted SQL rows; the model cannot provide arbitrary chart datapoints
 - no Python/matplotlib/image chart generation
 - job cancellation polling during model/tool/query work
@@ -85,6 +85,20 @@ A chart is persisted as JSON for the future React/ECharts frontend, for example:
 ```
 
 The `data` array comes from the persisted, bounded SQL result referenced by `source_sql_execution_id`; it is not supplied by the model.
+
+`create_chart` supports generic bar variants through `orientation` (`vertical` or
+`horizontal`) and `stacked` (boolean). Defaults produce grouped vertical columns.
+Stacked charts require complete additive components in the same unit, with one numeric
+column per series and one row per category. The same options and all series are preserved
+when saving, editing and refreshing dashboard widgets.
+
+`donut` uses the same `category_field` and `value_field` mapping as `pie`. Donut values
+must be non-negative and complete, with a positive total. Existing artifact schema version
+1 remains supported; older bar artifacts use the default orientation and grouping.
+
+Apply `alembic upgrade head` before saving donut widgets, then restart the API and worker
+to load the updated chart contracts. Frontend development mode reloads the renderer;
+production frontend deployments require a new build.
 
 ## What Task 4 adds
 

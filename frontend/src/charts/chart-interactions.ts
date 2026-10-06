@@ -1,4 +1,5 @@
 import type { CartesianChartType, ChartableModel } from './chart-domain';
+import { isCircularChart } from './chart-domain';
 
 export type ChartSelection = {
   dimensionLabel: string;
@@ -9,7 +10,9 @@ export type ChartSelection = {
 };
 
 function object(value: unknown): Record<string, unknown> | null {
-  return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function primitive(value: unknown): string | number | null {
@@ -17,16 +20,20 @@ function primitive(value: unknown): string | number | null {
 }
 
 export function compatibleChartTypes(model: ChartableModel): CartesianChartType[] {
-  if (model.chartType === 'pie') return [];
+  if (isCircularChart(model)) return [];
+  if (model.stacked || model.orientation === 'horizontal') return ['bar'];
   return ['line', 'bar', 'area'];
 }
 
-export function chartSelectionFromEvent(model: ChartableModel, event: unknown): ChartSelection | null {
+export function chartSelectionFromEvent(
+  model: ChartableModel,
+  event: unknown,
+): ChartSelection | null {
   const params = object(event);
   const data = object(params?.data);
   if (!params || !data) return null;
 
-  if (model.chartType === 'pie') {
+  if (isCircularChart(model)) {
     const category = primitive(data[model.category]);
     const value = primitive(data[model.value]);
     if (category == null || value == null) return null;
@@ -40,9 +47,10 @@ export function chartSelectionFromEvent(model: ChartableModel, event: unknown): 
   }
 
   const seriesId = typeof params.seriesId === 'string' ? params.seriesId : null;
-  const series = model.series.find((item) => item.id === seriesId)
-    ?? model.series.find((item) => item.label === params.seriesName)
-    ?? model.series[0];
+  const series =
+    model.series.find((item) => item.id === seriesId) ??
+    model.series.find((item) => item.label === params.seriesName) ??
+    model.series[0];
   if (!series) return null;
   const dimension = primitive(data[model.dimension]);
   const value = primitive(data[series.metric]);
@@ -60,8 +68,13 @@ function subject(selection: ChartSelection) {
   return `${selection.metricLabel} for ${selection.dimensionLabel} ${selection.dimensionValue}`;
 }
 
-export function followUpForSelection(action: 'explain' | 'breakdown' | 'compare', selection: ChartSelection): string {
-  if (action === 'breakdown') return `Break down ${subject(selection)} and explain the most important contributors.`;
-  if (action === 'compare') return `Compare ${subject(selection)} with the most relevant previous period and explain the change.`;
+export function followUpForSelection(
+  action: 'explain' | 'breakdown' | 'compare',
+  selection: ChartSelection,
+): string {
+  if (action === 'breakdown')
+    return `Break down ${subject(selection)} and explain the most important contributors.`;
+  if (action === 'compare')
+    return `Compare ${subject(selection)} with the most relevant previous period and explain the change.`;
   return `Explain ${subject(selection)}, including the main reasons behind this result.`;
 }

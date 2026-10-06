@@ -10,8 +10,8 @@ export const widgetTitleSchema = z.object({
   title: z.string().trim().min(1, 'Widget title is required.').max(240),
 });
 
-export const widgetTypes = ['metric', 'table', 'bar', 'line', 'area', 'pie'] as const;
-export type WidgetType = typeof widgetTypes[number];
+export const widgetTypes = ['metric', 'table', 'bar', 'line', 'area', 'pie', 'donut'] as const;
+export type WidgetType = (typeof widgetTypes)[number];
 
 export type SaveWidgetValues = {
   dashboardId: string;
@@ -21,4 +21,12 @@ export type SaveWidgetValues = {
   xField: string;
   valueField: string;
   categoryField: string;
+  orientation?: 'vertical' | 'horizontal';
+  stacked?: boolean;
+  series?: Array<{ field: string; label?: string }>;
 };
+
+export type WidgetMappingValues = Pick<
+  SaveWidgetValues,
+  'metricField' | 'xField' | 'valueField' | 'categoryField' | 'orientation' | 'stacked' | 'series'
+>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JobArtifact, SqlExecution } from '../agent/api/execution-api';
-import { combineCompatibleCharts, normalizeChartArtifact } from './chart-domain';
+import { combineCompatibleCharts, isCircularChart, normalizeChartArtifact } from './chart-domain';
 
 const sql = (id: string, source: string): SqlExecution => ({
   id,
@@ -57,7 +57,7 @@ describe('chart artifact normalization', () => {
         'Warehouse',
       );
       expect(model?.chartType).toBe(chartType);
-      if (model && model.chartType !== 'pie' && model.chartType !== 'metric') {
+      if (model && !isCircularChart(model) && model.chartType !== 'metric') {
         expect(model.series[0]?.points[0]?.revenue).toBe(10.5);
       }
     },
@@ -179,11 +179,7 @@ describe('chart artifact normalization', () => {
       'Secondary DB',
     ]);
     const combinedModel = combined[0];
-    if (
-      combinedModel &&
-      combinedModel.chartType !== 'pie' &&
-      combinedModel.chartType !== 'metric'
-    ) {
+    if (combinedModel && !isCircularChart(combinedModel) && combinedModel.chartType !== 'metric') {
       expect(combinedModel.series.map((item) => item.dataSourceName)).toEqual([
         'Primary DB',
         'Secondary DB',
@@ -204,4 +200,124 @@ describe('chart artifact normalization', () => {
     );
     expect(combineCompatibleCharts([first!, second!])).toHaveLength(2);
   });
+
+  it('normalizes donut data with the same SQL provenance as other charts', () => {
+    const model = normalizeChartArtifact(
+      chart('a1', 's1', {
+        schema_version: 1,
+        renderer: 'frontend',
+        chart_type: 'donut',
+        source_sql_execution_id: 's1',
+        encoding: { category: { field: 'category' }, value: { field: 'sales' } },
+        data: [
+          { category: 'Services', sales: '60' },
+          { category: 'Products', sales: 40 },
+        ],
+      }),
+      sql('s1', 'ds1'),
+      'Warehouse',
+    );
+    expect(model?.chartType).toBe('donut');
+    if (model && isCircularChart(model)) {
+      expect(model.points[0]?.sales).toBe(60);
+      expect(model.provenance[0]?.executionId).toBe('s1');
+    }
+  });
+
+  it.each([
+    [-1, 10],
+    [0, 0],
+    [null, 10],
+  ])('rejects invalid donut measurements %s, %s', (first, second) => {
+    expect(
+      normalizeChartArtifact(
+        chart('a1', 's1', {
+          schema_version: 1,
+          renderer: 'frontend',
+          chart_type: 'donut',
+          encoding: { category: { field: 'category' }, value: { field: 'sales' } },
+          data: [
+            { category: 'Services', sales: first },
+            { category: 'Products', sales: second },
+          ],
+        }),
+        sql('s1', 'ds1'),
+        'Warehouse',
+      ),
+    ).toBeNull();
+  });
+
+  it('defaults old bar artifacts and preserves new orientation and stacking', () => {
+    const old = normalizeChartArtifact(
+      chart('a1', 's1', linePayload({ chart_type: 'bar' })),
+      sql('s1', 'ds1'),
+      'Warehouse',
+    );
+    expect(old).toMatchObject({ orientation: 'vertical', stacked: false });
+    const current = normalizeChartArtifact(
+      chart(
+        'a2',
+        's1',
+        linePayload({ chart_type: 'bar', orientation: 'horizontal', stacked: true }),
+      ),
+      sql('s1', 'ds1'),
+      'Warehouse',
+    );
+    expect(current).toMatchObject({ orientation: 'horizontal', stacked: true });
+  });
+
+  it.each([
+    { chart_type: 'bar', orientation: 'diagonal' },
+    { chart_type: 'bar', orientation: ['horizontal'] },
+    { chart_type: 'bar', stacked: 'true' },
+    { chart_type: 'line', stacked: true },
+    { chart_type: 'area', orientation: 'horizontal' },
+  ])('rejects unsupported chart options %j', (extra) => {
+    expect(
+      normalizeChartArtifact(chart('a1', 's1', linePayload(extra)), sql('s1', 'ds1'), 'Warehouse'),
+    ).toBeNull();
+  });
+
+  it('rejects stacks containing different measurement units', () => {
+    expect(
+      normalizeChartArtifact(
+        chart(
+          'a1',
+          's1',
+          linePayload({
+            chart_type: 'bar',
+            stacked: true,
+            encoding: {
+              x: { field: 'month' },
+              series: [
+                { field: 'revenue', unit: 'USD' },
+                { field: 'orders', unit: 'orders' },
+              ],
+            },
+            data: [{ month: 'Jan', revenue: 10, orders: 2 }],
+          }),
+        ),
+        sql('s1', 'ds1'),
+        'Warehouse',
+      ),
+    ).toBeNull();
+  });
+
+  it.each([{ orientation: 'horizontal' }, { stacked: true }])(
+    'keeps charts with different presentation options separate',
+    (options) => {
+      const payload = linePayload({ chart_type: 'bar', comparison_key: 'monthly-sales' });
+      const first = normalizeChartArtifact(
+        chart('a1', 's1', payload),
+        sql('s1', 'ds1'),
+        'Source A',
+      );
+      const second = normalizeChartArtifact(
+        chart('a2', 's2', { ...payload, ...options }),
+        sql('s2', 'ds2'),
+        'Source B',
+      );
+      expect(combineCompatibleCharts([first!, second!])).toHaveLength(2);
+    },
+  );
 });

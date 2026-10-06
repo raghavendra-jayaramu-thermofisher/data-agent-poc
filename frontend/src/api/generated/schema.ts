@@ -1163,7 +1163,7 @@ export interface components {
              * Widget Type
              * @enum {string}
              */
-            widget_type: "metric" | "table" | "bar" | "line" | "area" | "pie";
+            widget_type: "metric" | "table" | "bar" | "line" | "area" | "pie" | "donut";
         };
         /** DashboardWidgetResponse */
         DashboardWidgetResponse: {

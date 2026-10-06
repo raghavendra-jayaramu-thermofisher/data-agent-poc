@@ -36,10 +36,10 @@ def _chart_args(
     config: dict[str, object],
 ) -> CreateChartArgs:
     try:
-        if widget_type == "pie":
+        if widget_type in {"pie", "donut"}:
             return CreateChartArgs(
                 sql_execution_id=sql_execution_id,
-                chart_type="pie",
+                chart_type=widget_type,  # type: ignore[arg-type]
                 title=title,
                 category_field=config.get("category_field"),
                 value_field=config.get("value_field"),
@@ -58,6 +58,8 @@ def _chart_args(
             x_field=config.get("x_field"),
             x_label=config.get("x_label"),
             series=series,
+            orientation=config.get("orientation", "vertical"),
+            stacked=config.get("stacked", False),
         )
     except ValidationError as exc:
         raise JobFailureError(
@@ -245,7 +247,7 @@ async def _refresh_widget(
         raise JobFailureError(exc.code, exc.public_message, retryable=exc.retryable) from exc
 
     chart_payload: dict[str, object] | None = None
-    if widget_type in {"bar", "line", "area", "pie"}:
+    if widget_type in {"bar", "line", "area", "pie", "donut"}:
         parsed = _chart_args(
             widget_type, widget_title, sql_execution_id, visualization_config
         )

@@ -636,7 +636,7 @@ def build_frontend_chart_payload(
     parsed: CreateChartArgs, columns: list[str], rows: list[object]
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     required_fields: list[str]
-    if parsed.chart_type == "pie":
+    if parsed.chart_type in ("pie", "donut"):
         required_fields = [parsed.category_field or "", parsed.value_field or ""]
     elif parsed.chart_type == "metric":
         required_fields = [parsed.value_field or ""]
@@ -670,10 +670,10 @@ def build_frontend_chart_payload(
                 "SQL with separate dimension and measure columns, then retry the chart.",
                 retryable=True,
             )
-    elif parsed.chart_type == "pie" and parsed.category_field == parsed.value_field:
+    elif parsed.chart_type in ("pie", "donut") and parsed.category_field == parsed.value_field:
         raise AgentToolError(
             "CHART_FIELD_ROLE_CONFLICT",
-            "A pie chart requires different category and numeric value columns.",
+            "Pie and donut charts require different category and numeric value columns.",
             retryable=True,
         )
 
@@ -716,13 +716,13 @@ def build_frontend_chart_payload(
                 "the chart.",
                 retryable=True,
             )
-    elif parsed.chart_type == "pie":
+    elif parsed.chart_type in ("pie", "donut"):
         category_field = parsed.category_field or ""
         category_values = [record.get(category_field) for record in records]
         if any(value is None for value in category_values):
             raise AgentToolError(
                 "CHART_CATEGORY_MISSING",
-                f"The pie category field {category_field!r} contains null values. Group or label "
+                f"The chart category field {category_field!r} contains null values. Group or label "
                 "null categories in SQL before retrying the chart.",
                 retryable=True,
             )
@@ -732,7 +732,7 @@ def build_frontend_chart_payload(
         if len(set(category_keys)) != len(category_keys):
             raise AgentToolError(
                 "CHART_CATEGORY_NOT_UNIQUE",
-                "Pie chart SQL must return one aggregated row per category. Aggregate repeated "
+                "Pie and donut SQL must return one aggregated row per category. Aggregate repeated "
                 "categories in SQL, then retry the chart.",
                 retryable=True,
             )
@@ -752,16 +752,27 @@ def build_frontend_chart_payload(
         "source_sql_execution_id": str(parsed.sql_execution_id),
         "data": records,
     }
+    if parsed.chart_type == "bar":
+        chart_payload["orientation"] = parsed.orientation
+        chart_payload["stacked"] = parsed.stacked
     numeric_fields = (
         [parsed.value_field or ""]
-        if parsed.chart_type in ("pie", "metric")
+        if parsed.chart_type in ("pie", "donut", "metric")
         else [item.field for item in parsed.series]
     )
     for field in numeric_fields:
         has_numeric_value = False
+        has_positive_value = False
         for record in records:
             value = record.get(field)
             if value is None:
+                if parsed.chart_type == "donut" or parsed.stacked:
+                    raise AgentToolError(
+                        "CHART_VALUE_MISSING",
+                        "Donut and stacked charts require complete numeric values. "
+                        "Resolve missing measurements in SQL before creating the chart.",
+                        retryable=True,
+                    )
                 continue
             if isinstance(value, bool):
                 raise AgentToolError(
@@ -770,7 +781,12 @@ def build_frontend_chart_payload(
                 )
             if isinstance(value, (int, float)):
                 if math.isfinite(float(value)):
+                    if parsed.chart_type == "donut" and value < 0:
+                        raise AgentToolError(
+                            "CHART_VALUE_NEGATIVE", "Donut charts require non-negative values."
+                        )
                     has_numeric_value = True
+                    has_positive_value |= value > 0
                     continue
             if isinstance(value, str):
                 cleaned = value.replace(",", "").replace("$", "").replace(" ", "").strip()
@@ -779,7 +795,12 @@ def build_frontend_chart_payload(
                 except ValueError:
                     number = float("nan")
                 if math.isfinite(number):
+                    if parsed.chart_type == "donut" and number < 0:
+                        raise AgentToolError(
+                            "CHART_VALUE_NEGATIVE", "Donut charts require non-negative values."
+                        )
                     has_numeric_value = True
+                    has_positive_value |= number > 0
                     continue
             raise AgentToolError(
                 "CHART_VALUE_NOT_NUMERIC",
@@ -790,8 +811,14 @@ def build_frontend_chart_payload(
                 "CHART_VALUE_EMPTY",
                 f"Chart value field {field!r} contains no numeric values.",
             )
+        if parsed.chart_type == "donut" and not has_positive_value:
+            raise AgentToolError(
+                "CHART_TOTAL_EMPTY",
+                "Donut charts require a positive total. "
+                "Present the zero result as text or a metric.",
+            )
 
-    if parsed.chart_type == "pie":
+    if parsed.chart_type in ("pie", "donut"):
         chart_payload["encoding"] = {
             "category": {"field": parsed.category_field},
             "value": {"field": parsed.value_field, "label": parsed.value_label},
@@ -879,7 +906,9 @@ def build_default_tool_registry() -> AgentToolRegistry:
             description=(
                 "Create a frontend visualization from one successful execute_sql result in this job. "
                 "Use metric for one headline value, line or area for an ordered trend, bar for category "
-                "comparison, and pie only for a small part-to-whole result. Reference exact output "
+                "comparison, and pie or donut for a small part-to-whole result. Bar charts support "
+                "orientation='horizontal' or 'vertical' and stacked=true for additive components "
+                "in the same unit. Reference exact output "
                 "fields; this tool reads persisted rows and never accepts invented values. The SQL must "
                 "already have the final grain, ordering, and manageable category count. For bar, line, "
                 "and area charts, return one row per x-axis value and one distinct numeric output column "

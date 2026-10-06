@@ -16,7 +16,7 @@ import { useDashboards } from '../hooks/useDashboards';
 
 const widgetOptions = [
   { value: 'metric', label: 'Metric' }, { value: 'table', label: 'Table' }, { value: 'bar', label: 'Bar chart' },
-  { value: 'line', label: 'Line chart' }, { value: 'area', label: 'Area chart' }, { value: 'pie', label: 'Pie chart' },
+  { value: 'line', label: 'Line chart' }, { value: 'area', label: 'Area chart' }, { value: 'pie', label: 'Pie chart' }, { value: 'donut', label: 'Donut chart' },
 ];
 
 export function SaveToDashboardModal() {
@@ -39,7 +39,7 @@ export function SaveToDashboardModal() {
 
   useEffect(() => {
     if (!source) return;
-    setValues((current) => ({ ...current, widgetType: source.defaultWidgetType, ...source.defaults }));
+    setValues((current) => ({ ...current, widgetType: source.defaultWidgetType, orientation: 'vertical', stacked: false, series: undefined, ...source.defaults }));
   }, [source]);
   useEffect(() => {
     if (!values.dashboardId && dashboards.data) setValues((current) => ({ ...current, dashboardId: dashboards.data!.length ? dashboards.data![0]!.id : '__new__' }));

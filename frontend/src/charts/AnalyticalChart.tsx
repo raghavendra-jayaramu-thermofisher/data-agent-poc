@@ -12,9 +12,10 @@ import {
   type ChartSelection,
 } from './chart-interactions';
 import type { CartesianChartType, ChartableModel } from './chart-domain';
+import { isCircularChart } from './chart-domain';
 
 function dataModel(chart: ChartableModel): AnalyticalTableModel {
-  if (chart.chartType === 'pie') {
+  if (isCircularChart(chart)) {
     const columns = ['Data source', chart.category, chart.value];
     return {
       columns,
@@ -52,7 +53,7 @@ function formatSelectionValue(value: string | number) {
 }
 
 function withChartType(model: ChartableModel, chartType: CartesianChartType): ChartableModel {
-  return model.chartType === 'pie' ? model : { ...model, chartType };
+  return isCircularChart(model) ? model : { ...model, chartType };
 }
 
 function ChartCanvas({
@@ -101,7 +102,7 @@ export function AnalyticalChart({
 }) {
   const [view, setView] = useState<'chart' | 'data'>('chart');
   const [chartType, setChartType] = useState<CartesianChartType | null>(
-    model.chartType === 'pie' ? null : model.chartType
+    isCircularChart(model) ? null : model.chartType
   );
   const [selection, setSelection] = useState<ChartSelection | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -111,7 +112,7 @@ export function AnalyticalChart({
   );
   const sourceCount = new Set(model.provenance.map((item) => item.dataSourceId)).size;
   const pointCount =
-    model.chartType === 'pie'
+    isCircularChart(model)
       ? model.points.length
       : Math.max(0, ...model.series.map((series) => series.points.length));
   const chartTypes = compatibleChartTypes(model);

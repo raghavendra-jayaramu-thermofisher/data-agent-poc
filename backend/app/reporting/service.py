@@ -325,7 +325,9 @@ class ReportingService:
         job_id = item.last_refresh_job_id or item.created_from_job_id
         if job_id is None:
             return None
-        desired = "chart" if item.widget_type in {"bar", "line", "area", "pie"} else "table"
+        desired = (
+            "chart" if item.widget_type in {"bar", "line", "area", "pie", "donut"} else "table"
+        )
         conditions = [JobArtifact.job_id == job_id, JobArtifact.kind == desired]
         if item.last_refresh_job_id is None and item.created_from_sql_execution_id is not None:
             conditions.append(
@@ -395,10 +397,10 @@ class ReportingService:
         from pydantic import ValidationError
         from app.agent.tool_schemas import ChartSeriesInput, CreateChartArgs
         try:
-            if widget_type == "pie":
+            if widget_type in {"pie", "donut"}:
                 parsed = CreateChartArgs(
                     sql_execution_id=sql_execution_id,
-                    chart_type="pie",
+                    chart_type=widget_type,  # type: ignore[arg-type]
                     title="Validation",
                     category_field=config.get("category_field"),
                     value_field=config.get("value_field"),
@@ -418,6 +420,8 @@ class ReportingService:
                     x_field=config.get("x_field"),
                     x_label=config.get("x_label"),
                     series=series,
+                    orientation=config.get("orientation", "vertical"),
+                    stacked=config.get("stacked", False),
                 )
         except (ValidationError, ValueError, TypeError) as exc:
             raise AppError("WIDGET_CONFIG_INVALID", "The widget visualization configuration is invalid.", 400) from exc

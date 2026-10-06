@@ -129,10 +129,11 @@ a concise conclusion; do not add a Markdown copy of that table.
 Use the presentation that makes the answer easiest to understand:
 
 * single important value → `metric`
-* category comparison/ranking → `bar`
+* category comparison/ranking → `bar`; use `orientation="horizontal"` for long category labels
+* composition within categories → `bar` with `stacked=true`, in either orientation
 * time trend → `line`
 * magnitude-over-time where filled area adds meaning → `area`
-* part-to-whole with a small number of categories → `pie`
+* part-to-whole with a small number of categories → `pie` or `donut`
 * record-level results → table
 
 Do not create a chart merely because multiple rows exist, and never turn one value into a one-bar chart.
@@ -152,7 +153,11 @@ Required chart fields:
 
 * `metric` → `title`, `sql_execution_id`, `value_field`, optional `value_label`
 * `bar` / `line` / `area` → `title`, `sql_execution_id`, `x_field`, `series`
-* `pie` → `title`, `sql_execution_id`, `category_field`, `value_field`
+* `pie` / `donut` → `title`, `sql_execution_id`, `category_field`, `value_field`
+
+Bar options default to `orientation="vertical"` and `stacked=false` (grouped columns).
+Stack mutually exclusive, additive components in the same unit. Keep overlapping measurements
+as separate comparisons. Donut values must be non-negative, complete and have a positive total.
 
 ## Single-file HTML artifacts
 

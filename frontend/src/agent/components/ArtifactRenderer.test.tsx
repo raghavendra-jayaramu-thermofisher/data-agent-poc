@@ -19,7 +19,7 @@ vi.mock('echarts-for-react', () => ({
         <button
           type="button"
           onClick={() =>
-            onEvents.click({
+            onEvents.click?.({
               seriesId: 'chart-output:revenue:0',
               data: { month: 'Feb', revenue: 20 },
             })
@@ -287,4 +287,21 @@ it('does not silently save only one source from a combined multi-source chart', 
     screen.getByText(/Combined multi-source views remain separate when saved/i),
   ).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save to dashboard' })).not.toBeInTheDocument();
+});
+
+it.each([
+  { chart_type: 'donut', encoding: { category: { field: 'month' }, value: { field: 'revenue', label: 'Revenue' } } },
+  { chart_type: 'bar', orientation: 'horizontal', stacked: true, encoding: { x: { field: 'month' }, series: [{ field: 'revenue', label: 'Revenue' }] } },
+])('supports chart selection, data view and expansion for $chart_type artifacts', async (spec) => {
+  const user = userEvent.setup();
+  const artifact = a('chart-output', 'chart', { ...artifacts[1]!.payload, ...spec });
+  render(<MemoryRouter><ArtifactRenderer jobId="j1" artifacts={[artifact]} sql={sql} dataSourceNames={{ ds1: 'Warehouse' }}/></MemoryRouter>);
+  expect(screen.getByTestId('echarts')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Select chart point' }));
+  expect(screen.getByText('Selected Point')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Data' }));
+  expect(screen.getByRole('table', { name: 'Revenue data' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Chart' }));
+  await user.click(screen.getByTitle('Expand chart full screen'));
+  expect(screen.getAllByTestId('echarts')).toHaveLength(2);
 });

@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-WidgetType = Literal["metric", "table", "bar", "line", "area", "pie"]
+WidgetType = Literal["metric", "table", "bar", "line", "area", "pie", "donut"]
 
 
 class DashboardCreate(BaseModel):

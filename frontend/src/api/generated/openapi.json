@@ -649,7 +649,8 @@
               "bar",
               "line",
               "area",
-              "pie"
+              "pie",
+              "donut"
             ],
             "title": "Widget Type",
             "type": "string"
