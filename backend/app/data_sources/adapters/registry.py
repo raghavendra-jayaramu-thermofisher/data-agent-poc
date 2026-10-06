@@ -65,7 +65,16 @@ class DataSourceAdapterRegistry:
             )
         parsed_config = self.validate_config(kind, config)
         parsed_credentials: DatabaseCredentials | None = None
-        if registration.requires_credentials:
+        windows_auth = (
+            isinstance(parsed_config, MSSQLConfig)
+            and parsed_config.authentication_mode == "windows"
+        )
+        if windows_auth and credentials is not None:
+            raise DataSourceConfigurationError(
+                "DATASOURCE_CREDENTIALS_NOT_APPLICABLE",
+                "Windows authentication uses the application Windows account; omit credentials.",
+            )
+        if registration.requires_credentials and not windows_auth:
             if credentials is None:
                 raise DataSourceConfigurationError(
                     "DATASOURCE_CREDENTIALS_MISSING", "Datasource credentials are unavailable."
@@ -109,7 +118,7 @@ def _mssql_factory(
     config: BaseModel, credentials: DatabaseCredentials | None, _path: Path | None
 ) -> DataSourceAdapter:
     assert isinstance(config, MSSQLConfig)
-    return MSSQLAdapter(config, _require_credentials(credentials))
+    return MSSQLAdapter(config, credentials)
 
 
 def _duckdb_factory(

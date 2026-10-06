@@ -6,11 +6,12 @@ from typing import Any
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import URL
+from sqlalchemy.engine.reflection import ObjectKind
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.data_sources.errors import DataSourceOperationError
 from app.data_sources.diagnostics import connection_error
+from app.data_sources.errors import DataSourceOperationError
 from app.data_sources.types import (
     ColumnMetadata,
     ConnectionTestResult,
@@ -42,7 +43,9 @@ class SQLAlchemyAsyncAdapter:
                 connect_args=self.connect_args,
             )
         except (ImportError, ModuleNotFoundError) as exc:
-            raise connection_error(exc, stage="driver initialization", secrets=self._diagnostic_secrets()) from exc
+            raise connection_error(
+                exc, stage="driver initialization", secrets=self._diagnostic_secrets()
+            ) from exc
         except Exception as exc:
             raise DataSourceOperationError(
                 "DATASOURCE_CONFIGURATION_INVALID",
@@ -52,7 +55,9 @@ class SQLAlchemyAsyncAdapter:
     def _diagnostic_secrets(self) -> tuple[str, ...]:
         return (self.url.username or "", self.url.password or "")
 
-    async def _with_engine(self, operation: Callable[[AsyncEngine], Any], *, stage: str = "database operation") -> Any:
+    async def _with_engine(
+        self, operation: Callable[[AsyncEngine], Any], *, stage: str = "database operation"
+    ) -> Any:
         engine = self._create_engine()
         try:
             return await operation(engine)
@@ -73,7 +78,9 @@ class SQLAlchemyAsyncAdapter:
             except DataSourceOperationError:
                 raise
             except Exception as exc:
-                raise connection_error(exc, stage=stage, secrets=self._diagnostic_secrets()) from exc
+                raise connection_error(
+                    exc, stage=stage, secrets=self._diagnostic_secrets()
+                ) from exc
             return ConnectionTestResult(ok=True)
 
         return await self._with_engine(operation, stage="connection test (connect and SELECT 1)")
@@ -89,7 +96,8 @@ class SQLAlchemyAsyncAdapter:
         inspector = inspect(sync_connection)
         tables: list[TableMetadata] = []
         names: list[tuple[str, str]] = []
-        for name in inspector.get_table_names(schema=self.schema):
+        table_names = inspector.get_table_names(schema=self.schema)
+        for name in table_names:
             names.append((name, "table"))
         try:
             for name in inspector.get_view_names(schema=self.schema):
@@ -97,7 +105,30 @@ class SQLAlchemyAsyncAdapter:
         except NotImplementedError:
             pass
 
+        if not names:
+            return SchemaMetadata(tables=())
+
+        # Fetch each metadata category once for the schema. Individual reflection
+        # calls multiply network round trips on large remote databases.
+        columns_by_table = inspector.get_multi_columns(
+            schema=self.schema,
+            kind=ObjectKind.ANY,
+        )
+        try:
+            primary_keys = (
+                inspector.get_multi_pk_constraint(schema=self.schema) if table_names else {}
+            )
+        except NotImplementedError:
+            primary_keys = {}
+        try:
+            foreign_keys_by_table = (
+                inspector.get_multi_foreign_keys(schema=self.schema) if table_names else {}
+            )
+        except NotImplementedError:
+            foreign_keys_by_table = {}
+
         for name, object_type in sorted(set(names), key=lambda item: (item[1], item[0])):
+            key = (self.schema, name)
             columns = tuple(
                 ColumnMetadata(
                     name=str(column["name"]),
@@ -105,39 +136,31 @@ class SQLAlchemyAsyncAdapter:
                     nullable=column.get("nullable"),
                     default=(str(column["default"]) if column.get("default") is not None else None),
                 )
-                for column in inspector.get_columns(name, schema=self.schema)
+                for column in columns_by_table[key]
             )
             primary_key: tuple[str, ...] = ()
             foreign_keys: tuple[ForeignKeyMetadata, ...] = ()
             if object_type == "table":
-                try:
-                    pk = inspector.get_pk_constraint(name, schema=self.schema)
-                    primary_key = tuple(
-                        str(value) for value in (pk.get("constrained_columns") or [])
+                pk = primary_keys.get(key, {})
+                primary_key = tuple(str(value) for value in (pk.get("constrained_columns") or []))
+                foreign_keys = tuple(
+                    ForeignKeyMetadata(
+                        constrained_columns=tuple(
+                            str(value) for value in (fk.get("constrained_columns") or [])
+                        ),
+                        referred_schema=(
+                            str(fk["referred_schema"])
+                            if fk.get("referred_schema") is not None
+                            else None
+                        ),
+                        referred_table=str(fk.get("referred_table") or ""),
+                        referred_columns=tuple(
+                            str(value) for value in (fk.get("referred_columns") or [])
+                        ),
                     )
-                except NotImplementedError:
-                    pass
-                try:
-                    foreign_keys = tuple(
-                        ForeignKeyMetadata(
-                            constrained_columns=tuple(
-                                str(value) for value in (fk.get("constrained_columns") or [])
-                            ),
-                            referred_schema=(
-                                str(fk["referred_schema"])
-                                if fk.get("referred_schema") is not None
-                                else None
-                            ),
-                            referred_table=str(fk.get("referred_table") or ""),
-                            referred_columns=tuple(
-                                str(value) for value in (fk.get("referred_columns") or [])
-                            ),
-                        )
-                        for fk in inspector.get_foreign_keys(name, schema=self.schema)
-                        if fk.get("referred_table")
-                    )
-                except NotImplementedError:
-                    pass
+                    for fk in foreign_keys_by_table.get(key, [])
+                    if fk.get("referred_table")
+                )
             tables.append(
                 TableMetadata(
                     schema=self.schema,

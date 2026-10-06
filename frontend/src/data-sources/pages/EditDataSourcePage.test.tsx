@@ -90,7 +90,7 @@ describe('connection edit workflow', () => {
   it('saves and clears cached schema after a connection edit without testing', async () => {
     show();
     const user = userEvent.setup();
-    await user.type(screen.getByRole('textbox', { name: 'Host' }), '.example.com');
+    await user.type(screen.getByRole('combobox', { name: 'Host' }), '.example.com');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByText('Source details')).toBeInTheDocument();
     expect(state.remove).toHaveBeenCalled();

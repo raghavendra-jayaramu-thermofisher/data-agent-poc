@@ -33,7 +33,7 @@ describe('editing data-source connections', () => {
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Sales Data');
     expect(screen.getByRole('spinbutton', { name: 'Port' })).toHaveValue(5432);
     expect(screen.getByRole('textbox', { name: 'Database' })).toHaveValue('sales');
-    const host = screen.getByRole('textbox', { name: 'Host' });
+    const host = screen.getByRole('combobox', { name: 'Host' });
     expect(host).toHaveValue('old.example.com');
     await user.clear(host);
     await user.type(host, 'new.example.com');
@@ -115,7 +115,7 @@ describe('editing data-source connections', () => {
         name: kind === 'mysql' ? 'Use SSL connection' : 'Encrypt connection',
       }),
     ).toBeChecked();
-    const host = screen.getByRole('textbox', { name: 'Host' });
+    const host = screen.getByRole('combobox', { name: 'Host' });
     const user = userEvent.setup();
     await user.clear(host);
     await user.type(host, 'fixed.example.com');
@@ -135,7 +135,7 @@ describe('editing data-source connections', () => {
         onSubmit={vi.fn()}
       />,
     );
-    expect(screen.queryByRole('textbox', { name: 'Host' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Host' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Username' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Save & Test Connection' }),

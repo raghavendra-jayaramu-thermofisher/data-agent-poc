@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 
 class DatabaseCredentials(BaseModel):
@@ -36,6 +36,7 @@ class MySQLConfig(BaseModel):
 class MSSQLConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    authentication_mode: Literal["sql", "windows"] = "sql"
     host: str = Field(min_length=1, max_length=255)
     port: int = Field(default=1433, ge=1, le=65535)
     database: str = Field(min_length=1, max_length=255)
@@ -69,7 +70,17 @@ class MSSQLDataSourceCreate(BaseModel):
     kind: Literal["mssql"]
     name: str = Field(min_length=1, max_length=180)
     config: MSSQLConfig
-    credentials: DatabaseCredentials
+    credentials: DatabaseCredentials | None = None
+
+    @model_validator(mode="after")
+    def validate_authentication(self) -> MSSQLDataSourceCreate:
+        if self.config.authentication_mode == "sql" and self.credentials is None:
+            raise ValueError("SQL authentication requires username and password.")
+        if self.config.authentication_mode == "windows" and self.credentials is not None:
+            raise ValueError(
+                "Windows authentication uses the application Windows account; omit credentials."
+            )
+        return self
 
 
 RelationalDataSourceCreate = Annotated[

@@ -1,15 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@heroui/react';
 import { Controller, useForm } from 'react-hook-form';
-import type { FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import type { AppError } from '../../api/errors';
 import type { DataSource } from '../../api/types';
 import { FormField } from '../../auth/components/FormField';
 import { SecretField } from '../../components/SecretField';
 import { SingleSelect } from '../../components/SingleSelect';
 import type { DataSourceUpdate } from '../api/data-source-api';
-import { dataSourceEditSchema, type DataSourceEditValues } from '../schemas/data-source-schemas';
+import {
+  authenticationOptions,
+  windowsAuthenticationHelp,
+  dataSourceEditSchema,
+  type DataSourceEditValues,
+} from '../schemas/data-source-schemas';
 import { buildRelationalPayload } from './RelationalDataSourceForm';
+import { ConnectionSuggestions } from './ConnectionSuggestions';
 const statuses = [
   { value: 'active', label: 'Active' },
   { value: 'disabled', label: 'Disabled' },
@@ -21,6 +27,10 @@ export function DataSourceEditForm({
   source: DataSource;
   onSubmit(values: DataSourceUpdate, testConnection?: boolean): Promise<void>;
 }) {
+  const suggestionId = useId();
+  const hostListId = `${suggestionId}-hosts`;
+  const portListId = `${suggestionId}-ports`;
+  const driverListId = `${suggestionId}-drivers`;
   const relational =
     source.kind === 'postgres' || source.kind === 'mysql' || source.kind === 'mssql';
   const config = source.config;
@@ -29,6 +39,8 @@ export function DataSourceEditForm({
     handleSubmit,
     resetField,
     setError,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<DataSourceEditValues>({
     resolver: zodResolver(dataSourceEditSchema),
@@ -37,6 +49,8 @@ export function DataSourceEditForm({
       status: source.status === 'disabled' ? 'disabled' : 'active',
       username: '',
       password: '',
+      originalAuthenticationMode:
+        source.kind === 'mssql' && config.authentication_mode === 'windows' ? 'windows' : 'sql',
       connection: relational
         ? {
             host: String(config.host ?? ''),
@@ -53,17 +67,23 @@ export function DataSourceEditForm({
             encrypt: config.encrypt !== false,
             trustServerCertificate: Boolean(config.trust_server_certificate),
             odbcDriver: String(config.odbc_driver ?? 'ODBC Driver 18 for SQL Server'),
+            authenticationMode:
+              source.kind === 'mssql' && config.authentication_mode === 'windows'
+                ? 'windows'
+                : 'sql',
           }
         : undefined,
     },
   });
+  const windowsAuth =
+    source.kind === 'mssql' && watch('connection.authenticationMode') === 'windows';
   const submit = (event: FormEvent<HTMLFormElement>) => {
     const testConnection =
       (event.nativeEvent as SubmitEvent).submitter?.getAttribute('data-test-connection') === 'true';
     return handleSubmit(async (values) => {
       try {
         const credentials =
-          values.username && values.password
+          !windowsAuth && values.username && values.password
             ? { username: values.username, password: values.password }
             : undefined;
         let nextConfig: DataSourceUpdate['config'];
@@ -75,7 +95,14 @@ export function DataSourceEditForm({
             username: '',
             password: '',
           }).config;
-          const merged = { ...config, ...built };
+          const merged: Record<string, unknown> = { ...config, ...built };
+          // Keep an unchanged legacy SQL connection unchanged on save.
+          if (
+            source.kind === 'mssql' &&
+            config.authentication_mode == null &&
+            merged.authentication_mode === 'sql'
+          )
+            delete merged.authentication_mode;
           if (Object.entries(merged).some(([key, value]) => config[key] !== value))
             nextConfig = merged;
         }
@@ -125,14 +152,20 @@ export function DataSourceEditForm({
             <hr />
           </div>
           <p className="text-xs text-[var(--db-text-secondary)]">
-            After changing the host, port, database, or schema, test the connection and regenerate its knowledge in Knowledge.
+            After changing the host, port, database, or schema, test the connection and regenerate
+            its knowledge in Knowledge.
           </p>
           <div className="form-grid-2">
             <Controller
               control={control}
               name="connection.host"
               render={({ field }) => (
-                <FormField label="Host" {...field} error={errors.connection?.host?.message} />
+                <FormField
+                  label="Host"
+                  list={hostListId}
+                  {...field}
+                  error={errors.connection?.host?.message}
+                />
               )}
             />
             <Controller
@@ -142,6 +175,7 @@ export function DataSourceEditForm({
                 <FormField
                   label="Port"
                   type="number"
+                  list={portListId}
                   min={1}
                   max={65535}
                   {...field}
@@ -177,6 +211,12 @@ export function DataSourceEditForm({
               />
             )}
           </div>
+          <ConnectionSuggestions
+            kind={source.kind}
+            hostListId={hostListId}
+            portListId={portListId}
+            driverListId={driverListId}
+          />
           {source.kind === 'postgres' && (
             <Controller
               control={control}
@@ -245,25 +285,51 @@ export function DataSourceEditForm({
                 render={({ field }) => (
                   <FormField
                     label="ODBC driver"
+                    list={driverListId}
                     {...field}
                     error={errors.connection?.odbcDriver?.message}
                   />
                 )}
               />
+              <p className="text-xs text-[var(--db-text-secondary)]">
+                Use a driver installed on the machine running the API and worker.
+              </p>
             </>
           )}
         </>
       )}
 
-      {relational && (
+      {source.kind === 'mssql' && (
+        <Controller
+          control={control}
+          name="connection.authenticationMode"
+          render={({ field }) => (
+            <SingleSelect
+              label="Authentication method"
+              value={field.value ?? 'sql'}
+              options={authenticationOptions}
+              onChange={(next) => {
+                field.onChange(next);
+                setValue('username', '');
+                setValue('password', '');
+              }}
+            />
+          )}
+        />
+      )}
+      {windowsAuth && (
+        <p className="text-xs text-[var(--db-text-secondary)]">{windowsAuthenticationHelp}</p>
+      )}
+      {relational && !windowsAuth && (
         <>
           <div className="form-section-divider">
             <span>Replace credentials</span>
             <hr />
           </div>
           <p className="text-xs text-[var(--db-text-secondary)] -mt-2 mb-1">
-            Stored credentials are never redisplayed. Leave both fields blank to keep the current
-            secret.
+            {source.kind === 'mssql' && config.authentication_mode === 'windows'
+              ? 'Enter new username and password to switch to SQL authentication.'
+              : 'Stored credentials are never redisplayed. Leave both fields blank to keep the current secret.'}
           </p>
 
           <div className="form-grid-2">

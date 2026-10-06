@@ -194,4 +194,16 @@ This preserves the project, database, environment files, and uploaded data. Post
 - **Jobs stay queued:** check that the worker is running from the `backend` directory with the same `.env` as the API.
 - **Browser cannot reach the API:** check `frontend\.env.local`, backend `CORS_ORIGINS`, and the API readiness endpoint.
 
-MSSQL Windows authentication has not yet been added to this application. Its current MSSQL datasource connections use SQL username/password authentication.
+## MSSQL Windows authentication
+
+1. Start the API and worker using the PowerShell commands above, under the same Windows account. Run `whoami` in each terminal to confirm the account.
+2. That Windows account must have a SQL Server login and access to the selected database, schema and tables. Verify it in SQL Server Management Studio using **Windows Authentication**.
+3. In the application, create or edit a **Microsoft SQL Server** datasource and select **Windows Authentication**. Enter the host, port, database and schema. No database username or password is needed.
+4. Keep the correct ODBC driver and encryption settings. Both API and worker need Microsoft ODBC Driver 18 for SQL Server (or the configured driver).
+5. Save, test the connection, then generate or regenerate knowledge. Queries use the same Windows account.
+
+This uses the Windows account running the backend, regardless of who signs into the web application. A frontend running in a browser or Docker does not change that account.
+
+The API and worker must run directly on Windows for this mode. For the project's Linux Docker API/worker, select **SQL Authentication** and enter SQL Server credentials. Existing MSSQL connections continue using SQL authentication unless you change the selection.
+
+Switching to Windows authentication deletes the saved SQL credentials and clears the connection test and knowledge version. Switching back requires a new SQL username/password. Test the connection and regenerate knowledge after changing modes. No additional `.env` setting or database migration is required.

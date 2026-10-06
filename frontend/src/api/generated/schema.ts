@@ -1652,6 +1652,12 @@ export interface components {
         };
         /** MSSQLConfig */
         MSSQLConfig: {
+            /**
+             * Authentication Mode
+             * @default sql
+             * @enum {string}
+             */
+            authentication_mode: "sql" | "windows";
             /** Database */
             database: string;
             /**
@@ -1685,7 +1691,7 @@ export interface components {
         /** MSSQLDataSourceCreate */
         MSSQLDataSourceCreate: {
             config: components["schemas"]["MSSQLConfig"];
-            credentials: components["schemas"]["DatabaseCredentials"];
+            credentials?: components["schemas"]["DatabaseCredentials"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

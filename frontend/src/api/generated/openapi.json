@@ -1892,6 +1892,15 @@
       "MSSQLConfig": {
         "additionalProperties": false,
         "properties": {
+          "authentication_mode": {
+            "default": "sql",
+            "enum": [
+              "sql",
+              "windows"
+            ],
+            "title": "Authentication Mode",
+            "type": "string"
+          },
           "database": {
             "maxLength": 255,
             "minLength": 1,
@@ -1918,8 +1927,8 @@
           },
           "port": {
             "default": 1433,
-            "maximum": 65535,
-            "minimum": 1,
+            "maximum": 65535.0,
+            "minimum": 1.0,
             "title": "Port",
             "type": "integer"
           },
@@ -1950,7 +1959,14 @@
             "$ref": "#/components/schemas/MSSQLConfig"
           },
           "credentials": {
-            "$ref": "#/components/schemas/DatabaseCredentials"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatabaseCredentials"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "kind": {
             "const": "mssql",
@@ -1967,8 +1983,7 @@
         "required": [
           "kind",
           "name",
-          "config",
-          "credentials"
+          "config"
         ],
         "title": "MSSQLDataSourceCreate",
         "type": "object"

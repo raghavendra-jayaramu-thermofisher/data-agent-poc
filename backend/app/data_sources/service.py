@@ -20,10 +20,11 @@ from app.data_sources.errors import DataSourceConfigurationError, DataSourceOper
 from app.data_sources.models import DataSource, DataSourceFile
 from app.data_sources.repository import DataSourceRepository
 from app.data_sources.schemas import (
+    DatabaseCredentials,
     DataSourceFileResponse,
     DataSourceResponse,
     DataSourceUpdate,
-    DatabaseCredentials,
+    MSSQLConfig,
     RelationalDataSourceCreate,
 )
 from app.data_sources.secrets import SecretService
@@ -63,12 +64,14 @@ class DataSourceService:
         await self._ensure_name_available(organization_id, name)
         config = payload.config.model_dump(mode="json")
         self.adapters.validate_config(payload.kind, config)
-        credentials = self._credentials_payload(payload.credentials)
-        secret = await self.secrets.create(
-            organization_id=organization_id,
-            purpose="datasource_credentials",
-            payload=credentials,
-        )
+        secret_id = None
+        if payload.credentials is not None:
+            secret = await self.secrets.create(
+                organization_id=organization_id,
+                purpose="datasource_credentials",
+                payload=self._credentials_payload(payload.credentials),
+            )
+            secret_id = secret.id
         data_source = DataSource(
             organization_id=organization_id,
             name=name,
@@ -76,7 +79,7 @@ class DataSourceService:
             display_type=payload.kind,
             status="pending",
             config=config,
-            secret_id=secret.id,
+            secret_id=secret_id,
             created_by=user_id,
             last_tested_at=None,
             last_error_code=None,
@@ -239,6 +242,32 @@ class DataSourceService:
         payload: DataSourceUpdate,
     ) -> DataSource:
         data_source = await self.require_for_org(data_source_id, organization_id)
+        was_windows_auth = (
+            data_source.kind == "mssql"
+            and data_source.config.get("authentication_mode", "sql") == "windows"
+        )
+        next_config_input = payload.config if payload.config is not None else data_source.config
+        if data_source.kind == "mssql":
+            try:
+                parsed_config = self.adapters.validate_config("mssql", next_config_input)
+            except DataSourceConfigurationError as exc:
+                raise AppError(exc.code, exc.public_message, 400) from exc
+            assert isinstance(parsed_config, MSSQLConfig)
+            windows_auth = parsed_config.authentication_mode == "windows"
+        else:
+            windows_auth = False
+        if windows_auth and payload.credentials is not None:
+            raise AppError(
+                "DATASOURCE_CREDENTIALS_NOT_APPLICABLE",
+                "Windows authentication uses the application Windows account; omit credentials.",
+                400,
+            )
+        if was_windows_auth and not windows_auth and payload.credentials is None:
+            raise AppError(
+                "DATASOURCE_CREDENTIALS_MISSING",
+                "Enter username and password when switching to SQL authentication.",
+                400,
+            )
         if payload.name is not None:
             name = payload.name.strip()
             existing = await self.repo.find_by_name(organization_id, name)
@@ -260,7 +289,10 @@ class DataSourceService:
                     raise AppError(exc.code, exc.public_message, 400) from exc
                 next_config = parsed.model_dump(mode="json")
                 location_fields = ("host", "port", "database", "schema_name")
-                if any(data_source.config.get(key) != next_config.get(key) for key in location_fields):
+                authentication_changed = was_windows_auth != windows_auth
+                if authentication_changed or any(
+                    data_source.config.get(key) != next_config.get(key) for key in location_fields
+                ):
                     knowledge_repo = KnowledgeRepository(self.session)
                     base = await knowledge_repo.get_base_for_source(data_source.id, organization_id)
                     if base is not None:
@@ -269,7 +301,8 @@ class DataSourceService:
                             if base.status == "generating":
                                 raise AppError(
                                     "KNOWLEDGE_GENERATION_IN_PROGRESS",
-                                    "Wait for knowledge generation to finish before changing the database connection.",
+                                    "Wait for knowledge generation to finish before changing "
+                                    "the database connection.",
                                     409,
                                 )
                             base.current_version_id = None
@@ -280,6 +313,12 @@ class DataSourceService:
                 data_source.last_error_code = None
                 data_source.last_connection_diagnostics = None
                 data_source.last_tested_at = None
+        if windows_auth and data_source.secret_id is not None:
+            secret = await self.secrets.repo.get_for_org(data_source.secret_id, organization_id)
+            data_source.secret_id = None
+            await self.session.flush()
+            if secret is not None:
+                await self.secrets.repo.delete(secret)
         if payload.credentials is not None:
             if data_source.kind == "duckdb":
                 raise AppError(
@@ -298,9 +337,7 @@ class DataSourceService:
             else:
                 secret = await self.secrets.repo.get_for_org(data_source.secret_id, organization_id)
                 if secret is None:
-                    raise AppError(
-                        "SECRET_NOT_FOUND", "Stored credentials are unavailable.", 500
-                    )
+                    raise AppError("SECRET_NOT_FOUND", "Stored credentials are unavailable.", 500)
                 await self.secrets.replace(secret, credential_payload)
             data_source.status = "pending"
             data_source.last_error_code = None
@@ -325,11 +362,11 @@ class DataSourceService:
             raise AppError(
                 "DATASOURCE_NAME_EXISTS", "A datasource with this name already exists.", 409
             ) from exc
+        # Reload the server-updated timestamp before serializing the API response.
+        await self.session.refresh(data_source)
         return data_source
 
-    async def delete(
-        self, *, data_source_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> None:
+    async def delete(self, *, data_source_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         data_source = await self.require_for_org(data_source_id, organization_id)
         secret_id = data_source.secret_id
         await self.repo.delete_data_source(data_source)
@@ -361,7 +398,11 @@ class DataSourceService:
 
     async def resolve_adapter(self, data_source: DataSource) -> DataSourceAdapter:
         credentials: dict[str, Any] | None = None
-        if data_source.secret_id is not None:
+        windows_auth = (
+            data_source.kind == "mssql"
+            and data_source.config.get("authentication_mode", "sql") == "windows"
+        )
+        if data_source.secret_id is not None and not windows_auth:
             credentials = await self.secrets.read(
                 secret_id=data_source.secret_id,
                 organization_id=data_source.organization_id,
@@ -421,7 +462,9 @@ class DataSourceService:
         data_source.last_connection_diagnostics = None
         await self.session.commit()
 
-    async def mark_test_failed(self, data_source: DataSource, code: str, diagnostics: dict[str, object] | None = None) -> None:
+    async def mark_test_failed(
+        self, data_source: DataSource, code: str, diagnostics: dict[str, object] | None = None
+    ) -> None:
         data_source.status = "error"
         data_source.last_tested_at = utc_now()
         data_source.last_error_code = code[:100]
