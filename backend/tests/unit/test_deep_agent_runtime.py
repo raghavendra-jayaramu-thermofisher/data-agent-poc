@@ -231,3 +231,14 @@ async def test_model_audit_callback_records_from_langchain_worker_thread(monkeyp
     assert recorded[0].phase == "analysis"
     assert recorded[0].status == "succeeded"
     assert recorded[0].total_tokens == 14
+
+
+def test_model_error_diagnostics_do_not_store_provider_content() -> None:
+    error = Exception("secret prompt and API credentials")
+    error.status_code = 400
+    error.body = {"param": "temperature", "message": "private request content"}
+    code, message = module.model_failure_details(error)
+    assert code == "MODEL_PARAMETER_UNSUPPORTED"
+    assert "temperature" in message
+    assert "private" not in message
+    assert "secret" not in message

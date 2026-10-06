@@ -466,6 +466,39 @@ class ProductionDeepAgentFactory:
         )
 
 
+def model_failure_details(error: BaseException) -> tuple[str, str]:
+    """Return safe diagnostics without storing provider bodies or request content."""
+    status = getattr(error, "status_code", None)
+    body = getattr(error, "body", None)
+    if isinstance(body, dict):
+        detail = body.get("error", body)
+        if isinstance(detail, dict):
+            parameter = detail.get("param")
+            if status == 400 and parameter in {
+                "temperature", "max_tokens", "max_completion_tokens"
+            }:
+                return (
+                    "MODEL_PARAMETER_UNSUPPORTED",
+                    f"The provider rejected the {parameter} setting. "
+                    "Update the model profile settings.",
+                )
+    if status == 401:
+        return "MODEL_AUTHENTICATION_FAILED", "The provider rejected the model API credentials."
+    if status == 403:
+        return "MODEL_ACCESS_DENIED", "The provider denied access to this model."
+    if status == 404:
+        return "MODEL_NOT_FOUND", "The configured model or provider endpoint was not found."
+    if status == 429:
+        return (
+            "MODEL_RATE_LIMITED",
+            "The provider rejected the request due to rate or usage limits.",
+        )
+    return (
+        "MODEL_REQUEST_FAILED",
+        "The model request failed. Check the model profile and provider connection.",
+    )
+
+
 def _build_chat_model(model: ModelRuntimeConfiguration, timeout_seconds: float) -> Any:
     try:
         from langchain_openai import ChatOpenAI
@@ -777,6 +810,8 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
             started = self._started_at.pop(str(run_id), utc_now())
             finished = utc_now()
 
+            error_code, error_message = model_failure_details(error)
+
             async def _record_err() -> None:
                 async with self._record_lock:
                     async with get_session_factory()() as session:
@@ -788,6 +823,8 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             model_name=self.audit_context.model_name,
                             phase="analysis",
                             status="failed",
+                            error_code=error_code,
+                            error_message=error_message,
                             started_at=started,
                             finished_at=finished,
                         )
