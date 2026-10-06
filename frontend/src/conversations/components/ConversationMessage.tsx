@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sparkles, User, Copy, Check } from 'lucide-react';
 import type { ConversationMessage as Message } from '../api/conversation-api';
 import { formatLocalDateTime } from '../../lib/datetime';
+import { AnswerVerification } from './AnswerVerification';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDetails';
 import { BRANDING } from '../../lib/branding';
@@ -57,6 +58,7 @@ export function ConversationMessage({
             <time className="assistant-time" dateTime={message.created_at}>
               {formatLocalDateTime(message.created_at)}
             </time>
+            <AnswerVerification message={message} />
             <button
               type="button"
               className="p-1 rounded text-[#8B848C] hover:text-[#252127] hover:bg-[#F0EEE9] transition-colors"

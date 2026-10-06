@@ -1,3 +1,4 @@
+vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { role: 'member' } }) }));
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage as Message } from '../api/conversation-api';

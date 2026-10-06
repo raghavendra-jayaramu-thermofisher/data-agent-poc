@@ -48,3 +48,9 @@ export async function deleteConversation(id: string): Promise<void> {
     params: { path: { conversation_id: id } },
   }));
 }
+
+export function saveVerification(message: ConversationMessage, body: S['MessageVerificationUpdate']): Promise<ConversationMessage> {
+  return withAuthRefresh(() => apiClient.PATCH('/api/v1/conversations/{conversation_id}/messages/{message_id}/verification', {
+    params: { path: { conversation_id: message.conversation_id, message_id: message.id } }, body,
+  }));
+}

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ConversationCreate(BaseModel):
@@ -94,6 +95,12 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     job_id: uuid.UUID | None
+    verification_status: Literal["CORRECT", "PARTIALLY_CORRECT", "INCORRECT"] | None = None
+    verification_percentage: int | None = None
+    verification_summary: str | None = None
+    verified_by: uuid.UUID | None = None
+    verified_by_name: str | None = None
+    verified_at: datetime | None = None
     metadata: dict[str, object] = Field(validation_alias="metadata_json")
     created_at: datetime
 
@@ -105,3 +112,26 @@ class MessageAcceptedResponse(BaseModel):
 
 class ConversationDetailResponse(ConversationResponse):
     messages: list[MessageResponse] = Field(default_factory=list)
+
+
+class MessageVerificationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verification_status: Literal["CORRECT", "PARTIALLY_CORRECT", "INCORRECT"] | None
+    verification_percentage: int | None = Field(default=None, strict=True, ge=1, le=99)
+    verification_summary: str | None = Field(default=None, max_length=20000)
+
+    @model_validator(mode="after")
+    def validate_review(self):
+        self.verification_summary = (self.verification_summary or "").strip() or None
+        if self.verification_status is None:
+            if self.verification_summary is not None or self.verification_percentage is not None:
+                raise ValueError("Clear verification using a null status without summary or percentage.")
+        else:
+            if not self.verification_summary:
+                raise ValueError("A verification summary is required.")
+            if self.verification_status == "PARTIALLY_CORRECT":
+                if self.verification_percentage is None:
+                    raise ValueError("Partially correct reviews require a percentage from 1 to 99.")
+            elif self.verification_percentage is not None:
+                raise ValueError("Percentage applies only to partially correct reviews.")
+        return self

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.repository import ConversationRepository
 from app.conversations.schemas import (
+    MessageVerificationUpdate,
     ConversationCreate,
     ConversationRename,
     ConversationResponse,
@@ -35,6 +36,25 @@ class ConversationService:
         self.settings = settings
         self.redis = redis
         self.repo = ConversationRepository(session)
+
+    async def verify_message(self, conversation_id, message_id, organization_id, user, role, payload: MessageVerificationUpdate) -> Message:
+        if role not in {"owner", "admin"}:
+            raise AppError("FORBIDDEN", "Only workspace owners and admins can verify answers.", 403)
+        await self.require_for_org(conversation_id, organization_id)
+        item = await self.session.get(Message, message_id)
+        if item is None or item.conversation_id != conversation_id:
+            raise AppError("MESSAGE_NOT_FOUND", "Message not found.", 404)
+        if item.role != "assistant":
+            raise AppError("INVALID_VERIFICATION_TARGET", "Only assistant answers can be verified.", 422)
+        item.verification_status = payload.verification_status
+        item.verification_percentage = payload.verification_percentage
+        item.verification_summary = payload.verification_summary
+        item.verified_by = user.id if payload.verification_status else None
+        item.verified_by_name = user.display_name if payload.verification_status else None
+        item.verified_at = utc_now() if payload.verification_status else None
+        await self.session.commit()
+        await self.session.refresh(item)
+        return item
 
     async def create(
         self,

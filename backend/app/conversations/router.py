@@ -16,6 +16,7 @@ from app.conversations.schemas import (
     MessageAcceptedResponse,
     MessageCreate,
     MessageResponse,
+    MessageVerificationUpdate,
 )
 from app.conversations.service import ConversationService
 from app.core.config import Settings, get_settings
@@ -138,3 +139,20 @@ async def submit_message(
         payload=payload,
     )
     return MessageAcceptedResponse(message_id=message.id, job_id=job_id)
+
+
+@router.patch("/{conversation_id}/messages/{message_id}/verification", response_model=MessageResponse)
+async def verify_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    payload: MessageVerificationUpdate,
+    current_user: User = Depends(get_current_user),
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    organization, membership = context
+    item = await ConversationService(session, settings).verify_message(
+        conversation_id, message_id, organization.id, current_user, membership.role, payload
+    )
+    return MessageResponse.model_validate(item)

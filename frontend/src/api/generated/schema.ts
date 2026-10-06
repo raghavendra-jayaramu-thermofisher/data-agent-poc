@@ -190,6 +190,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/messages/{message_id}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Verify Message */
+        patch: operations["verify_message_api_v1_conversations__conversation_id__messages__message_id__verification_patch"];
+        trace?: never;
+    };
     "/api/v1/dashboards": {
         parameters: {
             query?: never;
@@ -1726,6 +1743,15 @@ export interface components {
             /** Model Profile Id */
             model_profile_id?: string | null;
         };
+        /** MessageVerificationUpdate */
+        MessageVerificationUpdate: {
+            /** Verification Percentage */
+            verification_percentage?: number | null;
+            /** Verification Status */
+            verification_status: ("CORRECT" | "PARTIALLY_CORRECT" | "INCORRECT") | null;
+            /** Verification Summary */
+            verification_summary?: string | null;
+        };
         /** ModelConnectionCreate */
         ModelConnectionCreate: {
             /** Api Key */
@@ -2249,6 +2275,18 @@ export interface components {
             };
             /** Role */
             role: string;
+            /** Verification Percentage */
+            verification_percentage?: number | null;
+            /** Verification Status */
+            verification_status?: ("CORRECT" | "PARTIALLY_CORRECT" | "INCORRECT") | null;
+            /** Verification Summary */
+            verification_summary?: string | null;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Verified By */
+            verified_by?: string | null;
+            /** Verified By Name */
+            verified_by_name?: string | null;
         };
     };
     responses: never;
@@ -2738,6 +2776,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_message_api_v1_conversations__conversation_id__messages__message_id__verification_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageVerificationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__conversations__schemas__MessageResponse"];
                 };
             };
             /** @description Validation Error */
