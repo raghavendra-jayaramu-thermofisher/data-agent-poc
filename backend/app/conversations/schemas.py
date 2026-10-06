@@ -59,6 +59,14 @@ class ConversationRename(BaseModel):
         return cleaned
 
 
+class AnswerReviewCounts(BaseModel):
+    total: int = Field(default=0, ge=0)
+    correct: int = Field(default=0, ge=0)
+    partially_correct: int = Field(default=0, ge=0)
+    incorrect: int = Field(default=0, ge=0)
+    unreviewed: int = Field(default=0, ge=0)
+
+
 class ConversationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -68,6 +76,7 @@ class ConversationResponse(BaseModel):
     created_by: uuid.UUID
     model_profile_id: uuid.UUID | None
     data_source_ids: list[uuid.UUID] = Field(default_factory=list)
+    answer_review_counts: AnswerReviewCounts = Field(default_factory=AnswerReviewCounts)
     created_at: datetime
     updated_at: datetime
 

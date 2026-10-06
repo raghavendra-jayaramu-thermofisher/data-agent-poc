@@ -17,7 +17,6 @@ import {
   Menu,
   Plus,
   Sparkles,
-  MessageSquare,
   X,
   Search,
   FileText,
@@ -31,7 +30,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useOrganization } from '../organizations/OrganizationProvider';
 import { useConversationList, useDeleteConversation } from '../conversations/hooks/useConversations';
 import { BRANDING } from '../lib/branding';
-import { formatRelativeTime } from '../lib/datetime';
+import { ConversationListItemContent } from '../conversations/components/ConversationListItemContent';
 import { useSidebarDisplay } from './useSidebarDisplay';
 import { DisplaySettingsModal } from './DisplaySettingsModal';
 import { preferences } from '../lib/preferences';
@@ -285,18 +284,7 @@ export function AppShell() {
                         className={`secondary-chat-item ${isActive ? 'active' : ''}`}
                         title={conv.title || 'Untitled analysis'}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <MessageSquare
-                            size={14}
-                            className={isActive ? 'text-[#4B123F] shrink-0' : 'text-[#8B848C] shrink-0'}
-                          />
-                          <span className="text-[13px] truncate font-medium text-[#252127]">
-                            {conv.title?.trim() || 'Untitled analysis'}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#8B848C] pl-5">
-                          {formatRelativeTime(conv.updated_at)}
-                        </span>
+                        <ConversationListItemContent conversation={conv} />
                       </Link>
                       <button
                         type="button"

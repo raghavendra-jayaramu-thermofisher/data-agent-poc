@@ -1,6 +1,42 @@
 {
   "components": {
     "schemas": {
+      "AnswerReviewCounts": {
+        "properties": {
+          "correct": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Correct",
+            "type": "integer"
+          },
+          "incorrect": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Incorrect",
+            "type": "integer"
+          },
+          "partially_correct": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Partially Correct",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "unreviewed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unreviewed",
+            "type": "integer"
+          }
+        },
+        "title": "AnswerReviewCounts",
+        "type": "object"
+      },
       "AuditLogResponse": {
         "properties": {
           "action": {
@@ -260,6 +296,9 @@
       },
       "ConversationDetailResponse": {
         "properties": {
+          "answer_review_counts": {
+            "$ref": "#/components/schemas/AnswerReviewCounts"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -354,6 +393,9 @@
       },
       "ConversationResponse": {
         "properties": {
+          "answer_review_counts": {
+            "$ref": "#/components/schemas/AnswerReviewCounts"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",

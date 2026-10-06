@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
+from app.conversations.schemas import AnswerReviewCounts
 
 
 class ConversationRepository:
@@ -61,6 +62,30 @@ class ConversationRepository:
             .order_by(ConversationDataSource.data_source_id)
         )
         return list(result.scalars().all())
+
+    async def answer_review_counts(
+        self, conversation_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, AnswerReviewCounts]:
+        if not conversation_ids:
+            return {}
+        result = await self.session.execute(
+            select(
+                Message.conversation_id,
+                func.count().label("total"),
+                func.count().filter(Message.verification_status == "CORRECT").label("correct"),
+                func.count().filter(Message.verification_status == "PARTIALLY_CORRECT").label("partially_correct"),
+                func.count().filter(Message.verification_status == "INCORRECT").label("incorrect"),
+                func.count().filter(Message.verification_status.is_(None)).label("unreviewed"),
+            )
+            .where(Message.conversation_id.in_(conversation_ids), Message.role == "assistant")
+            .group_by(Message.conversation_id)
+        )
+        return {
+            row.conversation_id: AnswerReviewCounts(
+                **{name: getattr(row, name) for name in AnswerReviewCounts.model_fields}
+            )
+            for row in result.all()
+        }
 
     async def list_messages(
         self, conversation_id: uuid.UUID, *, limit: int = 200

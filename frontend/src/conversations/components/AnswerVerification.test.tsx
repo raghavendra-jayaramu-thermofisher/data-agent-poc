@@ -1,12 +1,18 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as renderUI, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
+import { queryKeys } from '../../api/queryKeys';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AnswerVerification } from './AnswerVerification';
 import type { ConversationMessage } from '../api/conversation-api';
 const state = vi.hoisted(() => ({ role: 'admin', save: vi.fn() }));
-vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { role: state.role } }) }));
+vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { id: 'org-1', role: state.role } }) }));
 vi.mock('../api/conversation-api', () => ({ saveVerification: state.save }));
 const message: ConversationMessage = { id: 'm1', conversation_id: 'c1', role: 'assistant', content: 'Answer', metadata: {}, job_id: null, created_at: '2026-10-06T09:00:00Z' };
+function render(ui: ReactElement) {
+  return renderUI(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
+}
 describe('answer verification', () => {
   it('shows only a collapsed badge initially and expands the safe Markdown summary', async () => {
     render(<AnswerVerification message={{ ...message, verification_status: 'CORRECT', verification_summary: '**Checked totals** <script>alert(1)</script>', verified_by_name: 'Reviewer', verified_at: message.created_at }} />);
@@ -36,5 +42,17 @@ describe('answer verification', () => {
     await userEvent.setup().click(screen.getByLabelText('Not verified'));
     expect(screen.queryByText('Verify answer')).not.toBeInTheDocument();
     state.role = 'admin';
+  });
+  it('refreshes sidebar review counts when verification is cleared', async () => {
+    const client = new QueryClient();
+    const key = queryKeys.conversations.list('org-1');
+    client.setQueryData(key, [{ id: 'c1' }]);
+    state.save.mockResolvedValue({ ...message, verification_status: null });
+    renderUI(<QueryClientProvider client={client}><AnswerVerification message={{ ...message, verification_status: 'CORRECT', verification_summary: 'Checked.' }} /></QueryClientProvider>);
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Verified · Correct'));
+    await user.click(screen.getByText('Clear verification'));
+    await waitFor(() => expect(client.getQueryState(key)?.isInvalidated).toBe(true));
+    expect(screen.getByLabelText('Not verified')).toBeInTheDocument();
   });
 });

@@ -909,6 +909,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnswerReviewCounts */
+        AnswerReviewCounts: {
+            /**
+             * Correct
+             * @default 0
+             */
+            correct: number;
+            /**
+             * Incorrect
+             * @default 0
+             */
+            incorrect: number;
+            /**
+             * Partially Correct
+             * @default 0
+             */
+            partially_correct: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Unreviewed
+             * @default 0
+             */
+            unreviewed: number;
+        };
         /** AuditLogResponse */
         AuditLogResponse: {
             /** Action */
@@ -989,6 +1017,7 @@ export interface components {
         };
         /** ConversationDetailResponse */
         ConversationDetailResponse: {
+            answer_review_counts?: components["schemas"]["AnswerReviewCounts"];
             /**
              * Created At
              * Format: date-time
@@ -1030,6 +1059,7 @@ export interface components {
         };
         /** ConversationResponse */
         ConversationResponse: {
+            answer_review_counts?: components["schemas"]["AnswerReviewCounts"];
             /**
              * Created At
              * Format: date-time

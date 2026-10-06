@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../api/queryKeys';
 import { BadgeCheck, BadgeAlert, BadgeX, ShieldQuestion } from 'lucide-react';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import { formatLocalDateTime } from '../../lib/datetime';
@@ -8,6 +10,7 @@ import { saveVerification, type ConversationMessage } from '../api/conversation-
 type Status = 'CORRECT' | 'PARTIALLY_CORRECT' | 'INCORRECT';
 const labels = { CORRECT: 'Verified · Correct', PARTIALLY_CORRECT: 'Verified · Partially correct', INCORRECT: 'Reviewed · Incorrect' };
 export function AnswerVerification({ message }: { message: ConversationMessage }) {
+  const queryClient = useQueryClient();
   const { activeOrganization } = useOrganization();
   const canReview = activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin';
   const [saved, setSaved] = useState(message);
@@ -32,6 +35,7 @@ export function AnswerVerification({ message }: { message: ConversationMessage }
         verification_percentage: status === 'PARTIALLY_CORRECT' ? Number(percentage) : null,
       });
       setSaved(updated); setEditing(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all(activeOrganization?.id ?? null) });
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save verification.'); }
     finally { setBusy(false); }
   };

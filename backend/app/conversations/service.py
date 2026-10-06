@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.repository import ConversationRepository
 from app.conversations.schemas import (
+    AnswerReviewCounts,
     MessageVerificationUpdate,
     ConversationCreate,
     ConversationRename,
@@ -106,10 +107,24 @@ class ConversationService:
             raise AppError("CONVERSATION_NOT_FOUND", "Conversation not found.", 404)
         return item
 
-    async def to_response(self, item: Conversation) -> ConversationResponse:
+    async def to_response(
+        self, item: Conversation, review_counts: AnswerReviewCounts | None = None
+    ) -> ConversationResponse:
         response = ConversationResponse.model_validate(item)
         response.data_source_ids = await self.repo.source_ids(item.id)
+        if review_counts is None:
+            counts = await self.repo.answer_review_counts([item.id])
+            review_counts = counts.get(item.id, AnswerReviewCounts())
+        response.answer_review_counts = review_counts
         return response
+
+    async def list_responses_for_org(self, organization_id: uuid.UUID) -> list[ConversationResponse]:
+        rows = await self.list_for_org(organization_id)
+        counts = await self.repo.answer_review_counts([item.id for item in rows])
+        return [
+            await self.to_response(item, counts.get(item.id, AnswerReviewCounts()))
+            for item in rows
+        ]
 
     async def list_for_org(self, organization_id: uuid.UUID) -> list[Conversation]:
         return await self.repo.list_for_org(organization_id)

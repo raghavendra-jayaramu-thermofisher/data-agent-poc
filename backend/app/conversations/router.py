@@ -53,8 +53,7 @@ async def list_conversations(
 ) -> list[ConversationResponse]:
     organization, _ = context
     service = ConversationService(session, settings)
-    rows = await service.list_for_org(organization.id)
-    return [await service.to_response(item) for item in rows]
+    return await service.list_responses_for_org(organization.id)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
