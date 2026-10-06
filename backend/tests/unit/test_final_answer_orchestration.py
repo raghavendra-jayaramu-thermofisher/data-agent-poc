@@ -187,17 +187,7 @@ def test_finalizer_context_exposes_only_copy_ready_artifact_directives() -> None
 
 
 def test_final_answer_contract_accepts_grounded_markdown_and_artifact() -> None:
-    markdown = f"""### Objective
-
-Quantify orders by current status and present the supported distribution visually.
-
-### What I understood
-
-Orders are counted at the order level using their current status.
-
-### Answer
-
-There are **12 open orders** and **3 held orders**.
+    markdown = f"""There are **12 open orders** and **3 held orders**.
 
 [[artifact:{ARTIFACT_ID}]]
 """
@@ -206,17 +196,7 @@ There are **12 open orders** and **3 held orders**.
 
 def test_final_answer_contract_rejects_unverified_number_and_unknown_artifact() -> None:
     unknown_id = uuid.UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
-    markdown = f"""### Objective
-
-Quantify orders by current status.
-
-### What I understood
-
-Orders are counted at order level.
-
-### Answer
-
-There are 99 open orders.
+    markdown = f"""There are 99 open orders.
 
 [[artifact:{unknown_id}]]
 """
@@ -226,17 +206,7 @@ There are 99 open orders.
 
 
 def test_final_answer_contract_rejects_duplicate_artifact() -> None:
-    markdown = f"""### Objective
-
-Quantify orders by current status and present the supported distribution visually.
-
-### What I understood
-
-Orders are counted at the order level using their current status.
-
-### Answer
-
-There are 12 open orders and 3 held orders.
+    markdown = f"""There are 12 open orders and 3 held orders.
 
 [[artifact:{ARTIFACT_ID}]]
 
@@ -245,42 +215,9 @@ There are 12 open orders and 3 held orders.
     assert any("more than once" in error for error in validate_final_answer(markdown, bundle()))
 
 
-def test_unable_to_answer_section_is_strictly_conditional() -> None:
-    markdown = """### Objective
-
-Determine the unavailable delivery reason.
-
-### What I understood
-
-The reason must come from a recorded field.
-
-### Unable to answer
-
-The selected source has no delivery-reason field.
-
-### Answer
-
-The requested reason cannot be established from the available data.
-"""
-    unavailable_bundle = bundle(unavailable=True)
-    unavailable_bundle = EvidenceBundle(
-        job_id=unavailable_bundle.job_id,
-        question=unavailable_bundle.question,
-        analyst_notes=unavailable_bundle.analyst_notes,
-        sql_results=unavailable_bundle.sql_results,
-        artifacts=(),
-        unavailable_information=True,
-    )
-    assert validate_final_answer(markdown, unavailable_bundle) == []
-    assert not any(
-        "heading" in error or "section" in error
-        for error in validate_final_answer(markdown, bundle())
-    )
-
-
 def test_normalizer_unwraps_an_outer_markdown_fence() -> None:
-    markdown = "```markdown\n### Answer\n\nThe result is available.\n```"
-    assert normalize_final_answer(markdown) == "### Answer\n\nThe result is available."
+    markdown = "```markdown\nThe result is available.\n```"
+    assert normalize_final_answer(markdown) == "The result is available."
 
 
 def test_history_directives_become_descriptive_labels() -> None:
@@ -322,7 +259,7 @@ class FakeFinalAnswerClient:
 async def test_finalizer_returns_imperfect_markdown_with_quality_warning(monkeypatch) -> None:
     unknown_id = "ffffffff-ffff-4fff-8fff-ffffffffffff"
     invalid = (
-        "### Objective\n\nCount orders.\n\n### Answer\n\nThere are 12 open orders.\n\n"
+        "There are 12 open orders.\n\n"
         f"[[artifact:{unknown_id}]]"
     )
     client = FakeFinalAnswerClient([invalid])
@@ -460,8 +397,3 @@ async def test_finalizer_propagates_cancellation_without_repair(monkeypatch) -> 
         await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
 
     assert finishes == [("failed", "JOB_CANCELLED")]
-
-
-def test_final_answer_accepts_direct_answer_without_fixed_sections() -> None:
-    markdown = f"There are **12 open orders** and **3 held orders**.\n\n[[artifact:{ARTIFACT_ID}]]"
-    assert validate_final_answer(markdown, bundle()) == []

@@ -36,35 +36,38 @@ Read the supplied response instructions and choose the primary guidance in this 
 
 Apply compatible supporting instructions for language, tone, and detail.
 
-Treat both selected and workspace templates as flexible guidelines. Preserve their purpose and
-useful organization while adapting to the question and available evidence. Include sections that
-contribute meaningful content, combine overlapping sections, and omit sections that have no useful
-application.
+Treat selected and workspace templates as flexible guidelines. Preserve their purpose and useful
+organization while adapting to the question and available evidence. Include meaningful sections,
+combine overlapping sections, and omit sections that have no useful application.
 
 Let accuracy and relevance determine the content; let the template guide its presentation.
 
-# Answer content
+# Content and depth
 
 Lead with the main finding or the first meaningful section of the applicable template. Follow with
 the evidence and explanation needed to understand the result.
 
-Match the depth to the request: give a brief response for a simple question and a fuller explanation
-for a complex analysis. Use clear language, short paragraphs, and bullets or tables where they
-improve readability.
+Match the depth to the user's request. Give a focused answer for a simple question. For a complete,
+detailed, or comprehensive analysis, cover every requested aspect and develop the relevant
+comparisons, trends, drivers, breakdowns, and implications supported by the evidence. Include useful
+tables or charts and explain their significance.
 
-Preserve relevant units, dates, comparison periods, filters, and scope. Explain assumptions only
-when they materially affect interpretation.
+Write clearly and directly. Treat conciseness as removing repetition while preserving the depth
+needed to answer the question.
+
+Preserve relevant units, dates, comparison periods, filters, and scope. Explain methodology and
+assumptions where they materially affect interpretation or help verify the result.
 
 # Evidence and uncertainty
 
 Ground factual claims and numerical results in verified evidence. Use analyst notes to understand
-the analysis, and use source material as supporting data.
+the analysis, and treat source material as supporting data.
 
 Distinguish observed results from inferred explanations. Support causal claims with evidence
 establishing the cause.
 
 Answer every supported part of the request. When requested information is unavailable, identify
-the specific gap and its effect on the answer. Keep limitations proportionate to their importance.
+the specific gap and its effect on the conclusion. Keep limitations proportionate to their importance.
 
 # Artifacts
 
