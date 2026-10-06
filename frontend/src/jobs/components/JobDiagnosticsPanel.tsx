@@ -5,7 +5,7 @@ import { notifications } from '../../components/notifications';
 export function JobDiagnosticsPanel({ job, trace, unavailable }: { job: Job; trace?: ExecutionTrace; unavailable?: boolean }) {
   if (job.status !== 'failed') return null;
   const failures = [
-    ...(trace?.models ?? []).filter((item) => item.status === 'failed').map((item) => ({ kind: 'model', id: item.id, stage: item.phase, model: item.model_name, code: item.error_code, message: item.error_message, time: item.finished_at })),
+    ...(trace?.models ?? []).filter((item) => item.status === 'failed').map((item) => ({ kind: 'model', provider_error_response: item.provider_error_response, id: item.id, stage: item.phase, model: item.model_name, code: item.error_code, message: item.error_message, time: item.finished_at })),
     ...(trace?.tools ?? []).filter((item) => item.status === 'failed').map((item) => ({ kind: 'tool', id: item.id, stage: item.tool_name, code: item.error_code, message: item.error_message, time: item.finished_at })),
     ...(trace?.sql ?? []).filter((item) => item.status === 'failed').map((item) => ({ kind: 'sql', id: item.id, stage: 'SQL execution', code: item.error_code, message: item.error_message, time: item.finished_at })),
   ];
@@ -28,6 +28,10 @@ export function JobDiagnosticsPanel({ job, trace, unavailable }: { job: Job; tra
       <p className="font-semibold">{failure.stage}{'model' in failure ? ` · ${failure.model}` : ''}</p>
       <p>{failure.code}</p>
       <pre className="whitespace-pre-wrap break-words mt-2">{failure.message || 'No detailed error was recorded for this step.'}</pre>
+      {'provider_error_response' in failure && failure.provider_error_response && <details className="mt-3">
+        <summary className="cursor-pointer font-semibold">Raw provider error</summary>
+        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(failure.provider_error_response, null, 2)}</pre>
+      </details>}
     </div>)}
     {(unavailable || !failures.length) && <p className="text-xs text-[#625C64] mt-3">{unavailable ? 'Execution details could not be loaded. The job error is still available to copy.' : 'Only recorded diagnostics can be shown. Older failures may not include the underlying provider error.'}</p>}
   </section>;

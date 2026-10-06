@@ -231,6 +231,7 @@ class FinalAnswerRuntime:
                 status="failed",
                 error_code="FINAL_ANSWER_PROVIDER_FAILED",
                 error_message=diagnostic_message(exc.public_message, exc.diagnostics),
+                provider_error_response=(exc.diagnostics or {}).get("provider_error_response"),
             )
             raise FinalAnswerError(
                 "FINAL_ANSWER_PROVIDER_FAILED",
@@ -290,6 +291,7 @@ class FinalAnswerRuntime:
         status: str,
         error_code: str | None = None,
         error_message: str | None = None,
+        provider_error_response: dict[str, object] | None = None,
         input_tokens: int | None = None,
         output_tokens: int | None = None,
         total_tokens: int | None = None,
@@ -301,6 +303,7 @@ class FinalAnswerRuntime:
             item.status = status
             item.error_code = error_code
             item.error_message = error_message
+            item.provider_error_response = provider_error_response
             item.input_tokens = input_tokens
             item.output_tokens = output_tokens
             item.total_tokens = total_tokens

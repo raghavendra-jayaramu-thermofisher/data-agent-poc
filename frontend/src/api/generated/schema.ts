@@ -1839,6 +1839,10 @@ export interface components {
             output_tokens: number | null;
             /** Phase */
             phase: string;
+            /** Provider Error Response */
+            provider_error_response?: {
+                [key: string]: unknown;
+            } | null;
             /** Sequence */
             sequence: number;
             /**

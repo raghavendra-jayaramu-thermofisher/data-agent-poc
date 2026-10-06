@@ -56,6 +56,7 @@ class ModelExecutionResponse(BaseModel):
     total_tokens: int | None
     error_code: str | None
     error_message: str | None
+    provider_error_response: dict[str, object] | None = None
     started_at: datetime
     finished_at: datetime | None
 

@@ -25,18 +25,19 @@ class ProviderDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         for value in ("privatekey", "privateprompt", "DO NOT EXPOSE"):
             self.assertNotIn(value, str(diagnostics))
 
-    async def test_non_json_body_is_not_exposed(self):
+    async def test_non_json_body_is_saved_without_url_credentials(self):
         response = httpx.Response(502, text="private HTML and secrets", request=httpx.Request("POST", "https://user:password@host/v1/chat/completions?key=hidden"))
         result = provider_diagnostics(response, api_key=None, request_payload=None)
         self.assertEqual(result["http_status"], 502)
         self.assertEqual(result["provider_host"], "host")
-        for secret in ("password", "hidden", "private HTML"):
+        self.assertEqual(result["provider_error_response"]["body"], "private HTML and secrets")
+        for secret in ("password", "hidden"):
             self.assertNotIn(secret, str(result))
 
     async def test_finalizer_persists_the_provider_reason_in_execution(self):
         runtime = FinalAnswerRuntime.__new__(FinalAnswerRuntime)
         runtime.settings = SimpleNamespace(final_answer_timeout_seconds=60)
-        client = SimpleNamespace(chat_completion=AsyncMock(side_effect=ModelProviderError("MODEL_PROVIDER_REJECTED_REQUEST", "Provider rejected request.", diagnostics={"http_status": 400, "provider_message": "Unsupported parameter", "parameter": "temperature"})))
+        client = SimpleNamespace(chat_completion=AsyncMock(side_effect=ModelProviderError("MODEL_PROVIDER_REJECTED_REQUEST", "Provider rejected request.", diagnostics={"http_status": 400, "provider_message": "Unsupported parameter", "parameter": "temperature", "provider_error_response": {"body": "extra provider detail"}})))
         runtime.client_factory = lambda *_: client
         runtime._start_execution = AsyncMock(return_value=uuid.uuid4())
         runtime._finish_execution = AsyncMock()
@@ -48,3 +49,21 @@ class ProviderDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         message = runtime._finish_execution.call_args.kwargs['error_message']
         self.assertIn('http_status: 400', message)
         self.assertIn('Unsupported parameter', message)
+        self.assertNotIn('extra provider detail', message)
+        self.assertEqual(runtime._finish_execution.call_args.kwargs['provider_error_response'], {'body': 'extra provider detail'})
+
+    async def test_raw_response_redacts_nested_credentials_and_retains_extra_details(self):
+        response = httpx.Response(500, json={"error": {"message": "Failed", "extra": "useful detail"}, "nested": {"api_key": "private", "password": "secret"}}, headers={"set-cookie": "session=private", "x-request-id": "req-500"}, request=httpx.Request("POST", "https://host/v1/chat/completions", headers={"Authorization": "Bearer echoed-key"}))
+        raw = provider_diagnostics(response, api_key=None, request_payload={"model": "m"})["provider_error_response"]
+        self.assertIn("useful detail", raw["body"])
+        self.assertNotIn("private", str(raw))
+        self.assertEqual(raw["headers"]["set-cookie"], "[redacted]")
+        self.assertEqual(raw["model"], "m")
+        self.assertFalse(raw["body_truncated"])
+
+    async def test_large_text_response_is_explicitly_truncated(self):
+        response = httpx.Response(502, text="x" * 70000, request=httpx.Request("POST", "https://host/v1"))
+        raw = provider_diagnostics(response, api_key=None, request_payload=None)["provider_error_response"]
+        self.assertEqual(len(raw["body"]), 65536)
+        self.assertTrue(raw["body_truncated"])
+        self.assertEqual(raw["body_format"], "text")

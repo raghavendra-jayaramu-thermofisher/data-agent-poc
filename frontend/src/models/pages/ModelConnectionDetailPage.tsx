@@ -105,6 +105,7 @@ export function ModelConnectionDetailPage() {
             Endpoint Configuration
           </h2>
           <ConnectionEdit
+            key={item.id}
             connection={item}
             onSaved={async () => {
               await qc.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
@@ -150,7 +151,6 @@ function ConnectionEdit({
   onSaved(): Promise<void>;
 }) {
   const {
-    register,
     control,
     handleSubmit,
     setError,
@@ -178,8 +178,8 @@ function ConnectionEdit({
 
   return (
     <form className="space-y-4 max-w-lg" onSubmit={submit}>
-      <FormField label="Connection Name" {...register('name')} error={errors.name?.message} />
-      <FormField label="Base URL" {...register('baseUrl')} error={errors.baseUrl?.message} />
+      <Controller control={control} name="name" render={({ field }) => <FormField label="Connection Name" {...field} error={errors.name?.message} />} />
+      <Controller control={control} name="baseUrl" render={({ field }) => <FormField label="Base URL" {...field} error={errors.baseUrl?.message} />} />
       <Controller
         control={control}
         name="apiKey"

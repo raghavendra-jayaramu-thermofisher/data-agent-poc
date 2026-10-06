@@ -8,6 +8,18 @@ vi.mock('../../components/notifications', () => ({ notifications: { success: vi.
 const job: Job = { id: 'j1', job_type: 'chat_query', status: 'failed', error_code: 'FINAL_ANSWER_PROVIDER_FAILED', error_message: 'Final answer failed.', organization_id: 'o', requested_by: 'u', conversation_id: null, input: { private_prompt: 'secret' }, result: null, attempt_count: 1, max_attempts: 3, cancel_requested_at: null, created_at: '2026-10-04T00:00:00Z', started_at: null, finished_at: null };
 const trace: ExecutionTrace = { models: [{ id: 'm1', job_id: 'j1', sequence: 1, model_profile_id: 'p', model_name: 'model', phase: 'finalization', status: 'failed', input_tokens: null, output_tokens: null, total_tokens: null, error_code: 'FINAL_ANSWER_PROVIDER_FAILED', error_message: 'http_status: 400\nprovider_message: Unsupported parameter\nparameter: temperature', started_at: job.created_at, finished_at: null }], tools: [], sql: [], artifacts: [] };
 describe('job failure diagnostics', () => {
+  it('expands and copies the raw provider response', async () => {
+    const user = userEvent.setup();
+    const raw = { http_status: 500, headers: { 'x-request-id': 'req-debug' }, body: '<html>Provider unavailable</html>', body_format: 'text' };
+    render(<JobDiagnosticsPanel job={job} trace={{ ...trace, models: [{ ...trace.models[0], provider_error_response: raw }] }} />);
+    const summary = screen.getByText('Raw provider error');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+    await user.click(summary);
+    expect(summary.closest('details')).toHaveAttribute('open');
+    expect(screen.getByText(/req-debug/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Copy Diagnostics' }));
+    expect(JSON.parse(await navigator.clipboard.readText()).failures[0].provider_error_response).toEqual(raw);
+  });
   it('shows the recorded cause and copies only diagnostics without retry controls or prompts', async () => {
     const user = userEvent.setup(); render(<JobDiagnosticsPanel job={job} trace={trace} />);
     expect(screen.getByText(/Unsupported parameter/)).toBeInTheDocument();

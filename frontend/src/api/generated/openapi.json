@@ -2347,6 +2347,18 @@
             "title": "Phase",
             "type": "string"
           },
+          "provider_error_response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Error Response"
+          },
           "sequence": {
             "title": "Sequence",
             "type": "integer"

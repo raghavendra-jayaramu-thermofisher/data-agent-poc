@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+
+import httpx
 from collections.abc import Awaitable, Callable, Coroutine
 from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.agent.models import ModelExecution
+from app.models.diagnostics import provider_diagnostics
 from app.agent.repository import AgentExecutionRepository
 from app.agent.tools import (
     AgentLimitError,
@@ -498,7 +501,7 @@ class ProductionDeepAgentFactory:
 
 
 def model_failure_details(error: BaseException) -> tuple[str, str]:
-    """Return safe diagnostics without storing provider bodies or request content."""
+    """Return the concise classification for a failed model request."""
     status = getattr(error, "status_code", None)
     body = getattr(error, "body", None)
     if isinstance(body, dict):
@@ -842,6 +845,13 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
             finished = utc_now()
 
             error_code, error_message = model_failure_details(error)
+            response = getattr(error, "response", None)
+            raw_error = None
+            if isinstance(response, httpx.Response):
+                raw_error = provider_diagnostics(
+                    response, api_key=None,
+                    request_payload={"model": self.audit_context.model_name},
+                )["provider_error_response"]
 
             async def _record_err() -> None:
                 async with self._record_lock:
@@ -856,6 +866,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             status="failed",
                             error_code=error_code,
                             error_message=error_message,
+                            provider_error_response=raw_error,
                             started_at=started,
                             finished_at=finished,
                         )

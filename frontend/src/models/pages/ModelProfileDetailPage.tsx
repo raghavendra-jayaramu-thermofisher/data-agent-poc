@@ -99,6 +99,7 @@ export function ModelProfileDetailPage() {
             Profile Parameters
           </h2>
           <ProfileEdit
+            key={item.id}
             profile={item}
             connections={connections.data}
             onSaved={async () => {
@@ -152,7 +153,6 @@ function ProfileEdit({
 }) {
   const settings = profile.settings;
   const {
-    register,
     control,
     handleSubmit,
     setError,
@@ -214,30 +214,27 @@ function ProfileEdit({
           />
         )}
       />
-      <FormField
-        label="Display Name"
-        {...register('displayName')}
-        error={errors.displayName?.message}
+      <Controller
+        control={control}
+        name="displayName"
+        render={({ field }) => <FormField label="Display Name" {...field} error={errors.displayName?.message} />}
       />
-      <FormField
-        label="Model Identifier"
-        {...register('modelName')}
-        error={errors.modelName?.message}
+      <Controller
+        control={control}
+        name="modelName"
+        render={({ field }) => <FormField label="Model Identifier" {...field} error={errors.modelName?.message} />}
       />
 
       <div className="grid grid-cols-2 gap-4">
-        <FormField
-          label="Temperature"
-          type="number"
-          step="0.1"
-          {...register('temperature', { setValueAs: parseOptionalNumberInput })}
-          error={errors.temperature?.message}
+        <Controller
+          control={control}
+          name="temperature"
+          render={({ field }) => <FormField label="Temperature" type="number" step="0.1" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.temperature?.message} />}
         />
-        <FormField
-          label="Max Tokens"
-          type="number"
-          {...register('maxTokens', { setValueAs: parseOptionalNumberInput })}
-          error={errors.maxTokens?.message}
+        <Controller
+          control={control}
+          name="maxTokens"
+          render={({ field }) => <FormField label="Max Tokens" type="number" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.maxTokens?.message} />}
         />
       </div>
 
