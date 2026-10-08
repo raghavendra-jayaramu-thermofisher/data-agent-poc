@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import select
 
 from app.agent.html_artifacts import HtmlArtifactStorage, HtmlArtifactValidationError
 from app.agent.models import JobArtifact, SQLExecution, ToolExecution
@@ -23,6 +24,7 @@ from app.agent.tool_schemas import (
     ReadKnowledgeIndexArgs,
     ReadTableSchemaArgs,
 )
+from app.conversations.table_scope import SourceTableScope
 from app.core.config import Settings, get_settings
 from app.core.database import get_session_factory
 from app.core.redis import get_redis
@@ -31,6 +33,7 @@ from app.data_sources.errors import DataSourceOperationError
 from app.data_sources.service import DataSourceService
 from app.jobs.repository import JobRepository
 from app.jobs.service import JobService
+from app.knowledge.models import KnowledgeDocument
 from app.knowledge.repository import KnowledgeRepository
 
 
@@ -63,6 +66,11 @@ class AgentToolContext:
     default_instructions: str | None = None
     command_instructions: str | None = None
     command_name: str | None = None
+    table_scope: tuple[SourceTableScope, ...] = ()
+
+    def selected_scope(self, source_id: uuid.UUID) -> SourceTableScope | None:
+        return next((item for item in self.table_scope
+            if item.data_source_id == source_id and item.mode == "selected"), None)
 
 
 ToolHandler = Callable[
@@ -191,6 +199,19 @@ async def read_knowledge_index(
             "business_annotations": business,
         }
         estimated_tokens = doc.estimated_tokens
+        selected = context.selected_scope(source_id)
+        if selected is not None:
+            version = selected.knowledge_version_id
+            documents = []
+            for table in selected.tables:
+                key = f"{table.schema_name}.{table.name}" if table.schema_name else table.name
+                entry = await repo.get_document(version, "table_schema", key)
+                if entry is None or (entry.metadata_json.get("schema"), entry.metadata_json.get("table")) != (table.schema_name, table.name):
+                    raise AgentToolError("TABLE_SCOPE_STALE", "A selected table is unavailable in the job's schema snapshot.")
+                documents.append(f"- `{key}` — {entry.metadata_json.get('object_type', 'table')}; schema document key: `{key}`")
+            payload["knowledge_version_id"] = str(version)
+            payload["index_markdown"] = "# Selected tables and views\n\n" + "\n".join(documents)
+            estimated_tokens = len(str(payload["index_markdown"])) // 4
     await append_agent_event(
         context.job_id,
         "knowledge.index.loaded",
@@ -217,12 +238,22 @@ async def read_table_schema(
                 "KNOWLEDGE_NOT_READY",
                 "Knowledge has not been generated for this datasource yet.",
             )
-        doc = await repo.get_document(base.current_version_id, "table_schema", table_key)
+        selected = context.selected_scope(source_id)
+        if selected is not None:
+            allowed = {(f"{table.schema_name}.{table.name}" if table.schema_name else table.name): table for table in selected.tables}
+            if table_key not in allowed:
+                raise AgentToolError("TABLE_NOT_AUTHORIZED", "This table is not selected for the conversation.")
+        version = selected.knowledge_version_id if selected else base.current_version_id
+        doc = await repo.get_document(version, "table_schema", table_key)
         if doc is None:
             raise AgentToolError(
                 "KNOWLEDGE_TABLE_NOT_FOUND",
                 "The requested table schema is not present in the current knowledge version.",
             )
+        if selected is not None:
+            table = allowed[table_key]
+            if (doc.metadata_json.get("schema"), doc.metadata_json.get("table")) != (table.schema_name, table.name):
+                raise AgentToolError("TABLE_SCOPE_STALE", "The selected table identity no longer matches its schema document.")
         annotations = await repo.list_annotations(base.id)
         relevant = [
             {"scope_type": item.scope_type, "scope_key": item.scope_key, "content": item.content}
@@ -268,8 +299,25 @@ async def execute_sql(
         source = await source_service.require_for_org(source_id, context.organization_id)
         if source.status != "active":
             raise AgentToolError("DATASOURCE_NOT_ACTIVE", "The datasource is not active.")
+        selected = context.selected_scope(source_id)
+        allowed_tables = None
+        catalog_tables = None
+        if selected is not None:
+            allowed_tables = tuple((table.schema_name, table.name) for table in selected.tables)
+            knowledge_repo = KnowledgeRepository(session)
+            base = await knowledge_repo.get_base_for_source(source_id, context.organization_id)
+            if base is None or base.status != "ready" or base.current_version_id is None:
+                raise AgentToolError("KNOWLEDGE_NOT_READY", "Schema knowledge is unavailable.")
+            metadata = (await session.execute(select(KnowledgeDocument.metadata_json).where(
+                KnowledgeDocument.knowledge_version_id == base.current_version_id,
+                KnowledgeDocument.document_type == "table_schema",
+            ))).scalars().all()
+            catalog_tables = tuple((item.get("schema"), item["table"]) for item in metadata)
+            if not set(allowed_tables).issubset(catalog_tables):
+                raise AgentToolError("TABLE_SCOPE_STALE", "A selected table is no longer available. Start a new conversation with available tables.")
         try:
-            sql = validate_read_only_sql(raw_sql, source_kind=source.kind)
+            sql = validate_read_only_sql(raw_sql, source_kind=source.kind,
+                allowed_tables=allowed_tables, catalog_tables=catalog_tables)
         except SQLSafetyViolation as exc:
             raise AgentToolError(exc.code, exc.public_message) from exc
         adapter = await source_service.resolve_adapter(source)

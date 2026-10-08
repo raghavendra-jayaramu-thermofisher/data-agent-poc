@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { JobArtifact } from '../../agent/api/execution-api';
 import { AssistantResponseRenderer } from './AssistantResponseRenderer';
@@ -61,5 +62,33 @@ describe('AssistantResponseRenderer', () => {
     );
     expect(screen.getByText('Historical answer.')).toBeInTheDocument();
     expect(screen.queryByTestId(`artifact-${artifactId}`)).not.toBeInTheDocument();
+  });
+
+  it('keeps inline artifacts with their section tab and restores the full answer', async () => {
+    const user = userEvent.setup();
+    render(
+      <AssistantResponseRenderer
+        jobId="job-1"
+        markdown={`# Report\n\n## Findings\nBefore output.\n\n[[artifact:${artifactId}]]\n\n## Actions\nAfter output.`}
+        artifacts={[artifact]}
+        sql={[]}
+      />,
+    );
+
+    expect(screen.queryByRole('navigation', { name: 'Table of contents' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Findings' }));
+    expect(screen.getByTestId(`artifact-${artifactId}`)).toBeInTheDocument();
+    expect(screen.queryByText('After output.')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Actions' }));
+    expect(screen.getByText('After output.')).toBeInTheDocument();
+    expect(screen.queryByTestId(`artifact-${artifactId}`)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Full answer' }));
+    expect(screen.getByRole('tab', { name: 'Full answer' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId(`artifact-${artifactId}`)).toBeInTheDocument();
   });
 });

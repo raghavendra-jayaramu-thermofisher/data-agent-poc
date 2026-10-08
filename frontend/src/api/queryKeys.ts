@@ -21,6 +21,7 @@ export const queryKeys = {
         list: (orgId: string | null) => ['data-sources', orgId, 'list'] as const,
         detail: (orgId: string | null, id: string) => ['data-sources', orgId, 'detail', id] as const,
         schema: (orgId: string | null, id: string) => ['data-sources', orgId, 'schema', id] as const,
+        tables: (orgId: string | null, id: string, search: string) => ['data-sources', orgId, id, 'tables', search] as const,
     },
     models: {
         all: (orgId: string | null) => ['models', orgId] as const,

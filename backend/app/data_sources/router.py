@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.service import AuditService
 from app.auth.dependencies import get_current_organization, get_current_user
 from app.auth.models import User
-from app.audit.service import AuditService
 from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
 from app.core.errors import AppError
@@ -27,9 +27,29 @@ from app.data_sources.schemas import (
     TableMetadataResponse,
 )
 from app.data_sources.service import DataSourceService
+from app.data_sources.table_catalog import TableCatalogResponse, table_catalog
 from app.organizations.models import Organization, OrganizationMembership
 
 router = APIRouter(prefix="/data-sources", tags=["data-sources"])
+
+
+@router.get("/{data_source_id}/tables", response_model=TableCatalogResponse)
+async def list_source_tables(
+    data_source_id: uuid.UUID,
+    search: str = Query(default="", max_length=600),
+    cursor: str | None = Query(default=None, max_length=600),
+    limit: int = Query(default=100, ge=1, le=200),
+    knowledge_version_id: uuid.UUID | None = None,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> TableCatalogResponse:
+    organization, _ = context
+    source = await DataSourceService(session, settings).require_for_org(data_source_id, organization.id)
+    if source.status != "active":
+        raise AppError("DATASOURCE_NOT_ACTIVE", "The datasource is not active.", 409)
+    return await table_catalog(session, organization.id, data_source_id, search=search,
+        cursor=cursor, limit=limit, version_id=knowledge_version_id)
 
 
 def require_admin(membership: OrganizationMembership) -> None:

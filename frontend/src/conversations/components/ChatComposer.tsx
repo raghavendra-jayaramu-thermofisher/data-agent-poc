@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import type { Ref } from 'react';
 import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, WandSparkles } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
 import { useInstructions } from '../../settings/hooks/useInstructions';
 import type { AgentInstruction } from '../../settings/api/instructions-api';
+import { TableScopeSelector } from './TableScopeSelector';
+import type { SourceTableScope } from './table-scope';
 
 type ChatComposerProps = {
   question: string;
@@ -21,6 +24,9 @@ type ChatComposerProps = {
   placement?: 'docked' | 'inline';
   dataSourceSelection?: 'editable' | 'hidden';
   inputLabel?: string;
+  containerRef?: Ref<HTMLDivElement>;
+  tableScope?: SourceTableScope[];
+  onTableScopeChange?(scope: SourceTableScope[]): void;
 };
 
 export function ChatComposer({
@@ -39,6 +45,9 @@ export function ChatComposer({
   placement = 'docked',
   dataSourceSelection = 'editable',
   inputLabel = 'Ask a question',
+  containerRef,
+  tableScope,
+  onTableScopeChange,
 }: ChatComposerProps) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
@@ -196,7 +205,7 @@ export function ChatComposer({
   };
 
   return (
-    <div className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
+    <div ref={containerRef} className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
       <div className="chat-composer-card">
         {/* Slash Command Autocomplete Popover */}
         {(skillsOpen || (isTypingCommand && !autocompleteDismissed && !activeInstruction)) && (
@@ -268,6 +277,7 @@ export function ChatComposer({
           </div>
         )}
 
+        <div className="chat-composer-input">
             {activeInstruction && (
               <div
                 className="chat-composer-chip active w-fit mb-2"
@@ -295,12 +305,14 @@ export function ChatComposer({
           value={visibleQuestion}
           onChange={(e) => onQuestionChange(activeInstruction ? `/${activeInstruction.command} ${e.target.value}` : e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled || isSubmitting}
+          disabled={disabled}
           aria-label={inputLabel}
         />
+        </div>
 
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
+            {tableScope && dataSourceSelection === 'hidden' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} readOnly />}
             {dataSourceSelection === 'editable' ? (
               <div className="chat-composer-picker" ref={sourcesPickerRef}>
                 <button
@@ -387,6 +399,7 @@ export function ChatComposer({
             ) : null}
 
             {/* Model Profile Picker */}
+            {tableScope && dataSourceSelection === 'editable' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} onChange={onTableScopeChange} disabled={disabled || isSubmitting} />}
             <div className="chat-composer-picker" ref={modelsPickerRef}>
               <button
                 type="button"
@@ -449,7 +462,7 @@ export function ChatComposer({
                 </div>
               )}
             </div>
-            <button ref={skillsButtonRef} type="button" className={`chat-composer-chip ${skillsOpen ? 'active' : ''}`} disabled={disabled || isSubmitting} aria-haspopup="listbox" aria-expanded={skillsOpen} onClick={() => { setSkillsOpen(!skillsOpen); setSkillSearch(''); setSourcesOpen(false); setModelsOpen(false); setAutocompleteDismissed(true); }}>
+            <button ref={skillsButtonRef} type="button" className={`chat-composer-chip ${skillsOpen ? 'active' : ''}`} disabled={disabled} aria-haspopup="listbox" aria-expanded={skillsOpen} onClick={() => { setSkillsOpen(!skillsOpen); setSkillSearch(''); setSourcesOpen(false); setModelsOpen(false); setAutocompleteDismissed(true); }}>
               <WandSparkles size={12} /><span>Skills</span><ChevronDown size={11} />
             </button>
           </div>

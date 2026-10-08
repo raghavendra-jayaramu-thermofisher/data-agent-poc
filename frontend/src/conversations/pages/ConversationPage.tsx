@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { Database, LockKeyhole, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpToLine, Database, LockKeyhole, Trash2 } from 'lucide-react';
 import { queryKeys } from '../../api/queryKeys';
 import { PageError, PageLoading, PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
@@ -51,6 +52,9 @@ export function ConversationPage() {
   const jobManager = useJobManager();
   const pendingStarted = useRef(false);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(null);
+  const [composerHeight, setComposerHeight] = useState(136);
   const [initialSubmitError, setInitialSubmitError] = useState<string | null>(null);
 
   const [followUpQuestion, setFollowUpQuestion] = useState('');
@@ -104,7 +108,7 @@ export function ConversationPage() {
         appendOptimisticMessage(accepted, content);
         await jobManager.registerJob(accepted.job_id);
         await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
-        setFollowUpQuestion('');
+        setFollowUpQuestion((current) => current === content ? '' : current);
       } finally {
         setIsSubmitting(false);
       }
@@ -128,6 +132,37 @@ export function ConversationPage() {
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.data?.length, activeRunningJob?.job.id]);
+
+  useEffect(() => {
+    if (!composerElement) return;
+    const composerCard = composerElement.querySelector<HTMLElement>('.chat-composer-card');
+    // Reserve enough scroll space to reach the final message above the fixed composer.
+    const updateComposerHeight = () => {
+      const top = composerCard?.getBoundingClientRect().top
+        ?? composerElement.getBoundingClientRect().top;
+      setComposerHeight(Math.max(0, Math.ceil(window.innerHeight - top)));
+    };
+    updateComposerHeight();
+    const observer = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateComposerHeight);
+    observer?.observe(composerElement);
+    if (composerCard) observer?.observe(composerCard);
+    window.addEventListener('resize', updateComposerHeight);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateComposerHeight);
+    };
+  }, [composerElement]);
+
+  const scrollConversation = (to: 'top' | 'bottom') => {
+    const scroller = workspaceRef.current?.closest<HTMLElement>('.main-content');
+    if (!scroller) return;
+    const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+      ? 'auto'
+      : 'smooth';
+    scroller.scrollTo({ top: to === 'top' ? 0 : scroller.scrollHeight, behavior });
+  };
 
   if (!conversationId) {
     return <PageError title="Conversation not found" message="The conversation identifier is missing." />;
@@ -197,7 +232,11 @@ export function ConversationPage() {
   );
 
   return (
-    <div className="chat-workspace">
+    <div
+      ref={workspaceRef}
+      className="chat-workspace"
+      style={{ '--conversation-composer-height': `${composerHeight}px` } as CSSProperties}
+    >
       {/* Sticky Compact Conversation Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 px-6 py-2.5 bg-[#F6F4EF]/95 backdrop-blur-sm border-b border-[#DAD5CD]">
         <div className="min-w-0 flex items-center gap-2.5 flex-1">
@@ -235,6 +274,26 @@ export function ConversationPage() {
         </div>
 
         <div className="flex items-center flex-shrink-0">
+          <div className="conversation-scroll-actions" role="group" aria-label="Conversation navigation">
+            <button
+              type="button"
+              className="conversation-header-icon"
+              aria-label="Scroll to top"
+              title="Scroll to top"
+              onClick={() => scrollConversation('top')}
+            >
+              <ArrowUpToLine size={16} />
+            </button>
+            <button
+              type="button"
+              className="conversation-header-icon"
+              aria-label="Scroll to bottom"
+              title="Scroll to bottom"
+              onClick={() => scrollConversation('bottom')}
+            >
+              <ArrowDownToLine size={16} />
+            </button>
+          </div>
           <button
             type="button"
             className="conversation-header-icon conversation-header-icon--danger"
@@ -289,17 +348,19 @@ export function ConversationPage() {
               <AnalysisFailure key={`orphan-failure-${entry.job.id}`} job={entry.job} />
             ))}
 
-          <div ref={scrollAnchorRef} />
+          <div ref={scrollAnchorRef} className="conversation-scroll-anchor" />
         </div>
       </div>
 
       {/* Fixed Bottom ChatGPT Follow-up Composer Deck */}
       <ChatComposer
+        containerRef={setComposerElement}
         question={followUpQuestion}
         onQuestionChange={setFollowUpQuestion}
         onSubmit={() => void submit(followUpQuestion, selectedProfileId)}
         dataSources={(dataSources.data ?? []).filter((s) => s.status === 'active')}
         selectedDataSourceIds={conversation.data?.data_source_ids ?? []}
+        tableScope={conversation.data?.table_scope ?? []}
         onDataSourceIdsChange={() => {}}
         profiles={(profiles.data ?? []).filter((p) => p.enabled)}
         selectedProfileId={selectedProfileId}

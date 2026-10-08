@@ -14,12 +14,12 @@ function render(ui: ReactElement) {
   return renderUI(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 }
 describe('answer verification', () => {
-  it('shows only a collapsed badge initially and expands the safe Markdown summary', async () => {
+  it('opens a dialog with the safe Markdown summary', async () => {
     render(<AnswerVerification message={{ ...message, verification_status: 'CORRECT', verification_summary: '**Checked totals** <script>alert(1)</script>', verified_by_name: 'Reviewer', verified_at: message.created_at }} />);
     const badge = screen.getByLabelText('Verified · Correct');
-    expect(badge.closest('details')).not.toHaveAttribute('open');
+    expect(screen.queryByRole('dialog', { name: 'Answer verification' })).not.toBeInTheDocument();
     await userEvent.setup().click(badge);
-    expect(badge.closest('details')).toHaveAttribute('open');
+    expect(screen.getByRole('dialog', { name: 'Answer verification' })).toBeInTheDocument();
     expect(document.querySelector('script')).toBeNull();
     expect(screen.getByText(/Reviewed by Reviewer/)).toBeInTheDocument();
   });

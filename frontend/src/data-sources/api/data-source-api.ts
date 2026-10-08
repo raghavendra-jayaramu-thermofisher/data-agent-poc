@@ -5,6 +5,13 @@ type Schemas = components['schemas'];
 export type RelationalDataSourceCreate = Schemas['PostgresDataSourceCreate'] | Schemas['MySQLDataSourceCreate'] | Schemas['MSSQLDataSourceCreate'];
 export type DataSourceUpdate = Schemas['DataSourceUpdate'];
 export type SchemaMetadata = Schemas['SchemaMetadataResponse'];
+export type TableCatalogItem = Schemas['TableCatalogItem'];
+export type TableCatalog = Schemas['TableCatalogResponse'];
+export function listSourceTables(id: string, search = '', cursor?: string, knowledgeVersionId?: string, signal?: AbortSignal): Promise<TableCatalog> {
+    return withAuthRefresh(() => apiClient.GET('/api/v1/data-sources/{data_source_id}/tables', {
+        params: { path: { data_source_id: id }, query: { search, cursor, knowledge_version_id: knowledgeVersionId, limit: 100 } }, signal,
+    }));
+}
 export function listDataSources(): Promise<DataSource[]> {
     return withAuthRefresh(() => apiClient.GET('/api/v1/data-sources'));
 }

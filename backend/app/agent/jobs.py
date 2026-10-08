@@ -21,6 +21,7 @@ from app.agent.tools import (
 )
 from app.conversations.models import Message
 from app.conversations.repository import ConversationRepository
+from app.conversations.table_scope import SourceTableScope
 from app.core.config import get_settings
 from app.core.database import get_session_factory
 from app.core.errors import AppError
@@ -90,6 +91,8 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         if conversation is None:
             raise JobFailureError("CONVERSATION_NOT_FOUND", "Conversation not found.")
         source_ids = await convo_repo.source_ids(conversation.id)
+        table_scope = tuple(SourceTableScope.model_validate(item) for item in
+            job.input.get("table_scope", conversation.table_scope or []))
         if not source_ids:
             raise JobFailureError(
                 "CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource."
@@ -145,6 +148,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         conversation_id=conversation_id,
         allowed_data_source_ids=frozenset(source_ids),
         settings=settings,
+        table_scope=table_scope,
         default_instructions=default_instructions,
         command_instructions=command_instructions,
         command_name=command_name,

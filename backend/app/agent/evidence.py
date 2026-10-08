@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from dataclasses import dataclass, replace
 
 import sqlglot
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlglot import expressions as exp
 
 from app.agent.models import JobArtifact, SQLExecution
 from app.agent.repository import AgentExecutionRepository
+from app.agent.sql_safety import SQLSafetyViolation, dialect_for_source
+from app.data_sources.models import DataSource
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +35,7 @@ class SQLResultEvidence:
     table_artifact_id: uuid.UUID | None
     title: str
     display: str
+    classification_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,11 +64,28 @@ class EvidenceBundle:
         return tuple(item for item in self.artifacts if item.visible)
 
 
-def is_aggregate_sql(sql: str) -> bool:
+class EvidenceSQLClassificationError(ValueError):
+    def __init__(self, code: str, message: str, *, dialect: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.dialect = dialect
+
+
+def is_aggregate_sql(sql: str, *, source_kind: str) -> bool:
     try:
-        statement = sqlglot.parse_one(sql)
-    except sqlglot.errors.ParseError:
-        return False
+        dialect = dialect_for_source(source_kind)
+    except SQLSafetyViolation as exc:
+        raise EvidenceSQLClassificationError(
+            exc.code, f"Unsupported datasource type {source_kind!r} for evidence classification."
+        ) from exc
+    try:
+        statement = sqlglot.parse_one(sql, read=dialect)
+    except sqlglot.errors.ParseError as exc:
+        raise EvidenceSQLClassificationError(
+            "EVIDENCE_SQL_PARSE_FAILED",
+            f"Evidence SQL could not be parsed using dialect {dialect!r}.",
+            dialect=dialect,
+        ) from exc
     return statement.find(exp.AggFunc) is not None or statement.find(exp.Group) is not None
 
 
@@ -172,6 +196,8 @@ async def collect_evidence(
     sql_items = await repo.list_sql(job_id)
     artifact_items = await repo.list_artifacts(job_id)
     tool_sequence = {item.id: item.sequence for item in tools}
+    tools_by_id = {item.id: item for item in tools}
+    fallback_source_kinds: dict[uuid.UUID, str | None] = {}
     tables_by_sql: dict[uuid.UUID, JobArtifact] = {}
     for artifact in artifact_items:
         if artifact.kind == "table" and artifact.source_sql_execution_id is not None:
@@ -198,6 +224,39 @@ async def collect_evidence(
             sql_item.truncated or payload.get("model_preview_truncated") is True
         )
         display = str(payload.get("display") or "auto")
+        tool = tools_by_id.get(sql_item.tool_execution_id)
+        summary = tool.output_summary if tool is not None and tool.status == "succeeded" else None
+        source_kind = summary.get("source_kind") if isinstance(summary, dict) else None
+        if not isinstance(source_kind, str) or not source_kind.strip():
+            # Older execution records may lack the server-captured datasource kind.
+            # Read only the kind, once per datasource; never infer it from SQL syntax.
+            if sql_item.data_source_id not in fallback_source_kinds:
+                fallback_source_kinds[sql_item.data_source_id] = await session.scalar(
+                    select(DataSource.kind).where(DataSource.id == sql_item.data_source_id)
+                )
+            source_kind = fallback_source_kinds[sql_item.data_source_id]
+
+        classification_error = None
+        is_aggregate = False
+        try:
+            if source_kind is None:
+                raise EvidenceSQLClassificationError(
+                    "EVIDENCE_SOURCE_KIND_MISSING",
+                    "Datasource type is unavailable for evidence classification.",
+                )
+            is_aggregate = is_aggregate_sql(sql_item.sql_text, source_kind=source_kind)
+        except EvidenceSQLClassificationError as exc:
+            classification_error = f"{exc.code}: {exc}"
+            logger.warning(
+                "evidence_sql_classification_failed",
+                extra={
+                    "job_id": str(job_id),
+                    "sql_execution_id": str(sql_item.id),
+                    "source_kind": source_kind,
+                    "dialect": exc.dialect,
+                    "error_code": exc.code,
+                },
+            )
         sql_results.append(
             SQLResultEvidence(
                 execution_id=sql_item.id,
@@ -210,10 +269,11 @@ async def collect_evidence(
                 preview_row_count=preview_count,
                 preview_truncated=preview_truncated,
                 stored_result_truncated=sql_item.truncated,
-                is_aggregate=is_aggregate_sql(sql_item.sql_text),
+                is_aggregate=is_aggregate,
                 table_artifact_id=table.id if table is not None else None,
                 title=(table.name or "Query result") if table is not None else "Query result",
                 display=display,
+                classification_error=classification_error,
             )
         )
 
@@ -368,9 +428,18 @@ def validate_evidence(bundle: EvidenceBundle) -> list[str]:
     aggregates = [
         item
         for item in bundle.sql_results
-        if item.is_aggregate and not item.preview_truncated and not item.stored_result_truncated
+        if item.is_aggregate
+        and not item.classification_error
+        and not item.preview_truncated
+        and not item.stored_result_truncated
     ]
     for detail in bundle.sql_results:
+        if detail.classification_error:
+            issues.append(
+                f"SQL execution {detail.execution_id} could not be classified: "
+                f"{detail.classification_error}"
+            )
+            continue
         if detail.is_aggregate or not detail.preview_truncated:
             continue
         if not any(item.tool_sequence > detail.tool_sequence for item in aggregates):

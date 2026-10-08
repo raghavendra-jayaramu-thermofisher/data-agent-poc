@@ -10,12 +10,13 @@ from app.conversations.models import Conversation, ConversationDataSource, Messa
 from app.conversations.repository import ConversationRepository
 from app.conversations.schemas import (
     AnswerReviewCounts,
-    MessageVerificationUpdate,
     ConversationCreate,
     ConversationRename,
     ConversationResponse,
     MessageCreate,
+    MessageVerificationUpdate,
 )
+from app.conversations.table_scope import SourceTableScope, resolve_table_scope
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.time import utc_now
@@ -81,9 +82,13 @@ class ConversationService:
             if not profile.enabled:
                 raise AppError("MODEL_PROFILE_DISABLED", "Model profile is disabled.", 409)
 
+        table_scope = await resolve_table_scope(
+            self.session, organization_id, payload.data_source_ids, payload.table_scope
+        )
         conversation = Conversation(
             organization_id=organization_id,
             title=payload.title,
+            table_scope=table_scope,
             created_by=user_id,
             model_profile_id=payload.model_profile_id,
         )
@@ -192,6 +197,10 @@ class ConversationService:
             organization_id=organization_id,
             override_profile_id=payload.model_profile_id,
         )
+        table_scope = await resolve_table_scope(
+            self.session, organization_id, source_ids,
+            [SourceTableScope.model_validate(item) for item in (conversation.table_scope or [])],
+        )
 
         # User message and job are both durable. The job contains only identifiers/content and
         # never credentials. JobService performs the queue publish after PostgreSQL commit.
@@ -246,6 +255,7 @@ class ConversationService:
                 "conversation_id": str(conversation.id),
                 "user_message_id": str(message.id),
                 "model_profile_id": str(profile_id),
+                "table_scope": table_scope,
             },
             conversation_id=conversation.id,
             # LLM/query mistakes are corrected inside the bounded agent loop; only the generic

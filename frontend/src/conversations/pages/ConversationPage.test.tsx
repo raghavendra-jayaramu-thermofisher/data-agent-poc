@@ -52,6 +52,31 @@ describe('durable conversation workspace', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
   });
 
+  it('preserves a new draft typed while the previous submission is pending', async () => {
+    baseHandlers();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const received = vi.fn();
+    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+      received(await request.json());
+      await pending;
+      return HttpResponse.json({ message_id: 'm-new', job_id: 'j-new' }, { status: 202 });
+    }));
+    renderPage();
+    const user = userEvent.setup();
+    const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
+    await user.type(input, 'Original question{Enter}');
+    await waitFor(() => expect(received).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled();
+    await user.clear(input);
+    await user.type(input, 'Next question draft{Enter}');
+    expect(received).toHaveBeenCalledOnce();
+    release();
+    await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-new'));
+    expect(input).toHaveValue('Next question draft');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send question' })).toBeEnabled());
+  });
+
   it('renames the chat in the header and recent list without submitting an analysis', async () => {
     baseHandlers();
     let saved = { ...conversation };
@@ -146,10 +171,33 @@ describe('durable conversation workspace', () => {
     await client.invalidateQueries({ queryKey: ['conversations', 'org-1', 'messages', 'c1'] });
     expect(await screen.findByText('Revenue declined 8%.')).toBeInTheDocument();
     const assistantCard = document.querySelector('[data-message-id="m2"] .assistant-card');
-    expect(assistantCard?.querySelector('.assistant-card-header')).not.toBeNull();
+    expect(assistantCard?.querySelector('.assistant-card-header')).toBeNull();
     expect(assistantCard?.querySelector('.assistant-card-content')).not.toBeNull();
     expect(assistantCard?.querySelector('.assistant-card-footer')).not.toBeNull();
-    expect(screen.getByRole('button', { name: /execution ledger/i })).toBeInTheDocument();
+    expect(assistantCard?.querySelector('.assistant-card-footer .assistant-card-actions')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /execution ledger/i })).not.toBeInTheDocument();
+  });
+
+  it('jumps to either end of the conversation', async () => {
+    baseHandlers(() => [
+      { id: 'm1', conversation_id: 'c1', role: 'assistant', content: 'Earlier answer', job_id: null, metadata: {}, created_at: '2026-08-24T12:00:00Z' },
+      { id: 'm2', conversation_id: 'c1', role: 'assistant', content: 'Latest answer', job_id: null, metadata: {}, created_at: '2026-08-24T12:00:03Z' },
+    ]);
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByText('Latest answer');
+
+    const workspace = document.querySelector<HTMLElement>('.chat-workspace')!;
+    const scrollRoot = workspace.parentElement!;
+    scrollRoot.classList.add('main-content');
+    Object.defineProperty(scrollRoot, 'scrollHeight', { configurable: true, value: 1800 });
+    const scrollTo = vi.fn();
+    Object.defineProperty(scrollRoot, 'scrollTo', { configurable: true, value: scrollTo });
+
+    await user.click(screen.getByRole('button', { name: 'Scroll to top' }));
+    await user.click(screen.getByRole('button', { name: 'Scroll to bottom' }));
+    expect(scrollTo).toHaveBeenNthCalledWith(1, expect.objectContaining({ top: 0 }));
+    expect(scrollTo).toHaveBeenNthCalledWith(2, expect.objectContaining({ top: 1800 }));
   });
 
   it('creates an independent durable job for a follow-up without waiting for an earlier answer', async () => {

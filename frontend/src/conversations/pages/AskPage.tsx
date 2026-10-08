@@ -11,6 +11,8 @@ import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/conversation-api';
 import { ChatComposer } from '../components/ChatComposer';
 import { deriveConversationTitle } from '../utils/title';
+import { normalizeTableScope } from '../components/table-scope';
+import type { SourceTableScope } from '../components/table-scope';
 
 type PendingConversationState = { pendingQuestion: string; modelProfileId: string | null };
 
@@ -33,6 +35,7 @@ export function AskPage() {
   });
 
   const [question, setQuestion] = useState('');
+  const [tableSelections, setTableSelections] = useState<Record<string, SourceTableScope[]>>({});
   const sourceScope = JSON.stringify([user?.id, orgId]);
   const [sourceSelections, setSourceSelections] = useState<Record<string, string[]>>(() =>
     preferences.get('askDataSourceIdsByScope') ?? {},
@@ -68,6 +71,7 @@ export function AskPage() {
     ? [soleSource.id]
     : rememberedSourceIds.filter((id) => activeSources.some((source) => source.id === id)).slice(0, 10);
   const handleSourceChange = (ids: string[]) => {
+    setTableSelections((current) => ({ ...current, [sourceScope]: normalizeTableScope(ids, current[sourceScope] ?? []) }));
     const next = { ...sourceSelections, [sourceScope]: ids };
     setSourceSelections(next);
     preferences.set('askDataSourceIdsByScope', next);
@@ -86,6 +90,7 @@ export function AskPage() {
       handleSourceChange(selectedSourceIds);
       const conversation = await api.createConversation({
         data_source_ids: selectedSourceIds,
+        table_scope: normalizeTableScope(selectedSourceIds, tableSelections[sourceScope] ?? []),
         model_profile_id: effectiveProfileId,
         title: deriveConversationTitle(question),
       });
@@ -125,12 +130,15 @@ export function AskPage() {
           )}
         </div>
         <ChatComposer
+          key={sourceScope}
           question={question}
           onQuestionChange={setQuestion}
           onSubmit={handleSubmit}
           dataSources={activeSources}
           selectedDataSourceIds={selectedSourceIds}
           onDataSourceIdsChange={handleSourceChange}
+          tableScope={normalizeTableScope(selectedSourceIds, tableSelections[sourceScope] ?? [])}
+          onTableScopeChange={(scope) => setTableSelections((current) => ({ ...current, [sourceScope]: scope }))}
           profiles={enabledProfiles}
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}

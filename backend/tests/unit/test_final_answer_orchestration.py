@@ -47,7 +47,7 @@ def sql_evidence(
         preview_row_count=min(len(rows), 1),
         preview_truncated=truncated,
         stored_result_truncated=False,
-        is_aggregate=is_aggregate_sql(sql),
+        is_aggregate=is_aggregate_sql(sql, source_kind="postgres"),
         table_artifact_id=None,
         title="Results",
         display="hidden",
@@ -85,9 +85,9 @@ def bundle(*, unavailable: bool = False) -> EvidenceBundle:
 
 
 def test_sql_classifier_recognizes_aggregates() -> None:
-    assert is_aggregate_sql("SELECT COUNT(*) FROM orders")
-    assert is_aggregate_sql("SELECT status FROM orders GROUP BY status")
-    assert not is_aggregate_sql("SELECT order_id, status FROM orders")
+    assert is_aggregate_sql("SELECT COUNT(*) FROM orders", source_kind="postgres")
+    assert is_aggregate_sql("SELECT status FROM orders GROUP BY status", source_kind="postgres")
+    assert not is_aggregate_sql("SELECT order_id, status FROM orders", source_kind="postgres")
 
 
 def test_truncated_detail_requires_later_complete_aggregate() -> None:

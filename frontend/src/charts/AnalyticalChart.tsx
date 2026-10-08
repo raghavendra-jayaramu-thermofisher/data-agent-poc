@@ -125,8 +125,8 @@ export function AnalyticalChart({
   };
 
   return (
-    <section className="analytical-chart border border-[#DAD5CD] bg-[#FFFDFC] rounded-lg p-4 shadow-xs" aria-label={model.title}>
-      <header className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[#E7E3DC]">
+    <section className="analytical-chart border border-[#DAD5CD] bg-[#FFFDFC] rounded-lg shadow-xs" aria-label={model.title}>
+      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#E7E3DC]">
         <div>
           <h4 className="font-semibold text-sm text-[#252127]">{model.title}</h4>
           <p className="text-xs text-[#625C64] mt-0.5">
@@ -192,6 +192,7 @@ export function AnalyticalChart({
         </div>
       </header>
 
+      <div className="analytical-chart-content p-4">
       {pointCount ? (
         view === 'chart' ? (
           <>
@@ -276,6 +277,7 @@ export function AnalyticalChart({
           </div>
         </div>
       ) : null}
+      </div>
 
       {/* Fullscreen Chart Modal */}
       {expanded && (

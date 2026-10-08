@@ -957,6 +957,15 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   text-align: center;
 }
 
+.conversation-scroll-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  padding-right: 8px;
+  border-right: 1px solid var(--db-border-default);
+}
+
 .chat-landing-badge {
   display: inline-flex;
   align-items: center;
@@ -1070,11 +1079,15 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   border: 1px solid var(--db-border-default);
   border-radius: 10px;
   box-shadow: 0 4px 20px -4px rgba(75, 18, 63, 0.08), 0 2px 6px -2px rgba(0, 0, 0, 0.04);
-  padding: 10px 14px 10px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.chat-composer-input {
+  padding: 12px 14px 8px;
 }
 
 .chat-composer-card:focus-within {
@@ -1083,6 +1096,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 }
 
 .chat-composer-textarea {
+  display: block;
   width: 100%;
   border: 0;
   outline: none;
@@ -1094,7 +1108,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   resize: none;
   min-height: 38px;
   max-height: 200px;
-  padding: 2px 0;
+  padding: 0;
 }
 
 .chat-composer-textarea::placeholder {
@@ -1106,7 +1120,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 6px;
+  padding: 8px 14px 10px;
   border-top: 1px solid var(--db-border-subtle);
 }
 
@@ -1351,6 +1365,15 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   gap: 28px;
 }
 
+.chat-workspace .chat-main-scroll {
+  padding-bottom: calc(var(--conversation-composer-height, 136px) + 12px);
+}
+
+.conversation-scroll-anchor {
+  margin-top: -28px;
+  height: 0;
+}
+
 .chat-message-row {
   display: flex;
   flex-direction: column;
@@ -1364,33 +1387,6 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 
 .chat-message-row.assistant {
   align-items: flex-start;
-}
-
-.user-bubble-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 2px;
-  color: var(--db-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.user-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: var(--db-surface-muted);
-  color: var(--db-text-secondary);
-}
-
-.user-time {
-  color: var(--db-text-muted);
-  font-weight: 500;
-  font-size: 12px;
 }
 
 .user-bubble {
@@ -1408,6 +1404,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 
 .assistant-card {
   width: 100%;
+  font-family: 'IBM Plex Sans', 'Source Sans 3', sans-serif;
   overflow: hidden;
   background: var(--db-surface-raised);
   border: 1px solid var(--db-border-default);
@@ -1415,17 +1412,127 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   box-shadow: 0 1px 4px rgba(37, 33, 39, 0.03);
 }
 
-.assistant-card-header {
+.assistant-card-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 46px;
-  padding: 10px 16px;
+  gap: 4px;
+}
+
+.assistant-card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--db-text-secondary);
+  cursor: pointer;
+}
+
+.assistant-card-action:hover { background: var(--db-surface-hover); color: var(--db-text-primary); }
+.assistant-card-action:focus-visible { outline: 2px solid var(--db-focus-ring); outline-offset: 2px; }
+.assistant-card-action:disabled { opacity: 0.4; cursor: not-allowed; }
+.assistant-card-action:disabled:hover { background: transparent; color: var(--db-text-secondary); }
+
+.presentation-navigation-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 8px;
+  padding-right: 12px;
+  border-right: 1px solid var(--db-border-default);
+}
+
+.assistant-card-action--present-navigation {
+  width: auto;
+  min-width: 72px;
+  padding: 0 6px;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.presentation-section-count {
+  min-width: 38px;
+  text-align: center;
+  color: var(--db-text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.assistant-card-action--present {
+  width: auto;
+  min-width: 72px;
+  height: 28px;
+  gap: 5px;
+  padding: 0 8px;
+  background: var(--db-primary-soft);
+  color: var(--db-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assistant-card-action--present:hover {
+  background: color-mix(in srgb, var(--db-primary) 14%, var(--db-surface-raised));
+  color: var(--db-primary-hover);
+}
+
+.chat-workspace .chat-composer-deck,
+.app-shell[data-has-secondary-sidebar="true"] .chat-workspace .chat-composer-deck {
+  padding-top: 0;
+  background: var(--db-canvas);
+}
+
+.assistant-card--presenting {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.assistant-card--presenting .assistant-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.assistant-card--presenting .answer-section-tabs [data-slot="tabs-list-container"] {
+  position: sticky;
+  top: 0;
+  z-index: 1001;
+  height: 40px;
+  background: var(--db-surface-raised);
+  border-bottom: 1px solid var(--db-border-default);
+}
+
+.assistant-presentation-toolbar {
+  flex: none;
+  max-height: 45dvh;
+  overflow-y: auto;
+  padding: 4px 12px;
+  background: var(--db-surface-raised);
   border-bottom: 1px solid var(--db-border-subtle);
 }
 
+.assistant-card--presenting .assistant-card-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .assistant-card-content {
-  padding: 18px 20px;
+  padding: 0;
 }
 
 .assistant-card-artifacts {
@@ -1433,9 +1540,21 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 }
 
 .assistant-card-footer {
-  padding: 6px 12px;
-  background: var(--db-surface-muted);
+  padding: 4px 12px;
+  background: var(--db-surface-raised);
   border-top: 1px solid var(--db-border-subtle);
+}
+
+.assistant-card-footer .assistant-card-action > svg,
+.assistant-presentation-toolbar .assistant-card-action > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.assistant-card-footer--actions-only {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .analysis-outcome {
@@ -1543,37 +1662,115 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   }
 }
 
-.assistant-avatar {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--db-primary);
-  font-size: 14.5px;
-  font-weight: 600;
+.answer-navigation { width: 100%; min-width: 0; }
+.answer-section-tabs { width: 100%; min-width: 0; margin: 0; gap: 0; }
+.answer-section-tabs [role="tablist"] {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  padding-inline: 12px;
 }
-
-.assistant-time {
-  color: var(--db-text-muted);
-  font-size: 12.5px;
+.answer-section-tabs [role="tab"] {
+  flex: 0 0 auto;
+  height: 40px;
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
 }
+.answer-section-tabs [role="tabpanel"] { width: 100%; min-width: 0; margin: 0; padding: 0; }
+.answer-main-content { padding: 16px 24px 20px; }
+.assistant-response-segments > .assistant-markdown + .artifact-stack { margin-top: 18px; }
 
 .assistant-markdown {
-  font-size: 15.5px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--db-text-primary);
   overflow-wrap: anywhere;
 }
 
-.assistant-markdown > :first-child { margin-top: 0; }
-.assistant-markdown > :last-child { margin-bottom: 0; }
-.assistant-markdown h1 { margin: 18px 0 8px; font-size: 18px; font-weight: 600; }
-.assistant-markdown h2 { margin: 16px 0 6px; font-size: 16px; font-weight: 600; }
-.assistant-markdown h3 { margin: 14px 0 4px; font-size: 14px; font-weight: 600; }
+/* Keep long report prose compact while preserving a clear heading hierarchy. */
+.assistant-card .assistant-markdown :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.assistant-card .assistant-markdown h1 {
+  margin: 22px 0 12px;
+  font-size: 24px;
+}
+
+.assistant-card .assistant-markdown h2 {
+  margin: 22px 0 10px;
+  font-size: 19px;
+}
+
+.assistant-card .assistant-markdown h3 {
+  margin: 20px 0 9px;
+  font-size: 17px;
+}
+
+.assistant-card .assistant-markdown h4 {
+  margin: 18px 0 8px;
+  font-size: 16px;
+}
+
+.assistant-card .assistant-markdown h5 {
+  margin: 16px 0 7px;
+  font-size: 15px;
+}
+
+.assistant-card .assistant-markdown h6 {
+  margin: 14px 0 6px;
+  font-size: 14px;
+}
+
+.assistant-card .assistant-markdown strong {
+  font-weight: 600;
+}
+
+.assistant-markdown > :first-child,
+.assistant-card .assistant-markdown > :first-child { margin-top: 0; }
+.assistant-markdown > :last-child,
+.assistant-card .assistant-markdown > :last-child { margin-bottom: 0; }
+.assistant-markdown h1,
+.assistant-markdown h2,
+.assistant-markdown h3,
+.assistant-markdown h4,
+.assistant-markdown h5,
+.assistant-markdown h6 {
+  color: var(--db-text-primary);
+  line-height: 1.25;
+  font-weight: 700;
+}
+.assistant-markdown h1 { margin: 28px 0 14px; font-size: 30px; }
+.assistant-markdown h2 { margin: 26px 0 12px; font-size: 24px; }
+.assistant-markdown h3 { margin: 22px 0 10px; font-size: 20px; }
+.assistant-markdown h4 { margin: 20px 0 8px; font-size: 18px; }
+.assistant-markdown h5 { margin: 18px 0 7px; font-size: 16px; }
+.assistant-markdown h6 { margin: 16px 0 6px; font-size: 14px; }
 .assistant-markdown p {
-  margin: 8px 0;
+  margin: 12px 0;
   white-space: pre-line;
 }
-.assistant-markdown ul, .assistant-markdown ol { padding-left: 20px; margin: 8px 0; }
+.assistant-markdown ul,
+.assistant-markdown ol {
+  margin: 12px 0 18px;
+  padding-inline-start: 28px;
+  list-style-position: outside;
+}
+.assistant-markdown ul { list-style-type: disc; }
+.assistant-markdown ol { list-style-type: decimal; }
+.assistant-markdown ul ul { list-style-type: circle; }
+.assistant-markdown ul ul ul { list-style-type: square; }
+.assistant-markdown li { padding-inline-start: 4px; }
+.assistant-markdown li + li { margin-top: 10px; }
+.assistant-markdown li::marker { color: var(--db-primary); }
+.assistant-markdown li > p { margin: 0; }
+.assistant-markdown li > p + p { margin-top: 8px; }
+.assistant-markdown li > ul,
+.assistant-markdown li > ol { margin: 8px 0 0; }
 .assistant-markdown pre {
   background: var(--db-surface-muted);
   border: 1px solid var(--db-border-subtle);
@@ -1595,6 +1792,13 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(37,33,39,0.03);
+}
+
+.assistant-markdown .markdown-table-wrapper table {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .assistant-markdown thead {
@@ -1631,66 +1835,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
   background: var(--db-surface-hover);
 }
 
-/* ==========================================================================
-   Execution Ledger & Steps (chart/table message footer)
-   ========================================================================== */
-
-.execution-ledger {
-  margin: 0;
-}
-
-.execution-ledger-summary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  width: auto;
-  min-height: 28px;
-  padding: 3px 6px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--db-text-secondary);
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  transition: all 100ms ease;
-}
-
-.execution-ledger-summary:hover {
-  background: var(--db-surface-hover);
-  color: var(--db-text-primary);
-}
-
-.execution-ledger-summary-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 600;
-  color: var(--db-text-secondary);
-  flex-shrink: 0;
-}
-
-.execution-ledger-stats {
-  display: flex;
-  align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--db-text-muted);
-  font-size: 10.5px;
-  font-weight: 400;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.execution-inspector {
-  margin-top: 6px;
-  padding: 10px;
-  background: var(--db-surface-raised);
-  border: 1px solid var(--db-border-default);
-  border-radius: 6px;
-}
+/* Execution steps remain available on the job detail page. */
 
 .execution-step-row {
   display: grid;
@@ -2857,6 +3002,7 @@ code, pre, .font-mono { font-family: "Source Code Pro", ui-monospace, SFMono-Reg
 .table-artifact .analytical-table-shell {
   border: none;
   border-radius: 0;
+  margin: 0;
 }
 
 

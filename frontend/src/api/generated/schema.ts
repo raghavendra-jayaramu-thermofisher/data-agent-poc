@@ -401,6 +401,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Source Tables */
+        get: operations["list_source_tables_api_v1_data_sources__data_source_id__tables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources/{data_source_id}/test": {
         parameters: {
             query?: never;
@@ -416,6 +433,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instructions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instructions */
+        get: operations["list_instructions_api_v1_instructions_get"];
+        put?: never;
+        /** Create Instruction */
+        post: operations["create_instruction_api_v1_instructions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instructions/{instruction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Instruction */
+        get: operations["get_instruction_api_v1_instructions__instruction_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Instruction */
+        delete: operations["delete_instruction_api_v1_instructions__instruction_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Instruction */
+        patch: operations["update_instruction_api_v1_instructions__instruction_id__patch"];
         trace?: never;
     };
     "/api/v1/jobs": {
@@ -1012,6 +1066,8 @@ export interface components {
             data_source_ids: string[];
             /** Model Profile Id */
             model_profile_id?: string | null;
+            /** Table Scope */
+            table_scope?: components["schemas"]["SourceTableScope"][];
             /** Title */
             title?: string | null;
         };
@@ -1044,6 +1100,8 @@ export interface components {
              * Format: uuid
              */
             organization_id: string;
+            /** Table Scope */
+            table_scope?: components["schemas"]["SourceTableScope"][];
             /** Title */
             title: string | null;
             /**
@@ -1084,6 +1142,8 @@ export interface components {
              * Format: uuid
              */
             organization_id: string;
+            /** Table Scope */
+            table_scope?: components["schemas"]["SourceTableScope"][];
             /** Title */
             title: string | null;
             /**
@@ -1425,6 +1485,88 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InstructionCreate */
+        InstructionCreate: {
+            /** Command */
+            command?: string | null;
+            /** Content */
+            content: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /** Prompt Template */
+            prompt_template?: string | null;
+        };
+        /** InstructionResponse */
+        InstructionResponse: {
+            /** Command */
+            command?: string | null;
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Description */
+            description?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Prompt Template */
+            prompt_template?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** InstructionUpdate */
+        InstructionUpdate: {
+            /** Command */
+            command?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Is Default */
+            is_default?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Prompt Template */
+            prompt_template?: string | null;
         };
         /** JobAcceptedResponse */
         JobAcceptedResponse: {
@@ -2163,6 +2305,54 @@ export interface components {
             organization_name?: string | null;
             /** Password */
             password: string;
+        };
+        /** SourceTableScope */
+        SourceTableScope: {
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /** Knowledge Version Id */
+            knowledge_version_id?: string | null;
+            /**
+             * Mode
+             * @default all
+             * @enum {string}
+             */
+            mode: "all" | "selected";
+            /** Tables */
+            tables?: components["schemas"]["TableIdentifier"][];
+        };
+        /** TableCatalogItem */
+        TableCatalogItem: {
+            /** Column Count */
+            column_count: number;
+            /** Name */
+            name: string;
+            /** Object Type */
+            object_type: string;
+            /** Schema */
+            schema?: string | null;
+        };
+        /** TableCatalogResponse */
+        TableCatalogResponse: {
+            /** Items */
+            items: components["schemas"]["TableCatalogItem"][];
+            /**
+             * Knowledge Version Id
+             * Format: uuid
+             */
+            knowledge_version_id: string;
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** TableIdentifier */
+        TableIdentifier: {
+            /** Name */
+            name: string;
+            /** Schema */
+            schema?: string | null;
         };
         /** TableMetadataResponse */
         TableMetadataResponse: {
@@ -3467,6 +3657,44 @@ export interface operations {
             };
         };
     };
+    list_source_tables_api_v1_data_sources__data_source_id__tables_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                cursor?: string | null;
+                limit?: number;
+                knowledge_version_id?: string | null;
+            };
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableCatalogResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     test_data_source_api_v1_data_sources__data_source_id__test_post: {
         parameters: {
             query?: never;
@@ -3487,6 +3715,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_instructions_api_v1_instructions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_instruction_api_v1_instructions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstructionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_instruction_api_v1_instructions__instruction_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                instruction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_instruction_api_v1_instructions__instruction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                instruction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_instruction_api_v1_instructions__instruction_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                instruction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstructionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionResponse"];
                 };
             };
             /** @description Validation Error */

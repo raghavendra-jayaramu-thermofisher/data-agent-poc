@@ -48,6 +48,33 @@ function EditableComposer({ onSubmit }: { onSubmit(): void }) {
 }
 
 describe('ChatComposer data-source scope', () => {
+  it('allows drafting while busy but blocks button and Enter submission', async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    function DraftComposer({ busy }: { busy: boolean }) {
+      const [question, setQuestion] = useState('');
+      return <ChatComposer question={question} onQuestionChange={setQuestion} onSubmit={onSubmit}
+        dataSources={[]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined}
+        profiles={[]} selectedProfileId={null} onProfileIdChange={() => undefined}
+        dataSourceSelection="hidden" isSubmitting={busy} />;
+    }
+    const view = render(<DraftComposer busy />);
+    const input = screen.getByRole('textbox', { name: 'Ask a question' });
+    expect(input).toBeEnabled();
+    await user.type(input, 'Compare regions');
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input).toHaveValue('Compare regions');
+    expect(screen.getByRole('button', { name: 'Skills' })).toBeEnabled();
+    view.rerender(<DraftComposer busy={false} />);
+    expect(input).toHaveValue('Compare regions');
+    expect(screen.getByRole('button', { name: 'Send question' })).toBeEnabled();
+    await user.click(input);
+    await user.keyboard('{Enter}');
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it('requires an explicit source selection before the first question can be sent', async () => {
     const onSubmit = vi.fn();
     const user = userEvent.setup();

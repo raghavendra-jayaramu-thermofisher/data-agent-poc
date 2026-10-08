@@ -6,12 +6,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.conversations.table_scope import SourceTableScope
+
 
 class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, max_length=240)
     data_source_ids: list[uuid.UUID] = Field(min_length=1, max_length=10)
+    table_scope: list[SourceTableScope] = Field(default_factory=list, max_length=10)
     model_profile_id: uuid.UUID | None = None
 
     @field_validator("title")
@@ -76,6 +79,7 @@ class ConversationResponse(BaseModel):
     created_by: uuid.UUID
     model_profile_id: uuid.UUID | None
     data_source_ids: list[uuid.UUID] = Field(default_factory=list)
+    table_scope: list[SourceTableScope] = Field(default_factory=list)
     answer_review_counts: AnswerReviewCounts = Field(default_factory=AnswerReviewCounts)
     created_at: datetime
     updated_at: datetime
