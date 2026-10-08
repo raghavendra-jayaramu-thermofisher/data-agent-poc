@@ -15,7 +15,7 @@ import * as api from '../api/conversation-api';
 import { AnalysisFailure } from '../components/AnalysisFailure';
 import { AnalysisProgress } from '../components/AnalysisProgress';
 import { ConversationMessage } from '../components/ConversationMessage';
-import { ChatComposer } from '../components/ChatComposer';
+import { FollowUpChatComposer } from '../components/FollowUpChatComposer';
 import { RenameConversationModal } from '../components/RenameConversationModal';
 import { useConversation, useConversationMessages, useDeleteConversation } from '../hooks/useConversations';
 
@@ -57,7 +57,6 @@ export function ConversationPage() {
   const [composerHeight, setComposerHeight] = useState(136);
   const [initialSubmitError, setInitialSubmitError] = useState<string | null>(null);
 
-  const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -108,12 +107,16 @@ export function ConversationPage() {
         appendOptimisticMessage(accepted, content);
         await jobManager.registerJob(accepted.job_id);
         await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
-        setFollowUpQuestion((current) => current === content ? '' : current);
       } finally {
         setIsSubmitting(false);
       }
     },
     [appendOptimisticMessage, conversationId, jobManager, orgId, queryClient]
+  );
+
+  const submitFollowUp = useCallback(
+    (question: string) => submit(question, selectedProfileId),
+    [selectedProfileId, submit],
   );
 
   useEffect(() => {
@@ -206,7 +209,7 @@ export function ConversationPage() {
       <ConversationMessage
         key={message.id}
         message={message}
-        onFollowUp={(q) => void submit(q, selectedProfileId)}
+        onFollowUp={submitFollowUp}
       />,
     ];
     if (message.role !== 'user' || !message.job_id || assistantJobIds.has(message.job_id)) return items;
@@ -353,11 +356,10 @@ export function ConversationPage() {
       </div>
 
       {/* Fixed Bottom ChatGPT Follow-up Composer Deck */}
-      <ChatComposer
+      <FollowUpChatComposer
+        key={conversationId}
         containerRef={setComposerElement}
-        question={followUpQuestion}
-        onQuestionChange={setFollowUpQuestion}
-        onSubmit={() => void submit(followUpQuestion, selectedProfileId)}
+        onSubmit={submitFollowUp}
         dataSources={(dataSources.data ?? []).filter((s) => s.status === 'active')}
         selectedDataSourceIds={conversation.data?.data_source_ids ?? []}
         tableScope={conversation.data?.table_scope ?? []}

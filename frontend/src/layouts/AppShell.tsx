@@ -22,7 +22,7 @@ import {
   FileText,
   Wrench,
   Trash2,
-  Terminal,
+  LayoutTemplate,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -40,7 +40,7 @@ const railNavigationItems = [
   { label: 'Dashboards', to: '/dashboards', icon: LayoutDashboard },
   { label: 'Data Sources', to: '/data-sources', icon: Database },
   { label: 'Knowledge', to: '/knowledge', icon: BrainCircuit },
-  { label: 'Skills', to: '/skills', icon: Terminal },
+  { label: 'Templates', to: '/skills', icon: LayoutTemplate },
   { label: 'Models', to: '/models', icon: Cpu },
   { label: 'Jobs', to: '/jobs', icon: Activity },
   { label: 'Settings', to: '/settings', icon: Settings },

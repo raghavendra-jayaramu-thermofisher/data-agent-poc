@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Ref } from 'react';
-import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, WandSparkles } from 'lucide-react';
+import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, LayoutTemplate } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
 import { useInstructions } from '../../settings/hooks/useInstructions';
@@ -213,12 +213,12 @@ export function ChatComposer({
             ref={skillsPickerRef}
             className="chat-composer-popover chat-composer-popover--commands"
             role="listbox"
-            aria-label={skillsOpen ? "Select a skill" : "Slash command suggestions"}
+            aria-label={skillsOpen ? "Select a template" : "Slash command suggestions"}
           >
             <div className="chat-composer-popover__header">
               <div>
-                  <strong>Skills</strong>
-                <span>{skillsOpen ? 'Choose a skill for this question' : 'Tab or Enter to select'}</span>
+                  <strong>Templates</strong>
+                <span>{skillsOpen ? 'Choose a template for this question' : 'Tab or Enter to select'}</span>
               </div>
               <button
                 type="button"
@@ -231,7 +231,7 @@ export function ChatComposer({
             </div>
             {skillsOpen && <label className="db-icon-search chat-composer-search">
               <Search size={13} />
-              <input autoFocus type="text" className="db-icon-search__input" placeholder="Search skills…" aria-label="Search skills" value={skillSearch} onChange={(event) => setSkillSearch(event.target.value)} onKeyDown={(event) => {
+              <input autoFocus type="text" className="db-icon-search__input" placeholder="Search templates…" aria-label="Search templates" value={skillSearch} onChange={(event) => setSkillSearch(event.target.value)} onKeyDown={(event) => {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                   event.preventDefault();
                   setSelectedIndex((index) => matchingCommands.length ? (index + (event.key === 'ArrowDown' ? 1 : -1) + matchingCommands.length) % matchingCommands.length : 0);
@@ -243,11 +243,11 @@ export function ChatComposer({
             <div className="chat-composer-popover__list">
               {availableCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
-                  No command skills configured. Add them in Skills.
+                  No command templates configured. Add them in Templates.
                 </p>
               ) : matchingCommands.length === 0 ? (
                 <p className="chat-composer-popover__empty">
-                  No skills matching &ldquo;{commandQuery}&rdquo;
+                  No templates matching &ldquo;{commandQuery}&rdquo;
                 </p>
               ) : (
                 matchingCommands.map((item, idx) => {
@@ -262,13 +262,13 @@ export function ChatComposer({
                       onClick={() => selectCommand(item)}
                       onMouseEnter={() => setSelectedIndex(idx)}
                     >
-                      <span className="chat-skill-icon" aria-hidden="true"><WandSparkles size={16} /></span>
+                      <span className="chat-skill-icon" aria-hidden="true"><LayoutTemplate size={16} /></span>
                       <span className="chat-skill-content">
                         <span className="chat-skill-name">{item.name}</span>
                         <span className="chat-skill-command">/{item.command}</span>
                         {item.description && <span className="chat-skill-description">{item.description}</span>}
                       </span>
-                      {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[#4B123F]" aria-label="Selected skill" />}
+                      {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[#4B123F]" aria-label="Selected template" />}
                     </button>
                   );
                 })
@@ -283,14 +283,14 @@ export function ChatComposer({
                 className="chat-composer-chip active w-fit mb-2"
                 title={activeInstruction.description || activeInstruction.name}
               >
-                <WandSparkles size={12} />
+                <LayoutTemplate size={12} />
                 <span>{activeInstruction.name}</span>
                 <button
                   type="button"
                   onClick={removeActiveCommand}
                   className="ml-0.5 p-0.5 hover:bg-black/10 rounded cursor-pointer"
-                  title="Remove selected skill"
-                  aria-label="Remove selected skill"
+                  title="Remove selected template"
+                  aria-label="Remove selected template"
                 >
                   <X size={11} />
                 </button>
@@ -463,7 +463,7 @@ export function ChatComposer({
               )}
             </div>
             <button ref={skillsButtonRef} type="button" className={`chat-composer-chip ${skillsOpen ? 'active' : ''}`} disabled={disabled} aria-haspopup="listbox" aria-expanded={skillsOpen} onClick={() => { setSkillsOpen(!skillsOpen); setSkillSearch(''); setSourcesOpen(false); setModelsOpen(false); setAutocompleteDismissed(true); }}>
-              <WandSparkles size={12} /><span>Skills</span><ChevronDown size={11} />
+              <LayoutTemplate size={12} /><span>Templates</span><ChevronDown size={11} />
             </button>
           </div>
 

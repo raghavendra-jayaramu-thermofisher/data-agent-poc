@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Sparkles,
+  LayoutTemplate,
   Terminal,
   Plus,
   Trash2,
@@ -59,11 +59,11 @@ export function SkillsPage() {
   const [formData, setFormData] = useState<FormState>(emptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (query.isLoading) return <PageLoading label="Loading skills…" />;
+  if (query.isLoading) return <PageLoading label="Loading templates…" />;
   if (query.isError) {
     return (
       <PageError
-        title="Unable to load skills"
+        title="Unable to load templates"
         message={(query.error as Error).message}
         retry={() => void query.refetch()}
       />
@@ -101,9 +101,9 @@ export function SkillsPage() {
         id: item.id,
         body: { is_default: true, enabled: true },
       });
-      notifications.success(`"${item.name}" is now the workspace default skill.`);
+      notifications.success(`"${item.name}" is now the workspace default template.`);
     } catch (err) {
-      notifications.error((err as AppError).message || 'Failed to update default skill');
+      notifications.error((err as AppError).message || 'Failed to update default template');
     }
   };
 
@@ -111,16 +111,16 @@ export function SkillsPage() {
     if (!canManage) return;
     if (
       !window.confirm(
-        `Are you sure you want to delete skill "${item.name}"? This action cannot be undone.`
+        `Are you sure you want to delete template "${item.name}"? This action cannot be undone.`
       )
     ) {
       return;
     }
     try {
       await deleteMutation.mutateAsync(item.id);
-      notifications.success(`Skill "${item.name}" deleted.`);
+      notifications.success(`Template "${item.name}" deleted.`);
     } catch (err) {
-      notifications.error((err as AppError).message || 'Failed to delete skill');
+      notifications.error((err as AppError).message || 'Failed to delete template');
     }
   };
 
@@ -134,11 +134,11 @@ export function SkillsPage() {
     const trimmedCommand = formData.command.trim().replace(/^\/+/, '').toLowerCase();
 
     if (!trimmedName) {
-      setFormError('Skill name is required.');
+      setFormError('Template name is required.');
       return;
     }
     if (!trimmedContent) {
-      setFormError('Skill instructions are required.');
+      setFormError('Template instructions are required.');
       return;
     }
 
@@ -154,7 +154,7 @@ export function SkillsPage() {
           enabled: formData.enabled,
         };
         await updateMutation.mutateAsync({ id: editingItem.id, body });
-        notifications.success(`Skill "${trimmedName}" updated.`);
+        notifications.success(`Template "${trimmedName}" updated.`);
       } else {
         const body: InstructionCreate = {
           name: trimmedName,
@@ -166,11 +166,11 @@ export function SkillsPage() {
           enabled: formData.enabled,
         };
         await createMutation.mutateAsync(body);
-        notifications.success(`Skill "${trimmedName}" created.`);
+        notifications.success(`Template "${trimmedName}" created.`);
       }
       setModalOpen(false);
     } catch (err) {
-      setFormError((err as AppError).message || 'Failed to save skill.');
+      setFormError((err as AppError).message || 'Failed to save template.');
     }
   };
 
@@ -179,9 +179,9 @@ export function SkillsPage() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-[#DAD5CD] gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[#252127]">Skills</h1>
+          <h1 className="text-xl font-semibold text-[#252127]">Templates</h1>
           <p className="text-xs text-[#625C64]">
-            Set an always-on workspace skill, or create command skills invoked with slash commands (e.g.{' '}
+            Set an always-on workspace template, or create command templates invoked with slash commands (e.g.{' '}
             <code className="text-[#4B123F] font-mono font-semibold">/retention</code>) for on-demand
             specialized analysis.
           </p>
@@ -193,7 +193,7 @@ export function SkillsPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors shrink-0"
           >
             <Plus size={14} />
-            <span>New Skill</span>
+            <span>New Template</span>
           </button>
         )}
       </div>
@@ -201,8 +201,8 @@ export function SkillsPage() {
       {/* Instructions list */}
       {instructions.length === 0 ? (
         <div className="p-8 text-center bg-[#FBFAF7] border border-[#DAD5CD] rounded-lg">
-          <Terminal size={28} className="mx-auto mb-2 text-[#8B848C]" />
-          <h3 className="text-sm font-semibold text-[#252127] mb-1">No skills configured</h3>
+          <LayoutTemplate size={28} className="mx-auto mb-2 text-[#8B848C]" />
+          <h3 className="text-sm font-semibold text-[#252127] mb-1">No templates configured</h3>
           <p className="text-xs text-[#625C64] max-w-md mx-auto mb-4">
             Add custom instructions to guide the data assistant on company-wide metric definitions,
             fiscal calendar rules, or create slash commands for quick analytical tasks.
@@ -214,7 +214,7 @@ export function SkillsPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors"
             >
               <Plus size={14} />
-              <span>Create First Skill</span>
+              <span>Create First Template</span>
             </button>
           )}
         </div>
@@ -266,7 +266,7 @@ export function SkillsPage() {
                   <div className="mt-1">
                     <details className="text-xs text-[#625C64] group">
                       <summary className="cursor-pointer text-[#4B123F] hover:underline font-medium list-none flex items-center gap-1 select-none">
-                        <span>View Skill Instructions</span>
+                        <span>View Template Instructions</span>
                       </summary>
                       <pre className="mt-2 p-3 bg-[#FBFAF7] border border-[#DAD5CD] rounded text-xs font-mono text-[#252127] whitespace-pre-wrap max-h-48 overflow-y-auto">
                         {item.content}
@@ -290,7 +290,7 @@ export function SkillsPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(item)}
-                      title="Edit skill"
+                      title="Edit template"
                       className="p-1.5 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded transition-colors"
                     >
                       <Edit2 size={13} />
@@ -298,7 +298,7 @@ export function SkillsPage() {
                     <button
                       type="button"
                       onClick={() => handleDelete(item)}
-                      title="Delete skill"
+                      title="Delete template"
                       className="p-1.5 text-[#8B848C] hover:text-[#A84545] hover:bg-[#F7E7E5] rounded transition-colors"
                     >
                       <Trash2 size={13} />
@@ -322,9 +322,9 @@ export function SkillsPage() {
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#DAD5CD]">
               <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-[#4B123F]" />
+                <LayoutTemplate size={16} className="text-[#4B123F]" />
                 <h3 id="instruction-modal-title" className="text-sm font-semibold text-[#252127]">
-                  {editingItem ? 'Edit Skill' : 'New Skill'}
+                  {editingItem ? 'Edit Template' : 'New Template'}
                 </h3>
               </div>
               <button
@@ -350,7 +350,7 @@ export function SkillsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Skill Name <span className="text-[#A84545]">*</span>
+                  Template Name <span className="text-[#A84545]">*</span>
                 </label>
                 <input
                   type="text"
@@ -421,7 +421,7 @@ export function SkillsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Skill Instructions <span className="text-[#A84545]">*</span>
+                  Template Instructions <span className="text-[#A84545]">*</span>
                 </label>
                 <textarea
                   required
@@ -453,7 +453,7 @@ export function SkillsPage() {
                   <div className="text-xs">
                     <span className="font-semibold text-[#252127]">Set as Workspace Default (always-on)</span>
                     <span className="text-[#625C64] block">
-                      Always applied to every query asked in this workspace. Only one skill can be the workspace default.
+                      Always applied to every query asked in this workspace. Only one template can be the workspace default.
                     </span>
                   </div>
                 </label>
@@ -467,7 +467,7 @@ export function SkillsPage() {
                     className="rounded border-[#DAD5CD] text-[#4B123F] focus:ring-[#4B123F]"
                   />
                   <span className="text-xs font-medium text-[#252127]">
-                    Skill Enabled
+                    Template Enabled
                   </span>
                 </label>
               </div>
@@ -485,7 +485,7 @@ export function SkillsPage() {
                   disabled={createMutation.isPending || updateMutation.isPending}
                   className="px-4 py-1.5 text-xs font-semibold bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded transition-colors disabled:opacity-50"
                 >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save Skill'}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save Template'}
                 </button>
               </div>
             </form>

@@ -10,7 +10,7 @@ import {
   Activity,
   Settings,
   Lock,
-  Terminal,
+  LayoutTemplate,
 } from 'lucide-react';
 import {
   ALL_SIDEBAR_TABS,
@@ -23,7 +23,7 @@ const TAB_ICONS: Record<SidebarTabKey, typeof MessageSquarePlus> = {
   '/dashboards': LayoutDashboard,
   '/data-sources': Database,
   '/knowledge': BrainCircuit,
-  '/skills': Terminal,
+  '/skills': LayoutTemplate,
   '/models': Cpu,
   '/jobs': Activity,
   '/settings': Settings,

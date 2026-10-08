@@ -12,47 +12,47 @@ vi.mock('../../settings/hooks/useInstructions', () => ({
   useUpdateInstruction: () => ({ mutateAsync: state.update }),
   useDeleteInstruction: () => ({ mutateAsync: state.remove }),
 }));
-const skill = { id: 's1', name: 'Retention', content: 'Use monthly cohorts', command: 'retention', enabled: true, is_default: false };
+const template = { id: 's1', name: 'Retention', content: 'Use monthly cohorts', command: 'retention', enabled: true, is_default: false };
 
-describe('Skills', () => {
+describe('Templates', () => {
   beforeEach(() => { state.role = 'owner'; state.items = []; vi.clearAllMocks(); });
 
-  it('creates a skill through the existing instructions API', async () => {
+  it('creates a template through the existing instructions API', async () => {
     render(<SkillsPage />);
     const user = userEvent.setup();
-    expect(screen.getByRole('heading', { name: 'Skills' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'New Skill' }));
+    expect(screen.getByRole('heading', { name: 'Templates' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'New Template' }));
     const inputs = screen.getAllByRole('textbox');
     await user.type(inputs[0]!, 'Retention');
     await user.type(inputs[1]!, 'retention');
     await user.type(inputs[4]!, 'Use monthly cohorts');
-    await user.click(screen.getByRole('button', { name: 'Save Skill' }));
+    await user.click(screen.getByRole('button', { name: 'Save Template' }));
     expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Retention', command: 'retention', content: 'Use monthly cohorts', enabled: true }));
   });
 
-  it('preserves editing, disabling, defaulting and deleting existing skills', async () => {
-    state.items = [skill];
+  it('preserves editing, disabling, defaulting and deleting existing templates', async () => {
+    state.items = [template];
     render(<SkillsPage />);
     const user = userEvent.setup();
     expect(screen.getAllByText('/retention')).toHaveLength(2);
-    await user.click(screen.getByTitle('Edit skill'));
-    expect(screen.getByRole('dialog', { name: 'Edit Skill' })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: 'Skill Enabled' }));
-    await user.click(screen.getByRole('button', { name: 'Save Skill' }));
+    await user.click(screen.getByTitle('Edit template'));
+    expect(screen.getByRole('dialog', { name: 'Edit Template' })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Template Enabled' }));
+    await user.click(screen.getByRole('button', { name: 'Save Template' }));
     expect(state.update).toHaveBeenCalledWith({ id: 's1', body: expect.objectContaining({ enabled: false }) });
     await user.click(screen.getByRole('button', { name: 'Make Default' }));
     expect(state.update).toHaveBeenCalledWith({ id: 's1', body: { is_default: true, enabled: true } });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await user.click(screen.getByTitle('Delete skill'));
+    await user.click(screen.getByTitle('Delete template'));
     expect(state.remove).toHaveBeenCalledWith('s1');
   });
 
-  it('allows members to view skills without management actions', () => {
-    state.role = 'member'; state.items = [skill];
+  it('allows members to view templates without management actions', () => {
+    state.role = 'member'; state.items = [template];
     render(<SkillsPage />);
     expect(screen.getByText('Retention')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New Skill' })).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Edit skill')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Delete skill')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Template' })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Edit template')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Delete template')).not.toBeInTheDocument();
   });
 });

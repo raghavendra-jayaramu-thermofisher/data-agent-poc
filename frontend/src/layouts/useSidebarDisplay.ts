@@ -7,7 +7,7 @@ export const ALL_SIDEBAR_TABS = [
   { key: '/dashboards', label: 'Dashboards', fixed: false },
   { key: '/data-sources', label: 'Data Sources', fixed: false },
   { key: '/knowledge', label: 'Knowledge', fixed: false },
-  { key: '/skills', label: 'Skills', fixed: false },
+  { key: '/skills', label: 'Templates', fixed: false },
   { key: '/models', label: 'Models', fixed: false },
   { key: '/jobs', label: 'Jobs', fixed: false },
   { key: '/settings', label: 'Settings', fixed: false },

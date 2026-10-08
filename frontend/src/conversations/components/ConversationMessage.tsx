@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDownToLine, ArrowUpToLine, ChevronLeft, ChevronRight, Copy, Check, Presentation, Minimize2 } from 'lucide-react';
 import type { ConversationMessage as Message } from '../api/conversation-api';
@@ -10,7 +10,7 @@ import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDe
 import type { JobArtifact } from '../../agent/api/execution-api';
 import { formatMarkdownForCopy } from '../../agent/lib/artifact-directives';
 
-export function ConversationMessage({
+export const ConversationMessage = memo(function ConversationMessage({
   message,
   onFollowUp,
 }: {
@@ -273,4 +273,4 @@ export function ConversationMessage({
       {presenting ? createPortal(card, document.body) : card}
     </div>
   );
-}
+});

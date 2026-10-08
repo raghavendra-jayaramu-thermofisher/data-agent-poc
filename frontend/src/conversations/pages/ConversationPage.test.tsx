@@ -1,13 +1,26 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
+import { queryKeys } from '../../api/queryKeys';
 import type { ManagedJob } from '../../jobs/types';
 
 const manager = vi.hoisted(() => ({ jobs: [] as ManagedJob[], registerJob: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined) }));
+const answerRenders = vi.hoisted(() => vi.fn());
+vi.mock('../components/AssistantMarkdown', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/AssistantMarkdown')>();
+  const { Profiler } = await import('react');
+  return {
+    AssistantMarkdown: (props: { content: string }) => (
+      <Profiler id="answer-markdown" onRender={answerRenders}>
+        <actual.AssistantMarkdown {...props} />
+      </Profiler>
+    ),
+  };
+});
 // Resolve fetch after MSW starts instead of capturing the original fetch during imports.
 vi.mock('openapi-fetch', async (importOriginal) => {
   const actual = await importOriginal<typeof import('openapi-fetch')>();
@@ -50,6 +63,33 @@ describe('durable conversation workspace', () => {
   beforeEach(() => {
     manager.jobs = []; manager.registerJob.mockClear(); manager.cancel.mockClear();
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  });
+
+  it('updates a follow-up draft without rerendering the report, and still renders new answer data', async () => {
+    const answer = {
+      id: 'm-answer', conversation_id: 'c1', role: 'assistant',
+      content: '# Customer report\n\nCurrent backlog.', job_id: null, metadata: {},
+      created_at: '2026-08-24T12:00:00Z',
+    };
+    baseHandlers(() => [answer]);
+    const client = renderPage();
+    const user = userEvent.setup();
+    await screen.findByText('Current backlog.');
+    const input = screen.getByRole('textbox', { name: 'Ask a follow-up' });
+    answerRenders.mockClear();
+
+    await user.type(input, 'Compare the customers{Shift>}{Enter}{/Shift}for this week');
+    expect(input).toHaveValue('Compare the customers\nfor this week');
+    expect(answerRenders).not.toHaveBeenCalled();
+
+    await act(async () => {
+      client.setQueryData(queryKeys.conversations.messages('org-1', 'c1'), [
+        { ...answer, content: '# Customer report\n\nUpdated backlog.' },
+      ]);
+    });
+    expect(await screen.findByText('Updated backlog.')).toBeInTheDocument();
+    expect(answerRenders).toHaveBeenCalled();
+    expect(input).toHaveValue('Compare the customers\nfor this week');
   });
 
   it('preserves a new draft typed while the previous submission is pending', async () => {

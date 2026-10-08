@@ -18,12 +18,12 @@ describe('AppShell', () => {
         expect(screen.getByRole('button', { name: 'Open navigation' })).toBeInTheDocument();
         expect(screen.getByText('Ask content')).toBeInTheDocument();
         expect(screen.getByText('Acme')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Skills' })).toHaveAttribute('href', '/skills');
+        expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/skills');
     });
 
-    it('keeps Skills outside the Settings navigation', () => {
+    it('keeps Templates outside the Settings navigation', () => {
         render(<MemoryRouter initialEntries={['/settings']}><Routes><Route element={<AppShell />}><Route path="/settings" element={<div>Settings content</div>}/></Route></Routes></MemoryRouter>);
-        expect(screen.getByRole('link', { name: 'Skills' })).toHaveAttribute('href', '/skills');
+        expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/skills');
         expect(screen.queryByText('AI Instructions & Commands')).not.toBeInTheDocument();
     });
 
