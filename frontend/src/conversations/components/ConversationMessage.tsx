@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowDownToLine, ArrowUpToLine, ChevronLeft, ChevronRight, Copy, Check, Presentation, Minimize2 } from 'lucide-react';
 import type { ConversationMessage as Message } from '../api/conversation-api';
 import { AnswerVerification } from './AnswerVerification';
+import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import { AnswerNavigation } from './AnswerNavigation';
 import { createAnswerOutline } from './answer-outline';
@@ -13,9 +14,13 @@ import { formatMarkdownForCopy } from '../../agent/lib/artifact-directives';
 export const ConversationMessage = memo(function ConversationMessage({
   message,
   onFollowUp,
+  showSuggestions = false,
+  followUpDisabled = false,
 }: {
   message: Message;
   onFollowUp?(question: string): Promise<void> | void;
+  showSuggestions?: boolean;
+  followUpDisabled?: boolean;
 }) {
   const assistant = message.role === 'assistant';
   const [copied, setCopied] = useState(false);
@@ -208,6 +213,10 @@ export const ConversationMessage = memo(function ConversationMessage({
     </div>
   );
 
+  const suggestions = !presenting && showSuggestions && onFollowUp ? (
+    <FollowUpSuggestions suggestions={message.metadata?.follow_up_suggestions} onSubmit={onFollowUp} disabled={followUpDisabled} />
+  ) : null;
+
   const card = (
     <article
       ref={cardRef}
@@ -271,6 +280,7 @@ export const ConversationMessage = memo(function ConversationMessage({
       style={presenting ? { minHeight: placeholderHeight } : undefined}
     >
       {presenting ? createPortal(card, document.body) : card}
+      {suggestions}
     </div>
   );
 });

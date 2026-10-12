@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -55,6 +55,35 @@ describe('new analysis screen', () => {
       data_source_ids: ['ds1'], model_profile_id: null, title: 'Count orders',
       table_scope: [{ data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }], knowledge_version_id: 'v1' }],
     }));
+  });
+
+  it('restores applied tables in a new Ask session and remembers an explicit return to all tables', async () => {
+    const showPage = () => render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><AskPage /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    showPage();
+    await user.click(await screen.findByRole('button', { name: 'Tables: All tables' }));
+    await user.click(await screen.findByRole('checkbox', { name: /orders/ }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    cleanup();
+    showPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Tables: orders' }));
+    expect(await screen.findByRole('checkbox', { name: /orders/ })).toBeChecked();
+    // Cancelled changes do not overwrite the remembered selection.
+    await user.click(screen.getByRole('radio', { name: 'All tables' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    cleanup();
+    showPage();
+    await user.click(await screen.findByRole('button', { name: 'Tables: orders' }));
+    await user.click(screen.getByRole('radio', { name: 'All tables' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    cleanup();
+    showPage();
+    expect(await screen.findByRole('button', { name: 'Tables: All tables' })).toBeInTheDocument();
   });
   it('centers a personal welcome and fixes the chosen source when creating the conversation', async () => {
     createConversation.mockResolvedValue({ id: 'c1' });

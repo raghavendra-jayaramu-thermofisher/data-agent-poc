@@ -117,6 +117,27 @@ describe('durable conversation workspace', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Send question' })).toBeEnabled());
   });
 
+  it('submits the latest answer suggestion in the same conversation without clearing a composer draft', async () => {
+    baseHandlers(() => [
+      { id: 'old', conversation_id: 'c1', role: 'assistant', content: 'Old answer', job_id: null, metadata: { follow_up_suggestions: ['Old suggestion?'] }, created_at: '2026-08-24T12:00:00Z' },
+      { id: 'latest', conversation_id: 'c1', role: 'assistant', content: 'Latest answer', job_id: 'answer-job', metadata: { follow_up_suggestions: ['Compare customers?'] }, created_at: '2026-08-24T12:01:00Z' },
+    ]);
+    const received = vi.fn();
+    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+      received(await request.json());
+      return HttpResponse.json({ message_id: 'm-suggestion', job_id: 'j-suggestion' }, { status: 202 });
+    }));
+    renderPage();
+    const user = userEvent.setup();
+    const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
+    await user.type(input, 'My draft');
+    expect(screen.queryByRole('button', { name: 'Old suggestion?' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Compare customers?' }));
+    await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-suggestion'));
+    expect(received).toHaveBeenCalledWith({ content: 'Compare customers?', model_profile_id: null });
+    expect(input).toHaveValue('My draft');
+  });
+
   it('renames the chat in the header and recent list without submitting an analysis', async () => {
     baseHandlers();
     let saved = { ...conversation };

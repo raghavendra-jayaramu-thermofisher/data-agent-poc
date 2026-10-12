@@ -198,6 +198,7 @@ export function ConversationPage() {
     .filter(Boolean);
 
   const durableMessages = messages.data ?? [];
+  const latestAssistantId = durableMessages.findLast((message) => message.role === 'assistant')?.id;
   const assistantJobIds = new Set(
     durableMessages.filter((message) => message.role === 'assistant' && message.job_id).map((message) => message.job_id)
   );
@@ -210,6 +211,8 @@ export function ConversationPage() {
         key={message.id}
         message={message}
         onFollowUp={submitFollowUp}
+        showSuggestions={message.id === latestAssistantId}
+        followUpDisabled={isSubmitting || Boolean(activeRunningJob)}
       />,
     ];
     if (message.role !== 'user' || !message.job_id || assistantJobIds.has(message.job_id)) return items;

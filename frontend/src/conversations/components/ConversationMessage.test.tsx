@@ -61,6 +61,21 @@ describe('ConversationMessage', () => {
     expect(screen.getByText('Revenue declined 8%.')).toBeInTheDocument();
   });
 
+  it.each([null, 'job-1'])('shows suggestions outside the answer card and hides them while presenting (job %s)', async (jobId) => {
+    const user = userEvent.setup();
+    render(<QueryClientProvider client={new QueryClient()}>
+      <ConversationMessage message={{ ...assistantMessage, job_id: jobId, metadata: { follow_up_suggestions: ['Compare regions?'] } }} showSuggestions onFollowUp={vi.fn()} />
+    </QueryClientProvider>);
+    const region = screen.getByRole('region', { name: 'Suggested follow-ups' });
+    expect(region.previousElementSibling).toHaveClass('assistant-card');
+    expect(region.closest('.assistant-card')).toBeNull();
+    expect(region.previousElementSibling?.lastElementChild).toHaveClass('assistant-card-footer');
+    await user.click(screen.getByRole('button', { name: 'Present answer' }));
+    expect(screen.queryByRole('region', { name: 'Suggested follow-ups' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Compare regions?' })).toBeInTheDocument();
+  });
+
   it('offers heading tabs for assistant messages without an execution job', async () => {
     const user = userEvent.setup();
     renderMessage({

@@ -1,3 +1,5 @@
+import type { components } from '../api/generated/schema';
+
 const KEY = 'db-assistant.preferences.v1';
 export type Preferences = {
     sidebarCollapsed?: boolean;
@@ -5,6 +7,7 @@ export type Preferences = {
     lastPath?: string;
     lastAskDataSourceIds?: string[];
     askDataSourceIdsByScope?: Record<string, string[]>;
+    askTableScopesByScope?: Record<string, components['schemas']['SourceTableScope'][]>;
     lastSelectedModelProfileId?: string | null;
 };
 function readAll(): Preferences {

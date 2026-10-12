@@ -8,7 +8,9 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useMemo, useRef, useState } from 'react';
-import { Copy, Check, Maximize2, X, Search, Download, Table } from 'lucide-react';
+import { Copy, Check, Maximize2, X, Search, Table } from 'lucide-react';
+import { ExcelExportButton } from './ExcelExportButton';
+import { excelTableFromModel } from './excel-export';
 import { notifications } from '../../components/notifications';
 import {
   formatAnalyticalValue,
@@ -87,18 +89,6 @@ export function AnalyticalTable({
     }
   }
 
-  function downloadCsv() {
-    const tsv = toTsv(model);
-    const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${label.replace(/\s+/g, '_').toLowerCase()}.tsv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    notifications.success('Downloaded table file');
-  }
-
   return (
     <div className="analytical-table-shell">
       {!hideToolbar && (
@@ -114,6 +104,7 @@ export function AnalyticalTable({
             )}
           </div>
           <div className="flex items-center gap-1.5">
+            <ExcelExportButton getTable={() => excelTableFromModel(model, label)} disabled={!model.columns.length} />
             <button
               type="button"
               className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-medium transition-colors"
@@ -204,7 +195,7 @@ export function AnalyticalTable({
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#DAD5CD] bg-[#FBFAF7]">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#DAD5CD] bg-[#FBFAF7]">
               <div className="flex items-center gap-2.5">
                 <Table size={18} className="text-[#4B123F]" />
                 <div>
@@ -215,7 +206,7 @@ export function AnalyticalTable({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
                   <Search size={13} className="absolute left-2.5 top-2.5 text-[#8B848C]" />
                   <input
@@ -223,22 +214,16 @@ export function AnalyticalTable({
                     value={globalFilter}
                     onChange={(e) => setGlobalFilter(e.target.value)}
                     placeholder="Search across all columns…"
-                    className="w-64 h-8 pl-8 pr-2.5 bg-[#FFFDFC] border border-[#DAD5CD] rounded text-xs text-[#252127] outline-none focus:border-[#9A4D86]"
+                    className="w-40 sm:w-64 h-8 pl-8 pr-2.5 bg-[#FFFDFC] border border-[#DAD5CD] rounded text-xs text-[#252127] outline-none focus:border-[#9A4D86]"
                   />
                 </div>
 
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-semibold"
-                  onClick={() => downloadCsv()}
-                >
-                  <Download size={13} />
-                  <span>Download TSV</span>
-                </button>
+                <ExcelExportButton getTable={() => excelTableFromModel(model, label)} disabled={!model.columns.length} />
 
                 <button
                   type="button"
                   className="p-1.5 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded cursor-pointer"
+                  aria-label="Close expanded table"
                   onClick={closeFullscreen}
                 >
                   <X size={18} />

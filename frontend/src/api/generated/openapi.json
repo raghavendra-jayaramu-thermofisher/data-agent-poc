@@ -3953,6 +3953,65 @@
         ],
         "title": "MessageResponse",
         "type": "object"
+      },
+      "ExcelTableExport": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 240,
+            "title": "Title",
+            "default": "Table"
+          },
+          "headers": {
+            "items": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "type": "array",
+            "maxItems": 256,
+            "minItems": 1,
+            "title": "Headers"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 32767
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "title": "Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "headers",
+          "rows"
+        ],
+        "title": "ExcelTableExport"
       }
     },
     "securitySchemes": {
@@ -8853,6 +8912,71 @@
         "tags": [
           "health"
         ]
+      }
+    },
+    "/api/v1/exports/excel": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Export Excel",
+        "operationId": "export_excel_api_v1_exports_excel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Organization-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcelTableExport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

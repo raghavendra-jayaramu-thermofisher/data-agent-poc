@@ -959,6 +959,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Excel */
+        post: operations["export_excel_api_v1_exports_excel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2507,6 +2524,23 @@ export interface components {
             verified_by?: string | null;
             /** Verified By Name */
             verified_by_name?: string | null;
+        };
+        /** ExcelTableExport */
+        ExcelTableExport: {
+            /**
+             * Title
+             * @default Table
+             */
+            title: string;
+            /** Headers */
+            headers: string[];
+            /** Rows */
+            rows: (string | number | boolean | null)[][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
         };
     };
     responses: never;
@@ -5066,6 +5100,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_excel_api_v1_exports_excel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExcelTableExport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

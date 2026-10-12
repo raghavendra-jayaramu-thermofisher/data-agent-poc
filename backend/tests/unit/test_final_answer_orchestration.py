@@ -262,7 +262,7 @@ async def test_finalizer_returns_imperfect_markdown_with_quality_warning(monkeyp
         "There are 12 open orders.\n\n"
         f"[[artifact:{unknown_id}]]"
     )
-    client = FakeFinalAnswerClient([invalid])
+    client = FakeFinalAnswerClient([invalid + '\n\n<follow_up_suggestions><suggestion>Compare regions?</suggestion></follow_up_suggestions>'])
     events: list[str] = []
     finishes: list[str] = []
 
@@ -298,9 +298,12 @@ async def test_finalizer_returns_imperfect_markdown_with_quality_warning(monkeyp
         api_key=None,
         settings={},
     )
-    answer = await runtime.run(job_id=JOB_ID, model=model, evidence=bundle())
+    suggestions: list[str] = []
+    answer = await runtime.run(job_id=JOB_ID, model=model, evidence=bundle(), follow_up_suggestions=suggestions)
 
     assert answer == invalid
+    assert suggestions == ['Compare regions?']
+    assert 'Follow-up suggestions output contract' in client.calls[0][0].content
     assert len(client.calls) == 1
     assert finishes == ["succeeded"]
     assert events == [

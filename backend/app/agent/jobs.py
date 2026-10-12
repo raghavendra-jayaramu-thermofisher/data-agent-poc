@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 
 from app.agent.artifact_directives import replace_artifact_directives
@@ -190,6 +191,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
 
         if await is_cancel_requested(job_id):
             raise AgentCancelledError
+        follow_up_suggestions: list[str] = []
         answer = await FinalAnswerRuntime(settings=settings).run(
             job_id=job_id,
             model=runtime_model,
@@ -197,6 +199,12 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             default_instructions=default_instructions,
             command_instructions=command_instructions,
             command_name=command_name,
+            follow_up_suggestions=follow_up_suggestions,
+            follow_up_context=json.dumps({
+                "data_source_ids": [str(source_id) for source_id in source_ids],
+                "table_scope": [item.model_dump(mode="json", by_alias=True) for item in table_scope],
+                "recent_questions": [item.content for item in messages if item.role == "user"],
+            }, ensure_ascii=False),
         )
         if await is_cancel_requested(job_id):
             raise AgentCancelledError
@@ -225,6 +233,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         existing = await repo.message_for_job(job_id, "assistant")
         metadata: dict[str, object] = {
             "runtime": "deepagents+finalizer",
+            "follow_up_suggestions": follow_up_suggestions,
             "model_profile_id": str(profile_id),
         }
         if existing is None:

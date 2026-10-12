@@ -56,4 +56,42 @@ describe('Ask source defaults', () => {
     expect(screen.getByRole('button', { name: 'Select data source' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled();
   });
+
+  it('isolates remembered tables by user and workspace and restores them when a source is reselected', async () => {
+    const scope = JSON.stringify(['u1', 'org1']);
+    preferences.set('askDataSourceIdsByScope', { [scope]: ['ds1'] });
+    preferences.set('askTableScopesByScope', {
+      [scope]: [
+        { data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] },
+        { data_source_id: 'removed', mode: 'selected', tables: [{ schema: 'dbo', name: 'old_table' }] },
+      ],
+    });
+    state.sources = [warehouse, sales];
+    showPage();
+    const user = userEvent.setup();
+    expect(screen.getByRole('button', { name: 'Tables: orders' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Warehouse' }));
+    await user.click(screen.getByRole('button', { name: /Warehouse.*postgres/ }));
+    await user.click(screen.getByRole('button', { name: /Sales.*postgres/ }));
+    await user.click(document.body);
+    expect(screen.getByRole('button', { name: 'Tables: All tables' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sales' }));
+    await user.click(screen.getByRole('button', { name: /Sales.*postgres/ }));
+    await user.click(screen.getByRole('button', { name: /Warehouse.*postgres/ }));
+    await user.click(document.body);
+    expect(screen.getByRole('button', { name: 'Tables: orders' })).toBeInTheDocument();
+    cleanup();
+    state.sources = [warehouse];
+    state.orgId = 'org2';
+    showPage();
+    expect(screen.getByRole('button', { name: 'Tables: All tables' })).toBeInTheDocument();
+    cleanup();
+    state.orgId = 'org1'; state.userId = 'u2';
+    showPage();
+    expect(screen.getByRole('button', { name: 'Tables: All tables' })).toBeInTheDocument();
+    cleanup();
+    state.userId = 'u1';
+    showPage();
+    expect(screen.getByRole('button', { name: 'Tables: orders' })).toBeInTheDocument();
+  });
 });

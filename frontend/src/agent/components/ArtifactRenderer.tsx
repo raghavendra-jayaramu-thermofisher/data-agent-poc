@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import type { JobArtifact, SqlExecution } from '../api/execution-api';
 import { AnalyticalTable } from '../../analytics/table/AnalyticalTable';
+import { ExcelExportButton } from '../../analytics/table/ExcelExportButton';
+import { excelTableFromModel } from '../../analytics/table/excel-export';
 import { toTsv, type AnalyticalTableModel } from '../../analytics/table/table-domain';
 import { notifications } from '../../components/notifications';
 import { AssistantMarkdown } from '../../conversations/components/AssistantMarkdown';
@@ -137,7 +139,7 @@ function CollapsibleTableArtifact({
   return (
     <section className="artifact-block table-artifact mb-3 border border-[#DAD5CD] rounded-none bg-[#FFFDFC] overflow-hidden transition-all">
       <header
-        className="flex items-center justify-between px-3.5 py-2 bg-[#FBFAF7] hover:bg-[#F0EEE9] border-b border-[#DAD5CD] cursor-pointer select-none transition-colors"
+        className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#FBFAF7] hover:bg-[#F0EEE9] border-b border-[#DAD5CD] cursor-pointer select-none transition-colors"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
       >
@@ -158,6 +160,7 @@ function CollapsibleTableArtifact({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <ExcelExportButton getTable={() => excelTableFromModel(model, artifact.name || 'Query result')} disabled={!model.columns.length} />
           {isOpen && (
             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
               <button

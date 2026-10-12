@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MarkdownTable } from './MarkdownTable';
 
 function safeHref(href: string | undefined): string | undefined {
   if (!href) return undefined;
@@ -36,13 +37,7 @@ export function AssistantMarkdown({ content }: { content: string }) {
             );
           },
           img: () => null, // Suppress hallucinated markdown images so broken image icons never appear
-          table: ({ children, ...props }) => (
-            <div className="markdown-table-wrapper max-h-[480px] overflow-auto border border-[#DAD5CD] rounded-lg my-3 shadow-2xs bg-[#FFFDFC]">
-              <table {...props} className="w-full text-xs">
-                {children}
-              </table>
-            </div>
-          ),
+          table: ({ children }) => <MarkdownTable>{children}</MarkdownTable>,
           th: ({ children, ...props }) => (
             <th
               {...props}

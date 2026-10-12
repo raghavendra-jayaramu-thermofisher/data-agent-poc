@@ -35,7 +35,9 @@ export function AskPage() {
   });
 
   const [question, setQuestion] = useState('');
-  const [tableSelections, setTableSelections] = useState<Record<string, SourceTableScope[]>>({});
+  const [tableSelections, setTableSelections] = useState<Record<string, SourceTableScope[]>>(() =>
+    preferences.get('askTableScopesByScope') ?? {},
+  );
   const sourceScope = JSON.stringify([user?.id, orgId]);
   const [sourceSelections, setSourceSelections] = useState<Record<string, string[]>>(() =>
     preferences.get('askDataSourceIdsByScope') ?? {},
@@ -71,10 +73,21 @@ export function AskPage() {
     ? [soleSource.id]
     : rememberedSourceIds.filter((id) => activeSources.some((source) => source.id === id)).slice(0, 10);
   const handleSourceChange = (ids: string[]) => {
-    setTableSelections((current) => ({ ...current, [sourceScope]: normalizeTableScope(ids, current[sourceScope] ?? []) }));
     const next = { ...sourceSelections, [sourceScope]: ids };
     setSourceSelections(next);
     preferences.set('askDataSourceIdsByScope', next);
+  };
+  const handleTableScopeChange = (scope: SourceTableScope[]) => {
+    const updatedSourceIds = new Set(scope.map((item) => item.data_source_id));
+    const next = {
+      ...tableSelections,
+      [sourceScope]: [
+        ...(tableSelections[sourceScope] ?? []).filter((item) => !updatedSourceIds.has(item.data_source_id)),
+        ...scope,
+      ],
+    };
+    setTableSelections(next);
+    preferences.set('askTableScopesByScope', next);
   };
   const enabledProfiles = (profiles.data ?? []).filter((profile) => profile.enabled);
   const effectiveProfileId = enabledProfiles.some((profile) => profile.id === selectedProfileId)
@@ -138,7 +151,7 @@ export function AskPage() {
           selectedDataSourceIds={selectedSourceIds}
           onDataSourceIdsChange={handleSourceChange}
           tableScope={normalizeTableScope(selectedSourceIds, tableSelections[sourceScope] ?? [])}
-          onTableScopeChange={(scope) => setTableSelections((current) => ({ ...current, [sourceScope]: scope }))}
+          onTableScopeChange={handleTableScopeChange}
           profiles={enabledProfiles}
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}
