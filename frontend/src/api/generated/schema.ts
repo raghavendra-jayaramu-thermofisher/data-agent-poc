@@ -1645,6 +1645,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Duration Ms */
+            duration_ms?: number | null;
             /** Error Code */
             error_code: string | null;
             /** Error Message */

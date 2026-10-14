@@ -32,7 +32,15 @@ async def list_jobs(
     jobs = await JobService(session, redis, settings).list_for_org(
         organization.id, status=status, limit=limit
     )
-    return [JobResponse.model_validate(job) for job in jobs]
+    responses = []
+    for job, first_event_at, last_event_at in jobs:
+        duration_ms = None
+        if first_event_at is not None and last_event_at is not None:
+            duration_ms = max(0, round((last_event_at - first_event_at).total_seconds() * 1000))
+        responses.append(
+            JobResponse.model_validate(job).model_copy(update={"duration_ms": duration_ms})
+        )
+    return responses
 
 
 @router.get("/{job_id}", response_model=JobResponse)

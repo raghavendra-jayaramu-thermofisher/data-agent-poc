@@ -15,6 +15,22 @@ function isJobFilter(value: string | null): value is JobFilter {
   return Boolean(value && filters.includes(value as JobFilter));
 }
 
+function formatJobDuration(durationMs: number | null | undefined) {
+  if (durationMs == null) return '—';
+  if (durationMs < 1000) return `${durationMs} ms`;
+
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+
+  if (hours) parts.push(`${hours}h`);
+  if (minutes || hours) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+  return parts.join(' ');
+}
+
 export function JobsPage() {
   const [params, setParams] = useSearchParams();
   const manager = useJobManager();
@@ -24,7 +40,12 @@ export function JobsPage() {
 
   const jobs = useMemo(() => {
     const managedById = new Map(manager.jobs.map((entry) => [entry.job.id, entry.job]));
-    return (query.data ?? []).map((job) => managedById.get(job.id) ?? job);
+    return (query.data ?? []).map((job) => {
+      const managedJob = managedById.get(job.id);
+      return managedJob
+        ? { ...job, ...managedJob, duration_ms: job.duration_ms ?? managedJob.duration_ms }
+        : job;
+    });
   }, [manager.jobs, query.data]);
 
   if (query.isLoading && !jobs.length) {
@@ -75,6 +96,7 @@ export function JobsPage() {
                 <th>Status</th>
                 <th>Progress / Message</th>
                 <th>Created</th>
+                <th>Time Taken</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -99,6 +121,7 @@ export function JobsPage() {
                   <td className="text-xs text-[#625C64]">
                     <span title={formatLocalDateTime(job.created_at)}>{formatRelativeTime(job.created_at)}</span>
                   </td>
+                  <td className="text-xs text-[#625C64]">{formatJobDuration(job.duration_ms)}</td>
                   <td>
                     <Link
                       to={`/jobs/${job.id}`}

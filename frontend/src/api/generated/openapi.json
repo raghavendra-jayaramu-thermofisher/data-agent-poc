@@ -1778,6 +1778,18 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Duration Ms"
           }
         },
         "required": [

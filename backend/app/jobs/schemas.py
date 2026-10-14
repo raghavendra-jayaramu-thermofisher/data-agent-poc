@@ -35,3 +35,4 @@ class JobResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    duration_ms: int | None = None

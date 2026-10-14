@@ -34,14 +34,31 @@ class JobRepository:
         *,
         status: str | None = None,
         limit: int = 50,
-    ) -> list[Job]:
-        statement = select(Job).where(Job.organization_id == organization_id)
+    ) -> list[tuple[Job, datetime | None, datetime | None]]:
+        first_event_at = (
+            select(func.min(JobEvent.created_at))
+            .where(JobEvent.job_id == Job.id)
+            .correlate(Job)
+            .scalar_subquery()
+        )
+        last_event_at = (
+            select(func.max(JobEvent.created_at))
+            .where(JobEvent.job_id == Job.id)
+            .correlate(Job)
+            .scalar_subquery()
+        )
+        statement = select(Job, first_event_at, last_event_at).where(
+            Job.organization_id == organization_id
+        )
         if status is not None:
             statement = statement.where(Job.status == status)
         result = await self.session.execute(
             statement.order_by(Job.created_at.desc()).limit(limit)
         )
-        return list(result.scalars().all())
+        return [
+            (job, first_recorded_at, last_recorded_at)
+            for job, first_recorded_at, last_recorded_at in result.all()
+        ]
 
 
     async def count_active_for_user(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> int:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -80,7 +80,7 @@ class JobService:
 
     async def list_for_org(
         self, organization_id: uuid.UUID, *, status: str | None = None, limit: int = 50
-    ) -> list[Job]:
+    ) -> list[tuple[Job, datetime | None, datetime | None]]:
         if status is not None and status not in {
             "queued", "running", "succeeded", "failed", "cancelled"
         }:
