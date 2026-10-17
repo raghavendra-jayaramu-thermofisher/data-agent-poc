@@ -20,6 +20,16 @@ describe('FollowUpSuggestions', () => {
     render(<FollowUpSuggestions suggestions={undefined} onSubmit={vi.fn()} />);
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
+  it('shows the full long question and submits it unchanged', async () => {
+    const question = 'Which customers and product groups account for the October 12 backlog increases in Japan and South Korea?';
+    const onSubmit = vi.fn();
+    render(<FollowUpSuggestions suggestions={[question]} onSubmit={onSubmit} />);
+    const button = screen.getByRole('button', { name: question });
+    expect(button).toHaveAttribute('title', question);
+    expect(button.textContent).toBe(question);
+    await userEvent.setup().click(button);
+    expect(onSubmit).toHaveBeenCalledWith(question);
+  });
   it('prevents duplicate requests and lets a failed request be retried', async () => {
     let reject!: (error: Error) => void;
     const onSubmit = vi.fn().mockImplementationOnce(() => new Promise<void>((_resolve, fail) => { reject = fail; })).mockResolvedValue(undefined);

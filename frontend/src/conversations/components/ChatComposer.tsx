@@ -262,11 +262,8 @@ export function ChatComposer({
                       onClick={() => selectCommand(item)}
                       onMouseEnter={() => setSelectedIndex(idx)}
                     >
-                      <span className="chat-skill-icon" aria-hidden="true"><LayoutTemplate size={16} /></span>
                       <span className="chat-skill-content">
                         <span className="chat-skill-name">{item.name}</span>
-                        <span className="chat-skill-command">/{item.command}</span>
-                        {item.description && <span className="chat-skill-description">{item.description}</span>}
                       </span>
                       {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[#4B123F]" aria-label="Selected template" />}
                     </button>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FileSpreadsheet, LoaderCircle } from 'lucide-react';
+import { Download, LoaderCircle } from 'lucide-react';
 import { notifications } from '../../components/notifications';
 import { downloadExcel, type ExcelTableExport } from './excel-export';
 
@@ -28,9 +28,10 @@ export function ExcelExportButton({ getTable, disabled = false }: {
   }
   return <button type="button" className="excel-export-button" disabled={disabled || pending}
     aria-label={pending ? 'Exporting to Excel' : 'Export to Excel'}
+    aria-busy={pending}
     title="Export all available rows to Excel"
     onClick={(event) => { event.stopPropagation(); void handleExport(); }}>
-    {pending ? <LoaderCircle size={12} className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet size={12} aria-hidden="true" />}
-    <span>{pending ? 'Exporting…' : 'Excel'}</span>
+    {pending ? <LoaderCircle size={12} className="animate-spin" aria-hidden="true" /> : <Download size={12} aria-hidden="true" />}
+    <span>{pending ? 'Exporting…' : 'Export'}</span>
   </button>;
 }

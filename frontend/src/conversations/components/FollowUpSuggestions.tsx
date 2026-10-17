@@ -28,9 +28,9 @@ export function FollowUpSuggestions({ suggestions, onSubmit, disabled = false }:
     }
   };
   return <section className="follow-up-suggestions" aria-label="Suggested follow-ups">
-    <h2>Ask next</h2>
+    <h2>Suggested follow-ups</h2>
     <div className="follow-up-suggestions-list">
-      {questions.map((question) => <button key={question} type="button" disabled={disabled || pending} onClick={() => void submit(question)}>
+      {questions.map((question) => <button key={question} type="button" aria-label={question} title={question} disabled={disabled || pending} onClick={() => void submit(question)}>
         <span>{question}</span><ChevronRight size={14} aria-hidden="true" />
       </button>)}
     </div>

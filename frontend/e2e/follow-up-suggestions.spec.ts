@@ -30,7 +30,7 @@ for (const width of [1280, 390]) {
     await page.reload();
     const suggestions = page.getByRole('region', { name: 'Suggested follow-ups' });
     await expect(suggestions).toBeVisible();
-    await expect(suggestions.getByRole('heading', { name: 'Ask next' })).toBeVisible();
+    await expect(suggestions.getByRole('heading', { name: 'Suggested follow-ups' })).toBeVisible();
     await expect(suggestions.getByRole('button')).toHaveCount(3);
     expect(await suggestions.evaluate((element) => element.closest('.assistant-card'))).toBeNull();
     expect(await suggestions.evaluate((element) => element.previousElementSibling?.classList.contains('assistant-card'))).toBe(true);
@@ -45,7 +45,14 @@ for (const width of [1280, 390]) {
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     const lastButton = suggestions.getByRole('button').last();
     const lastBounds = await lastButton.boundingBox();
-    expect(lastBounds!.y).toBeGreaterThan(bounds!.y + bounds!.height);
+    const availableWidth = await suggestions.locator('.follow-up-suggestions-list').evaluate((element) => element.clientWidth);
+    if (availableWidth >= 680) {
+      expect(lastBounds!.y).toBeCloseTo(bounds!.y, 0);
+      expect(lastBounds!.width).toBeCloseTo(bounds!.width, 0);
+    } else {
+      expect(lastBounds!.y).toBeGreaterThan(bounds!.y + bounds!.height);
+      expect(lastBounds!.width).toBeCloseTo(bounds!.width, 0);
+    }
     expect(lastBounds!.x + lastBounds!.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: test.info().outputPath(`suggestions-${width}.png`), animations: 'disabled' });
     await button.click();
