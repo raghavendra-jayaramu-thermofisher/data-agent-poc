@@ -12,45 +12,45 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
   const isSucceeded = execution.status === 'succeeded';
 
   return (
-    <div className="border border-[#DAD5CD] bg-[#FFFDFC] rounded-lg p-2.5 text-xs mb-2 shadow-2xs">
-      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[#EAE7E1]">
+    <div className="border border-[var(--db-border-default)] bg-[var(--db-surface-raised)] rounded-lg p-2.5 text-xs mb-2 shadow-2xs">
+      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[var(--db-surface-hover)]">
         <div className="flex items-center gap-2">
           {isSucceeded ? (
-            <CheckCircle2 size={13} className="text-[#32745A]" />
+            <CheckCircle2 size={13} className="text-[var(--db-success)]" />
           ) : (
-            <AlertCircle size={13} className="text-[#A84545]" />
+            <AlertCircle size={13} className="text-[var(--db-danger)]" />
           )}
-          <Bot size={13} className="text-[#4B123F]" />
-          <strong className="font-semibold text-[#252127]">{execution.model_name}</strong>
-          <span className="text-[10px] text-[#8B848C]">({execution.phase || 'Model Call'})</span>
+          <Bot size={13} className="text-[var(--db-primary)]" />
+          <strong className="font-semibold text-[var(--db-text-primary)]">{execution.model_name}</strong>
+          <span className="text-[10px] text-[var(--db-text-muted)]">({execution.phase || 'Model Call'})</span>
         </div>
 
-        <span className="text-[11px] text-[#8B848C]">
+        <span className="text-[11px] text-[var(--db-text-muted)]">
           {formatElapsed(execution.started_at, execution.finished_at)}
         </span>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 text-[10px] bg-[#F0EEE9] p-2 rounded">
+      <div className="grid grid-cols-4 gap-2 text-[10px] bg-[var(--db-surface-muted)] p-2 rounded">
         <div>
-          <span className="text-[#8B848C] block">Input Tokens</span>
-          <span className="font-semibold font-mono text-[#252127]">{token(execution.input_tokens)}</span>
+          <span className="text-[var(--db-text-muted)] block">Input Tokens</span>
+          <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.input_tokens)}</span>
         </div>
         <div>
-          <span className="text-[#8B848C] block">Output Tokens</span>
-          <span className="font-semibold font-mono text-[#252127]">{token(execution.output_tokens)}</span>
+          <span className="text-[var(--db-text-muted)] block">Output Tokens</span>
+          <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.output_tokens)}</span>
         </div>
         <div>
-          <span className="text-[#8B848C] block">Total Tokens</span>
-          <span className="font-semibold font-mono text-[#252127]">{token(execution.total_tokens)}</span>
+          <span className="text-[var(--db-text-muted)] block">Total Tokens</span>
+          <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.total_tokens)}</span>
         </div>
         <div>
-          <span className="text-[#8B848C] block">Started</span>
-          <span className="font-mono text-[#252127] truncate block">{formatLocalDateTime(execution.started_at)}</span>
+          <span className="text-[var(--db-text-muted)] block">Started</span>
+          <span className="font-mono text-[var(--db-text-primary)] truncate block">{formatLocalDateTime(execution.started_at)}</span>
         </div>
       </div>
 
       {error && (
-        <div className="mt-2 p-2 bg-[#F7E7E5] border border-[#A84545]/20 rounded text-[#A84545] text-xs">
+        <div className="mt-2 p-2 bg-[var(--db-danger-soft)] border border-[var(--db-danger)]/20 rounded text-[var(--db-danger)] text-xs">
           <strong>{execution.error_code || 'Model Error'}:</strong> {error}
         </div>
       )}

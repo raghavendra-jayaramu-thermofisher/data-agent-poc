@@ -17,6 +17,7 @@ import { useDashboards } from '../hooks/useDashboards';
 const widgetOptions = [
   { value: 'metric', label: 'Metric' }, { value: 'table', label: 'Table' }, { value: 'bar', label: 'Bar chart' },
   { value: 'line', label: 'Line chart' }, { value: 'area', label: 'Area chart' }, { value: 'pie', label: 'Pie chart' }, { value: 'donut', label: 'Donut chart' },
+  { value: 'combo', label: 'Line and stacked column chart' },
 ];
 
 export function SaveToDashboardModal() {
@@ -84,7 +85,7 @@ export function SaveToDashboardModal() {
             <p className="muted-copy">Widgets stay linked to the successful job and SQL execution. Leave the title blank to let the backend use the originating question.</p>
             <SingleSelect label="Dashboard" value={values.dashboardId} onChange={(value) => setValues((current) => ({ ...current, dashboardId: value }))} options={[{ value: '__new__', label: 'Create a new dashboard' }, ...(dashboards.data ?? []).map((dashboard) => ({ value: dashboard.id, label: dashboard.title }))]}/>
             {values.dashboardId === '__new__' ? <FormField label="New dashboard title" value={newDashboardTitle} onChange={(event) => setNewDashboardTitle(event.target.value)}/> : null}
-            <SingleSelect label="Widget type" value={values.widgetType} onChange={(value) => setValues((current) => ({ ...current, widgetType: value as WidgetType }))} options={widgetOptions}/>
+            <SingleSelect label="Widget type" value={values.widgetType} onChange={(value) => setValues((current) => ({ ...current, widgetType: value as WidgetType, ...(value === 'combo' ? { orientation: 'vertical', stacked: true } : {}) }))} options={widgetOptions}/>
             <FormField label="Widget title (optional)" value={values.title} onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}/>
             <WidgetMappingFields widgetType={values.widgetType} columns={source.columns} values={values} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))}/>
             <div className="save-source-summary"><span>{source.columns.length} source columns</span><code>{sourceSqlExecutionId}</code></div>

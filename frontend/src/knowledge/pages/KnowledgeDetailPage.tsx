@@ -115,16 +115,16 @@ export function KnowledgeDetailPage() {
         <div>
           <Link
             to="/knowledge"
-            className="inline-flex items-center gap-1 text-xs text-[#8B848C] hover:text-[#4B123F] mb-1 font-medium"
+            className="inline-flex items-center gap-1 text-xs text-[var(--db-text-muted)] hover:text-[var(--db-primary)] mb-1 font-medium"
           >
             <ArrowLeft size={12} />
             <span>Back to Knowledge</span>
           </Link>
           <div className="flex items-center gap-2">
-            <BrainCircuit size={22} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">{source.data.name} Knowledge Base</h1>
+            <BrainCircuit size={22} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">{source.data.name} Knowledge Base</h1>
           </div>
-          <p className="text-xs text-[#625C64]">
+          <p className="text-xs text-[var(--db-text-secondary)]">
             Schema index, semantic table documentation, and business domain annotations.
           </p>
         </div>
@@ -135,7 +135,7 @@ export function KnowledgeDetailPage() {
             <button
               type="button"
               disabled={generate.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors disabled:opacity-50"
               onClick={() => generate.mutate()}
             >
               <RefreshCw size={13} className={generate.isPending ? 'animate-spin' : ''} />
@@ -154,8 +154,8 @@ export function KnowledgeDetailPage() {
         />
       ) : (
         <>
-          <div className="p-4 bg-[#FFFDFC] border border-[#DAD5CD] rounded-md my-4">
-            <h2 className="text-sm font-semibold text-[#252127] pb-2 mb-3 border-b border-[#E7E3DC]">
+          <div className="p-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-md my-4">
+            <h2 className="text-sm font-semibold text-[var(--db-text-primary)] pb-2 mb-3 border-b border-[var(--db-border-subtle)]">
               Compact Index
             </h2>
             {index.isLoading ? (
@@ -163,7 +163,7 @@ export function KnowledgeDetailPage() {
             ) : index.data ? (
               <MarkdownDocument>{index.data.content_markdown}</MarkdownDocument>
             ) : (
-              <p className="text-xs text-[#8B848C]">Index unavailable.</p>
+              <p className="text-xs text-[var(--db-text-muted)]">Index unavailable.</p>
             )}
           </div>
 

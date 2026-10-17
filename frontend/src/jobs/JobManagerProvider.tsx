@@ -128,7 +128,7 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
                         ...current,
                         [jobId]: {
                             ...item,
-                            events: appendJobEvent(item.events, event).slice(-300),
+                            events: appendJobEvent(item.events, event),
                             lastSeenSequence: event.sequence,
                             connectionState: 'connected',
                         },

@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "renderer": "frontend",
+  "totals_source": "sql",
+  "source_sql_execution_id": "33333333-3333-4333-8333-333333333333",
+  "spec": {
+    "sql_execution_id": "33333333-3333-4333-8333-333333333333",
+    "title": "Sensor averages",
+    "rows": [
+      {
+        "field": "team",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "text",
+        "descending": false
+      },
+      {
+        "field": "device",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "text",
+        "descending": false
+      }
+    ],
+    "columns": [
+      {
+        "field": "year",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "number",
+        "descending": false
+      },
+      {
+        "field": "month",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "number",
+        "descending": false
+      }
+    ],
+    "measures": [
+      {
+        "field": "mean_reading",
+        "label": null,
+        "decimal_places": 2,
+        "format": "number"
+      }
+    ],
+    "row_depth_field": "rd",
+    "column_depth_field": "cd",
+    "show_row_subtotals": true,
+    "show_row_grand_total": true,
+    "show_column_subtotals": true,
+    "show_column_grand_total": true,
+    "initial_expansion_depth": 1
+  },
+  "row_nodes": [
+    {
+      "id": "rff430854e2bac77a4ab28a1d",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "A"
+      ],
+      "label": "A"
+    },
+    {
+      "id": "rafb8189bb0ba6f61b68bfe75",
+      "parent_id": "rff430854e2bac77a4ab28a1d",
+      "depth": 2,
+      "path": [
+        "A",
+        "x"
+      ],
+      "label": "x"
+    },
+    {
+      "id": "rcc5af8bdde019c8cfb2cd440",
+      "parent_id": "rff430854e2bac77a4ab28a1d",
+      "depth": 2,
+      "path": [
+        "A",
+        "y"
+      ],
+      "label": "y"
+    },
+    {
+      "id": "r47e45ef0866592af4f6d190c",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "B"
+      ],
+      "label": "B"
+    },
+    {
+      "id": "r4fe4170e35e72a5f5f909810",
+      "parent_id": "r47e45ef0866592af4f6d190c",
+      "depth": 2,
+      "path": [
+        "B",
+        "z"
+      ],
+      "label": "z"
+    },
+    {
+      "id": "r4f53cda18c2baa0c0354bb5f",
+      "parent_id": null,
+      "depth": 0,
+      "path": [],
+      "label": "Grand total"
+    }
+  ],
+  "column_nodes": [
+    {
+      "id": "c727500c6c52ab7e867cf5864",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        2026
+      ],
+      "label": "2026"
+    },
+    {
+      "id": "c47fae06aea5bcddc7e924465",
+      "parent_id": "c727500c6c52ab7e867cf5864",
+      "depth": 2,
+      "path": [
+        2026,
+        1
+      ],
+      "label": "1"
+    },
+    {
+      "id": "c7468cf3b47320454fa34dc89",
+      "parent_id": "c727500c6c52ab7e867cf5864",
+      "depth": 2,
+      "path": [
+        2026,
+        2
+      ],
+      "label": "2"
+    },
+    {
+      "id": "c4f53cda18c2baa0c0354bb5f",
+      "parent_id": null,
+      "depth": 0,
+      "path": [],
+      "label": "Grand total"
+    }
+  ],
+  "cells": [
+    {
+      "row_id": "r47e45ef0866592af4f6d190c",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r47e45ef0866592af4f6d190c",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r47e45ef0866592af4f6d190c",
+      "column_id": "c7468cf3b47320454fa34dc89",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c47fae06aea5bcddc7e924465",
+      "values": [
+        "43.333333333333336"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "33.75"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "33.75"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c7468cf3b47320454fa34dc89",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r4fe4170e35e72a5f5f909810",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r4fe4170e35e72a5f5f909810",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "r4fe4170e35e72a5f5f909810",
+      "column_id": "c7468cf3b47320454fa34dc89",
+      "values": [
+        "5.0"
+      ]
+    },
+    {
+      "row_id": "rafb8189bb0ba6f61b68bfe75",
+      "column_id": "c47fae06aea5bcddc7e924465",
+      "values": [
+        "15.0"
+      ]
+    },
+    {
+      "row_id": "rafb8189bb0ba6f61b68bfe75",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "15.0"
+      ]
+    },
+    {
+      "row_id": "rafb8189bb0ba6f61b68bfe75",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "15.0"
+      ]
+    },
+    {
+      "row_id": "rcc5af8bdde019c8cfb2cd440",
+      "column_id": "c47fae06aea5bcddc7e924465",
+      "values": [
+        "100.0"
+      ]
+    },
+    {
+      "row_id": "rcc5af8bdde019c8cfb2cd440",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "100.0"
+      ]
+    },
+    {
+      "row_id": "rcc5af8bdde019c8cfb2cd440",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "100.0"
+      ]
+    },
+    {
+      "row_id": "rff430854e2bac77a4ab28a1d",
+      "column_id": "c47fae06aea5bcddc7e924465",
+      "values": [
+        "43.333333333333336"
+      ]
+    },
+    {
+      "row_id": "rff430854e2bac77a4ab28a1d",
+      "column_id": "c4f53cda18c2baa0c0354bb5f",
+      "values": [
+        "43.333333333333336"
+      ]
+    },
+    {
+      "row_id": "rff430854e2bac77a4ab28a1d",
+      "column_id": "c727500c6c52ab7e867cf5864",
+      "values": [
+        "43.333333333333336"
+      ]
+    }
+  ],
+  "source_row_count": 19,
+  "source_digest": "823fbc9a87ca9b98da5620b1b0ff0f414e892217ceba8a01bc3f5b3ccb92fd2c"
+}

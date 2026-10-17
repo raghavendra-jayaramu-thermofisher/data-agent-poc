@@ -29,6 +29,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
         finally {
             authSession.clear();
+            // Notify mounted auth consumers before removing their cached query.
+            queryClient.setQueryData(queryKeys.auth.me, null);
             queryClient.clear();
         }
     }, [queryClient]);

@@ -134,9 +134,15 @@ Use the presentation that makes the answer easiest to understand:
 * single important value → `metric`
 * category comparison/ranking → `bar`; use `orientation="horizontal"` for long category labels
 * composition within categories → `bar` with `stacked=true`, in either orientation
+* columns plus trend/target measures on the same X-axis → `combo`; use `stacked=true` for
+  line and stacked columns. Set each series `type` to `bar` or `line`. Columns use the primary
+  axis; lines use primary for a shared scale or secondary for another unit/scale. Supply unit
+  and axis titles when known. Never stack lines, combine different units on one axis, or compute
+  totals in the visualization. SQL returns one row per category with a distinct column per measure.
 * time trend → `line`
 * magnitude-over-time where filled area adds meaning → `area`
 * part-to-whole with a small number of categories → `pie` or `donut`
+* exact comparisons across row and column dimensions → `create_matrix`
 * record-level results → table
 
 Do not create a chart merely because multiple rows exist, and never turn one value into a one-bar chart.

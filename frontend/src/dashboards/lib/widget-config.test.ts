@@ -9,6 +9,8 @@ import {
 } from './widget-config';
 import type { DashboardWidget } from '../api/dashboard-api';
 import type { SaveWidgetValues } from '../schemas/dashboard-schemas';
+import comboFixture from '../../../../test-fixtures/combo-chart.json';
+import { chartModelForWidget } from './dashboard-artifacts';
 
 const trace: ExecutionTrace = {
   tools: [],
@@ -62,6 +64,71 @@ function values(widgetType: SaveWidgetValues['widgetType']): SaveWidgetValues {
 }
 
 describe('dashboard widget configuration', () => {
+  it('preserves combo roles, units, scales and labels through save, edit and refresh rendering', () => {
+    const columns = Object.keys(comboFixture.data[0]!);
+    const source = findSaveSource(
+      {
+        ...trace,
+        artifacts: [
+          {
+            ...trace.artifacts![0]!,
+            payload: {
+              ...trace.artifacts![0]!.payload,
+              columns,
+              rows: comboFixture.data.map((row) =>
+                columns.map((column) => (row as Record<string, unknown>)[column]),
+              ),
+            },
+          },
+          { ...trace.artifacts![1]!, payload: { ...comboFixture, source_sql_execution_id: 's1' } },
+        ],
+      },
+      'chart',
+      's1',
+    )!;
+    expect(source.defaultWidgetType).toBe('combo');
+    const mapping = { ...values('bar'), widgetType: source.defaultWidgetType, ...source.defaults };
+    expect(validateWidgetMapping(mapping, columns)).toBeNull();
+    const saved = buildWidgetCreate(mapping, 'j1', 's1');
+    expect(saved.visualization_config!.series).toEqual(comboFixture.encoding.series);
+    const widget: DashboardWidget = {
+      id: 'widget1',
+      widget_type: 'combo',
+      visualization_config: saved.visualization_config!,
+      title: comboFixture.title,
+      data_source_id: 'ds1',
+      sql_text: 'SELECT fixture',
+      dashboard_id: 'd1',
+      created_from_job_id: 'j1',
+      enabled: true,
+      last_refresh_job_id: null,
+      last_refreshed_at: null,
+      layout_config: {},
+      question: null,
+      created_from_sql_execution_id: 's1',
+      created_at: '',
+      updated_at: '',
+      latest_artifact: {
+        id: 'latest',
+        kind: 'chart',
+        source_sql_execution_id: 's1',
+        created_at: '2026-10-17T00:00:00Z',
+        payload: { ...comboFixture, source_sql_execution_id: 's1' },
+      },
+    };
+    const editable = widgetValuesFromConfig(widget);
+    expect(buildVisualizationConfig(editable)).toEqual(saved.visualization_config);
+    const chart = chartModelForWidget(widget, 'Warehouse');
+    expect(chart?.chartType).toBe('combo');
+    if (chart?.chartType !== 'combo') throw new Error('Expected combo');
+    expect(chart.series.map((item) => item.axis)).toEqual([
+      'primary',
+      'primary',
+      'secondary',
+      'secondary',
+    ]);
+    expect(chart.secondaryYLabel).toBe('Fulfilment (%)');
+  });
   it('derives chart defaults from a persisted chart but validates against its table source', () => {
     const source = findSaveSource(trace, 'chart', 's1');
     expect(source?.defaultWidgetType).toBe('line');

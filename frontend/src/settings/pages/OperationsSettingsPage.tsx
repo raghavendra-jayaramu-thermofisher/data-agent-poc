@@ -32,9 +32,9 @@ function OperationsContent() {
 
   return (
     <div>
-      <div className="pb-3 mb-4 border-b border-[#DAD5CD]">
-        <h2 className="text-sm font-semibold text-[#252127]">Operational Status</h2>
-        <p className="text-xs text-[#625C64]">Sanitized backend health signals and limits for this workspace.</p>
+      <div className="pb-3 mb-4 border-b border-[var(--db-border-default)]">
+        <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Operational Status</h2>
+        <p className="text-xs text-[var(--db-text-secondary)]">Sanitized backend health signals and limits for this workspace.</p>
       </div>
 
       <div className="analytical-table-shell">
@@ -48,9 +48,9 @@ function OperationsContent() {
           <tbody>
             {entries.map(([key, value]) => (
               <tr key={key}>
-                <td className="font-medium text-xs text-[#252127] capitalize">{key.replaceAll('_', ' ')}</td>
+                <td className="font-medium text-xs text-[var(--db-text-primary)] capitalize">{key.replaceAll('_', ' ')}</td>
                 <td>
-                  <pre className="font-mono text-xs text-[#625C64] whitespace-pre-wrap">{displayValue(value)}</pre>
+                  <pre className="font-mono text-xs text-[var(--db-text-secondary)] whitespace-pre-wrap">{displayValue(value)}</pre>
                 </td>
               </tr>
             ))}

@@ -65,14 +65,14 @@ export function DashboardsPage() {
             onClick={() => setCreating((value) => !value)}
           >
             {creating ? <X size={14} /> : <Plus size={14} />}
-            <span>{creating ? 'Cancel' : 'New Dashboard'}</span>
+            <span>{creating ? 'Cancel' : 'New dashboard'}</span>
           </button>
         ) : null}
       </div>
 
       {creating && (
         <div className="p-5 mb-6 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg shadow-xs">
-          <h2 className="text-sm font-semibold text-[var(--db-text-primary)] mb-3">Create New Dashboard</h2>
+          <h2 className="text-sm font-semibold text-[var(--db-text-primary)] mb-3">Create new dashboard</h2>
           <DashboardForm
             submitLabel="Create dashboard"
             onCancel={() => setCreating(false)}
@@ -144,7 +144,7 @@ export function DashboardsPage() {
             <span>Create your first dashboard</span>
           </button>
           <div className="mt-8 pt-5 border-t border-[var(--db-border-subtle)] text-[11px] text-[var(--db-text-muted)] max-w-xs text-center">
-            💡 <strong>Tip:</strong> While asking questions to the Data Agent, click <strong>"Save to Dashboard"</strong> under any generated chart or table to add widgets instantly.
+            💡 <strong>Tip:</strong> While asking questions to the Data Agent, click <strong>"Save to dashboard"</strong> under any generated chart or table to add widgets instantly.
           </div>
         </div>
       ) : null}

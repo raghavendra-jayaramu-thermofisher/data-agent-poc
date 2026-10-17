@@ -113,7 +113,7 @@ export function DashboardDetailPage() {
             onClick={() => setEditing((value) => !value)}
           >
             <Edit size={13} />
-            <span>{editing ? 'Close Edit' : 'Edit Dashboard'}</span>
+            <span>{editing ? 'Close editor' : 'Edit dashboard'}</span>
           </button>
 
           <button
@@ -127,14 +127,14 @@ export function DashboardDetailPage() {
             }}
           >
             <RefreshCw size={13} className={dashboardRefreshing ? 'animate-spin' : ''} />
-            <span>Refresh All</span>
+            <span>Refresh all</span>
           </button>
 
           <ConfirmationDialog
             triggerLabel="Delete"
             title="Delete dashboard?"
             description="This removes the dashboard and all saved widgets. Source analyses and SQL executions remain available."
-            confirmLabel="Delete Dashboard"
+            confirmLabel="Delete dashboard"
             onConfirm={() =>
               void (async () => {
                 await deleteDashboard(item.id);
@@ -151,7 +151,7 @@ export function DashboardDetailPage() {
         <div className="p-5 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg shadow-xs mb-6">
           <DashboardForm
             initial={{ title: item.title, description: item.description ?? '' }}
-            submitLabel="Save Dashboard"
+            submitLabel="Save dashboard"
             onCancel={() => setEditing(false)}
             onSubmit={async (values) => {
               await updateDashboard(item.id, {

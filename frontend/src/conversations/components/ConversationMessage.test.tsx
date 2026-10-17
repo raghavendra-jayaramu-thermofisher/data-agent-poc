@@ -42,6 +42,17 @@ const assistantMessage: Message = {
 };
 
 describe('ConversationMessage', () => {
+  it('identifies the sender with their generated avatar without repeating their name', () => {
+    render(<ConversationMessage message={{ ...assistantMessage, role: 'user', job_id: null, content: 'Show orders' }} senderName="Alex Morgan" />);
+    expect(screen.getByRole('img', { name: 'Alex Morgan avatar' })).toHaveTextContent('AM');
+    expect(screen.queryByText('Alex Morgan')).not.toBeInTheDocument();
+    expect(screen.getByText('Show orders')).toHaveClass('user-bubble');
+  });
+
+  it('uses the application logo to identify assistant responses', () => {
+    renderMessage({ ...assistantMessage, job_id: null });
+    expect(screen.getByRole('img', { name: 'Data Agent' })).toHaveAttribute('viewBox', '0 0 24 24');
+  });
   const renderMessage = (message: Message) =>
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -161,7 +172,7 @@ describe('ConversationMessage', () => {
     },
   );
 
-  it('keeps the question and answer while hiding author labels and timestamps', () => {
+  it('keeps sender identity and answer content without adding timestamp metadata', () => {
     const { rerender } = renderMessage({
       ...assistantMessage,
       role: 'user',
@@ -175,7 +186,8 @@ describe('ConversationMessage', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByText('Revenue declined 8%.')).toBeInTheDocument();
-    expect(screen.queryByText('Data Agent')).not.toBeInTheDocument();
+    expect(screen.getByText('Data Agent')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Data Agent' })).toBeInTheDocument();
     expect(document.querySelector('.assistant-card time')).toBeNull();
   });
 

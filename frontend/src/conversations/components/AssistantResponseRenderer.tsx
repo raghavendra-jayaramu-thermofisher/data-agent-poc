@@ -41,6 +41,7 @@ export function AssistantResponseRenderer({
     <AnswerNavigation
       key={presenting ? 'presenting' : 'conversation'}
       content={markdown}
+      showIdentity={!presenting}
       onSectionChange={onSectionChange}
       selectedKey={selectedSection}
       onSelectedKeyChange={onSelectedSectionChange}
@@ -56,7 +57,7 @@ export function AssistantResponseRenderer({
               return (
                 <div
                   key={`artifact-${segment.artifactId}`}
-                  className="my-3 p-3 border border-[#DAD5CD] bg-[#FBFAF7] text-xs text-[#8B848C]"
+                  className="my-3 p-3 border border-[var(--db-border-default)] bg-[var(--db-surface)] text-xs text-[var(--db-text-muted)]"
                   role="status"
                 >
                   Loading output…
@@ -67,7 +68,7 @@ export function AssistantResponseRenderer({
               return (
                 <div
                   key={`artifact-${segment.artifactId}`}
-                  className="my-3 p-3 border border-[#DAD5CD] bg-[#F7E7E5] text-xs text-[#625C64]"
+                  className="my-3 p-3 border border-[var(--db-border-default)] bg-[var(--db-danger-soft)] text-xs text-[var(--db-text-secondary)]"
                   role="status"
                 >
                   <strong>Output unavailable</strong>

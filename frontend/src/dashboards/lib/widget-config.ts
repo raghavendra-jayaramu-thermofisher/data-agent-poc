@@ -1,5 +1,6 @@
 import type { ExecutionTrace, JobArtifact } from '../../agent/api/execution-api';
 import { parseTableArtifact } from '../../agent/lib/artifacts';
+import { validComboSeries } from '../../charts/chart-domain';
 import type { DashboardWidget, DashboardWidgetCreate } from '../api/dashboard-api';
 import type {
   SaveWidgetValues,
@@ -25,8 +26,19 @@ function text(value: unknown): string | null {
 }
 function isWidgetType(value: string | null): value is WidgetType {
   return (
-    value != null && ['metric', 'table', 'bar', 'line', 'area', 'pie', 'donut'].includes(value)
+    value != null &&
+    ['metric', 'table', 'bar', 'line', 'area', 'pie', 'donut', 'combo'].includes(value)
   );
+}
+
+function readSeries(item: Record<string, unknown> | null) {
+  return {
+    field: text(item?.field) ?? '',
+    label: text(item?.label) ?? undefined,
+    ...(text(item?.unit) ? { unit: text(item?.unit)! } : {}),
+    ...(item?.type === 'bar' || item?.type === 'line' ? { type: item.type } : {}),
+    ...(item?.axis === 'primary' || item?.axis === 'secondary' ? { axis: item.axis } : {}),
+  } as NonNullable<WidgetMappingValues['series']>[number];
 }
 
 export function findSaveSource(
@@ -61,12 +73,11 @@ export function findSaveSource(
         ? encoding.series.map(object).filter(Boolean)
         : [];
       defaults.valueField = text(series[0]?.field) ?? '';
-      defaults.series = series.map((item) => ({
-        field: text(item?.field) ?? '',
-        label: text(item?.label) ?? undefined,
-      }));
+      defaults.series = series.map(readSeries);
       defaults.orientation = payload?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
       defaults.stacked = payload?.stacked === true;
+      defaults.yLabel = text(payload?.y_label) ?? '';
+      defaults.secondaryYLabel = text(payload?.secondary_y_label) ?? '';
     }
   }
   return {
@@ -100,6 +111,8 @@ export function validateWidgetMapping(values: SaveWidgetValues, columns: string[
   if (new Set(fields).size !== fields.length)
     return 'Each series must use a different value field.';
   if (fields.includes(values.xField)) return 'X-axis and value fields must be different.';
+  if (values.widgetType === 'combo' && !validComboSeries(values.series ?? []))
+    return 'Choose at least one column and one line. Columns use the primary axis; measures on each axis must share a unit.';
   return null;
 }
 
@@ -151,10 +164,9 @@ export function widgetValuesFromConfig(
     categoryField: text(config.category_field) ?? '',
     orientation: config.orientation === 'horizontal' ? 'horizontal' : 'vertical',
     stacked: config.stacked === true,
-    series: series.map((item) => ({
-      field: text(item?.field) ?? '',
-      label: text(item?.label) ?? undefined,
-    })),
+    series: series.map(readSeries),
+    yLabel: text(config.y_label) ?? '',
+    secondaryYLabel: text(config.secondary_y_label) ?? '',
   };
 }
 
@@ -173,10 +185,21 @@ export function buildVisualizationConfig(
     x_field: values.xField,
     x_label: values.xField,
     series: values.series?.length
-      ? values.series
+      ? values.series.map((item) =>
+          values.widgetType === 'combo'
+            ? item
+            : { field: item.field, label: item.label, ...(item.unit ? { unit: item.unit } : {}) },
+        )
       : [{ field: values.valueField, label: values.valueField }],
-    ...(values.widgetType === 'bar'
-      ? { orientation: values.orientation ?? 'vertical', stacked: values.stacked ?? false }
+    ...(values.widgetType === 'bar' || values.widgetType === 'combo'
+      ? {
+          orientation:
+            values.widgetType === 'combo' ? 'vertical' : (values.orientation ?? 'vertical'),
+          stacked: values.stacked ?? false,
+        }
+      : {}),
+    ...(values.widgetType === 'combo'
+      ? { y_label: values.yLabel || null, secondary_y_label: values.secondaryYLabel || null }
       : {}),
   };
 }

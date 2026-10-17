@@ -136,13 +136,13 @@ def _valid_chart_artifact(payload: dict[str, object], source: SQLExecution | Non
     ):
         return False
     chart_type = payload.get("chart_type")
-    if chart_type not in {"bar", "line", "area", "pie", "donut", "metric"}:
+    if chart_type not in {"bar", "line", "area", "pie", "donut", "metric", "combo"}:
         return False
     orientation = payload.get("orientation", "vertical")
     stacked = payload.get("stacked", False)
     if orientation not in ("vertical", "horizontal") or not isinstance(stacked, bool):
         return False
-    if chart_type != "bar" and (orientation != "vertical" or stacked):
+    if chart_type not in {"bar", "combo"} and (orientation != "vertical" or stacked):
         return False
     data = payload.get("data")
     encoding = payload.get("encoding")
@@ -150,6 +150,33 @@ def _valid_chart_artifact(payload: dict[str, object], source: SQLExecution | Non
         return False
     if not isinstance(encoding, dict):
         return False
+    if chart_type == "combo":
+        if source.truncated:
+            return False
+        # Reuse the creation contract for saved artifacts and final-answer evidence.
+        from pydantic import ValidationError
+
+        from app.agent.tool_schemas import CreateChartArgs
+        from app.agent.tools import AgentToolError, build_frontend_chart_payload
+
+        try:
+            spec = CreateChartArgs(
+                sql_execution_id=source.id,
+                chart_type="combo",
+                title=payload.get("title"),
+                x_field=(encoding.get("x") or {}).get("field"),
+                series=encoding.get("series"),
+                orientation=orientation,
+                stacked=stacked,
+                y_label=payload.get("y_label"),
+                secondary_y_label=payload.get("secondary_y_label"),
+            )
+            columns = list(source.columns or [])
+            build_frontend_chart_payload(
+                spec, columns, [[row.get(column) for column in columns] for row in data]
+            )
+        except (ValidationError, AgentToolError, TypeError, AttributeError, ValueError):
+            return False
 
     def encoded_field(value: object) -> str | None:
         if not isinstance(value, dict):
@@ -293,6 +320,19 @@ async def collect_evidence(
             valid = source_ok and _valid_table_artifact(payload, source)
         elif artifact_item.kind == "chart":
             valid = source_ok and _valid_chart_artifact(payload, source)
+        elif artifact_item.kind == "matrix":
+            from app.agent.matrix import validate_stored_matrix
+
+            table = tables_by_sql.get(artifact_item.source_sql_execution_id)
+            valid = False
+            if (
+                source is not None
+                and table is not None
+                and _valid_table_artifact(table.payload, source)
+            ):
+                valid = validate_stored_matrix(
+                    payload, source.id, table.payload, truncated=source.truncated
+                )
         elif artifact_item.kind == "html":
             valid = bool(
                 source_ok
@@ -347,7 +387,7 @@ def mark_visible_artifacts(
     seen_renderables: set[str] = set()
     for artifact_evidence in artifacts:
         visible = False
-        if artifact_evidence.valid and artifact_evidence.kind == "chart":
+        if artifact_evidence.valid and artifact_evidence.kind in {"chart", "matrix"}:
             signature = _renderable_signature(artifact_evidence)
             if signature not in seen_renderables:
                 seen_renderables.add(signature)

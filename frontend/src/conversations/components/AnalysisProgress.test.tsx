@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ManagedJob } from '../../jobs/types';
 import { AnalysisProgress } from './AnalysisProgress';
@@ -64,12 +64,17 @@ describe('AnalysisProgress', () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it('shows event progress and updates elapsed time every second', () => {
+  it('shows only the current step by default and updates elapsed time without expanding logs', () => {
     render(<AnalysisProgress managedJob={managedJob} onCancel={() => undefined} />);
 
-    expect(screen.getByText('Analyzing your data')).toBeInTheDocument();
     expect(screen.getByText('Executing SQL…')).toBeInTheDocument();
-    expect(screen.getByText('Queued')).toBeInTheDocument();
+    expect(screen.queryByText('Queued')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Analysis activity' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show analysis activity' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(screen.getByLabelText('8 seconds elapsed')).toHaveTextContent('8s');
 
     act(() => vi.advanceTimersByTime(2000));
@@ -85,7 +90,7 @@ describe('AnalysisProgress', () => {
     expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled();
   });
 
-  it('freezes completed SQL timing and shows answer preparation as the active phase', () => {
+  it('expands the full event history, preserving repeated labels and fixed event times', () => {
     const completedSqlJob: ManagedJob = {
       ...managedJob,
       events: [
@@ -104,18 +109,111 @@ describe('AnalysisProgress', () => {
           payload: { tool_execution_id: 'tool-1' },
           created_at: '2026-09-16T12:00:05.200Z',
         },
+        {
+          sequence: 7,
+          event_type: 'sql.started',
+          level: 'info',
+          payload: {},
+          created_at: '2026-09-16T12:00:06.000Z',
+        },
+        {
+          sequence: 8,
+          event_type: 'finalization.started',
+          level: 'info',
+          payload: {},
+          created_at: '2026-09-16T12:00:07.000Z',
+        },
       ],
-      lastSeenSequence: 6,
+      lastSeenSequence: 8,
     };
 
     render(<AnalysisProgress managedJob={completedSqlJob} onCancel={() => undefined} />);
 
-    expect(screen.getByText('Preparing answer…')).toBeInTheDocument();
-    expect(screen.getByText('SQL completed').closest('li')).toHaveTextContent('<1s');
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing final answer…');
+    fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
+    const history = screen.getByRole('region', { name: 'Analysis activity' });
+    expect(within(history).getAllByRole('listitem')).toHaveLength(8);
+    expect(within(history).getAllByText('Executing SQL…')).toHaveLength(2);
+    expect(within(history).getByText('Queued')).toBeInTheDocument();
+    expect(within(history).getByText('SQL completed').closest('li')).toHaveTextContent('5s');
 
     act(() => vi.advanceTimersByTime(5000));
-    expect(screen.getByText('SQL completed').closest('li')).toHaveTextContent('<1s');
-    const preparingStep = screen.getByText('Preparing answer…').closest('li');
-    expect(preparingStep).toHaveTextContent('7s');
+    expect(within(history).getByText('SQL completed').closest('li')).toHaveTextContent('5s');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide analysis activity' }));
+    expect(screen.queryByRole('region', { name: 'Analysis activity' })).not.toBeInTheDocument();
+  });
+
+  it('follows real incoming steps without inventing an answer preparation phase', () => {
+    const { rerender } = render(
+      <AnalysisProgress managedJob={managedJob} onCancel={() => undefined} />,
+    );
+    rerender(
+      <AnalysisProgress
+        managedJob={{
+          ...managedJob,
+          events: [
+            ...managedJob.events,
+            {
+              sequence: 5,
+              event_type: 'sql.completed',
+              level: 'info',
+              payload: {},
+              created_at: '2026-09-16T12:00:06.000Z',
+            },
+          ],
+        }}
+        onCancel={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('SQL completed');
+    expect(screen.queryByText('Preparing answer…')).not.toBeInTheDocument();
+  });
+
+  it('handles a queued job without events', () => {
+    render(
+      <AnalysisProgress
+        managedJob={{ ...managedJob, job: { ...managedJob.job, status: 'queued' }, events: [] }}
+        onCancel={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Waiting to start…');
+    fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
+    expect(screen.getByText('Waiting for activity…')).toBeInTheDocument();
+  });
+
+  it('offers retry after cancellation fails', async () => {
+    const onCancel = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(undefined);
+    render(<AnalysisProgress managedJob={managedJob} onCancel={onCancel} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop' })));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not stop the analysis');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop' })));
+    expect(onCancel).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('includes unrecognized events without displaying raw payloads', () => {
+    render(
+      <AnalysisProgress
+        managedJob={{
+          ...managedJob,
+          events: [
+            {
+              sequence: 1,
+              event_type: 'internal.trace',
+              level: 'info',
+              payload: { secret: 'private-value' },
+              created_at: managedJob.job.created_at,
+            },
+          ],
+        }}
+        onCancel={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
+    expect(screen.getByText('Analysis update')).toBeInTheDocument();
+    expect(screen.queryByText('private-value')).not.toBeInTheDocument();
   });
 });

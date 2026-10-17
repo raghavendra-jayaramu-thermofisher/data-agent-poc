@@ -45,7 +45,7 @@ export function DataSourcesPage() {
         {canManage && (
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors"
             onClick={() => navigate('/data-sources/new')}
           >
             <Plus size={14} />
@@ -72,20 +72,20 @@ export function DataSourcesPage() {
                   <td>
                     <Link
                       to={`/data-sources/${source.id}`}
-                      className="font-medium text-[#4B123F] hover:underline flex items-center gap-1.5"
+                      className="font-medium text-[var(--db-primary)] hover:underline flex items-center gap-1.5"
                     >
-                      <Database size={13} className="text-[#8B848C]" />
+                      <Database size={13} className="text-[var(--db-text-muted)]" />
                       <span>{source.name}</span>
                     </Link>
                   </td>
-                  <td className="text-[#625C64]">{displayType(source.display_type)}</td>
+                  <td className="text-[var(--db-text-secondary)]">{displayType(source.display_type)}</td>
                   <td>
                     <StatusChip status={source.status} />
                   </td>
-                  <td className="text-[#625C64]">
+                  <td className="text-[var(--db-text-secondary)]">
                     {source.last_tested_at ? formatLocalDateTime(source.last_tested_at) : 'Never'}
                   </td>
-                  <td className="text-[#625C64]">{formatLocalDateTime(source.updated_at)}</td>
+                  <td className="text-[var(--db-text-secondary)]">{formatLocalDateTime(source.updated_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -103,7 +103,7 @@ export function DataSourcesPage() {
             canManage ? (
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
                 onClick={() => navigate('/data-sources/new')}
               >
                 <Plus size={14} />

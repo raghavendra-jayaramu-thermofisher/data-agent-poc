@@ -43,7 +43,7 @@ export function AnswerVerification({ message }: { message: ConversationMessage }
   };
   const badge = saved.verification_status ? labels[saved.verification_status] + (saved.verification_status === 'PARTIALLY_CORRECT' ? ` · ${saved.verification_percentage}%` : '') : 'Not verified';
   const Icon = saved.verification_status === 'CORRECT' ? BadgeCheck : saved.verification_status === 'PARTIALLY_CORRECT' ? BadgeAlert : saved.verification_status === 'INCORRECT' ? BadgeX : ShieldQuestion;
-  const color = saved.verification_status === 'CORRECT' ? 'text-green-700' : saved.verification_status === 'PARTIALLY_CORRECT' ? 'text-amber-700' : saved.verification_status === 'INCORRECT' ? 'text-red-700' : 'text-[#8B848C]';
+  const color = saved.verification_status === 'CORRECT' ? 'text-green-700' : saved.verification_status === 'PARTIALLY_CORRECT' ? 'text-amber-700' : saved.verification_status === 'INCORRECT' ? 'text-red-700' : 'text-[var(--db-text-muted)]';
   const close = () => {
     if (busy) return;
     setOpen(false);
@@ -86,7 +86,7 @@ export function AnswerVerification({ message }: { message: ConversationMessage }
                 </p>
                 {saved.verification_summary && <AssistantMarkdown content={saved.verification_summary} />}
                 {saved.verified_at && (
-                  <p className="text-[#625C64]">
+                  <p className="text-[var(--db-text-secondary)]">
                     Reviewed by {saved.verified_by_name || 'workspace reviewer'} · {formatLocalDateTime(saved.verified_at)}
                   </p>
                 )}

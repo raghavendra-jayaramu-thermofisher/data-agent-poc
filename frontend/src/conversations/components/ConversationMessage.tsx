@@ -10,14 +10,19 @@ import { createAnswerOutline } from './answer-outline';
 import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDetails';
 import type { JobArtifact } from '../../agent/api/execution-api';
 import { formatMarkdownForCopy } from '../../agent/lib/artifact-directives';
+import { UserAvatar } from '../../components/UserAvatar';
 
 export const ConversationMessage = memo(function ConversationMessage({
   message,
+  senderName = 'You',
+  question,
   onFollowUp,
   showSuggestions = false,
   followUpDisabled = false,
 }: {
   message: Message;
+  senderName?: string;
+  question?: string;
   onFollowUp?(question: string): Promise<void> | void;
   showSuggestions?: boolean;
   followUpDisabled?: boolean;
@@ -129,6 +134,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   if (!assistant) {
     return (
       <div className="chat-message-row user" data-message-id={message.id}>
+        <span className="message-avatar"><UserAvatar name={senderName} /></span>
         <div className="user-bubble">{message.content}</div>
       </div>
     );
@@ -197,7 +203,7 @@ export const ConversationMessage = memo(function ConversationMessage({
         aria-label="Copy answer"
         onClick={handleCopy}
       >
-        {copied ? <Check size={16} className="text-[#32745A]" /> : <Copy size={16} />}
+        {copied ? <Check size={16} className="text-[var(--db-success)]" /> : <Copy size={16} />}
       </button>
       <button
         ref={presentButtonRef}
@@ -228,6 +234,7 @@ export const ConversationMessage = memo(function ConversationMessage({
     >
       {presenting ? (
         <header className="assistant-presentation-toolbar" aria-label="Presentation controls">
+          <h1 className="assistant-presentation-title">{question?.trim() || 'Analysis'}</h1>
           {actions}
         </header>
       ) : null}
@@ -253,6 +260,7 @@ export const ConversationMessage = memo(function ConversationMessage({
               <AnswerNavigation
                 key={presenting ? 'presenting' : 'conversation'}
                 content={message.content}
+                showIdentity={!presenting}
                 renderContent={(markdown) => <AssistantMarkdown content={markdown} />}
                 selectedKey={selectedSection}
                 onSelectedKeyChange={setSelectedSection}

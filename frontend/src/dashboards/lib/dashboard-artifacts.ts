@@ -67,12 +67,12 @@ function chartArtifactForWidget(
   widget: DashboardWidget,
   latest: LatestArtifact,
 ): JobArtifact | null {
-  if (!['bar', 'line', 'area', 'pie', 'donut'].includes(widget.widget_type)) return null;
+  if (!['bar', 'line', 'area', 'pie', 'donut', 'combo'].includes(widget.widget_type)) return null;
   if (
     latest.kind === 'chart' &&
     (latest.payload.schema_version !== 1 ||
       latest.payload.renderer !== 'frontend' ||
-      !['bar', 'line', 'area', 'pie', 'donut', 'metric'].includes(
+      !['bar', 'line', 'area', 'pie', 'donut', 'metric', 'combo'].includes(
         String(latest.payload.chart_type),
       ))
   )
@@ -99,9 +99,13 @@ function chartArtifactForWidget(
     title: widget.title,
     data,
   };
-  if (widget.widget_type === 'bar') {
+  if (widget.widget_type === 'bar' || widget.widget_type === 'combo') {
     payload.orientation = config.orientation ?? latest.payload.orientation ?? 'vertical';
     payload.stacked = config.stacked ?? latest.payload.stacked ?? false;
+  }
+  if (widget.widget_type === 'combo') {
+    payload.y_label = config.y_label ?? latest.payload.y_label;
+    payload.secondary_y_label = config.secondary_y_label ?? latest.payload.secondary_y_label;
   }
   if (widget.widget_type === 'pie' || widget.widget_type === 'donut') {
     payload.encoding = {

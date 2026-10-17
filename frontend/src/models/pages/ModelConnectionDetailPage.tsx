@@ -48,16 +48,16 @@ export function ModelConnectionDetailPage() {
         <div>
           <Link
             to="/models"
-            className="inline-flex items-center gap-1 text-xs text-[#8B848C] hover:text-[#4B123F] mb-1 font-medium"
+            className="inline-flex items-center gap-1 text-xs text-[var(--db-text-muted)] hover:text-[var(--db-primary)] mb-1 font-medium"
           >
             <ArrowLeft size={12} />
             <span>Back to Models</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Cpu size={22} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">{item.name}</h1>
+            <Cpu size={22} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">{item.name}</h1>
           </div>
-          <p className="text-xs text-[#625C64] font-mono mt-0.5">{item.base_url}</p>
+          <p className="text-xs text-[var(--db-text-secondary)] font-mono mt-0.5">{item.base_url}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -66,43 +66,43 @@ export function ModelConnectionDetailPage() {
             <button
               type="button"
               disabled={test.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-semibold transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded text-xs font-semibold transition-colors disabled:opacity-50"
               onClick={() => test.mutate()}
             >
               <Activity size={13} className={test.isPending ? 'animate-spin' : ''} />
-              <span>{test.isPending ? 'Testing…' : 'Test Connection'}</span>
+              <span>{test.isPending ? 'Testing…' : 'Test connection'}</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Metadata & Status Card */}
-      <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg p-5 shadow-xs mb-6">
-        <h2 className="text-sm font-semibold text-[#252127] pb-2 mb-3 border-b border-[#E7E3DC]">
-          Connection Status
+      <div className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg p-5 shadow-xs mb-6">
+        <h2 className="text-sm font-semibold text-[var(--db-text-primary)] pb-2 mb-3 border-b border-[var(--db-border-subtle)]">
+          Connection status
         </h2>
         <dl className="grid grid-cols-3 gap-3 text-xs">
-          <dt className="text-[#8B848C] font-semibold uppercase text-[10px]">API Key Status</dt>
-          <dd className="col-span-2 flex items-center gap-1 text-[#252127]">
-            <ShieldCheck size={13} className="text-[#32745A]" />
+          <dt className="text-[var(--db-text-muted)] font-semibold uppercase text-[10px]">API key status</dt>
+          <dd className="col-span-2 flex items-center gap-1 text-[var(--db-text-primary)]">
+            <ShieldCheck size={13} className="text-[var(--db-success)]" />
             <span>{item.has_api_key ? 'Stored securely in backend vault' : 'Not configured'}</span>
           </dd>
 
-          <dt className="text-[#8B848C] font-semibold uppercase text-[10px]">Last Tested</dt>
-          <dd className="col-span-2 text-[#252127]">
+          <dt className="text-[var(--db-text-muted)] font-semibold uppercase text-[10px]">Last tested</dt>
+          <dd className="col-span-2 text-[var(--db-text-primary)]">
             {item.last_tested_at ? formatLocalDateTime(item.last_tested_at) : 'Never'}
           </dd>
 
-          <dt className="text-[#8B848C] font-semibold uppercase text-[10px]">Last Error</dt>
-          <dd className="col-span-2 text-[#625C64]">{item.last_error_code ?? '—'}</dd>
+          <dt className="text-[var(--db-text-muted)] font-semibold uppercase text-[10px]">Last error</dt>
+          <dd className="col-span-2 text-[var(--db-text-secondary)]">{item.last_error_code ?? '—'}</dd>
         </dl>
       </div>
 
       {/* Form Settings Card */}
       {canManage && (
-        <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg p-5 shadow-xs mb-6">
-          <h2 className="text-sm font-semibold text-[#252127] pb-2 mb-4 border-b border-[#E7E3DC]">
-            Endpoint Configuration
+        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg p-5 shadow-xs mb-6">
+          <h2 className="text-sm font-semibold text-[var(--db-text-primary)] pb-2 mb-4 border-b border-[var(--db-border-subtle)]">
+            Endpoint configuration
           </h2>
           <ConnectionEdit
             key={item.id}
@@ -115,14 +115,14 @@ export function ModelConnectionDetailPage() {
         </div>
       )}
 
-      {/* Danger Zone */}
+      {/* Danger zone */}
       {canManage && (
-        <div className="bg-[#FFFDFC] border border-[#A84545]/30 rounded-lg p-5 shadow-xs">
-          <div className="flex items-center gap-2 mb-1 text-[#A84545]">
+        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-danger)]/30 rounded-lg p-5 shadow-xs">
+          <div className="flex items-center gap-2 mb-1 text-[var(--db-danger)]">
             <AlertTriangle size={16} />
-            <h2 className="text-sm font-semibold">Danger Zone</h2>
+            <h2 className="text-sm font-semibold">Danger zone</h2>
           </div>
-          <p className="text-xs text-[#625C64] mb-3">
+          <p className="text-xs text-[var(--db-text-secondary)] mb-3">
             Deleting this connection will affect any AI reasoning profiles routed through it.
           </p>
           <ConfirmationDialog
@@ -178,25 +178,25 @@ function ConnectionEdit({
 
   return (
     <form className="space-y-4 max-w-lg" onSubmit={submit}>
-      <Controller control={control} name="name" render={({ field }) => <FormField label="Connection Name" {...field} error={errors.name?.message} />} />
+      <Controller control={control} name="name" render={({ field }) => <FormField label="Connection name" {...field} error={errors.name?.message} />} />
       <Controller control={control} name="baseUrl" render={({ field }) => <FormField label="Base URL" {...field} error={errors.baseUrl?.message} />} />
       <Controller
         control={control}
         name="apiKey"
         render={({ field }) => (
           <SecretField
-            label="Replace API Key"
+            label="Replace API key"
             {...field}
             autoComplete="new-password"
             error={errors.apiKey?.message}
           />
         )}
       />
-      <p className="text-[11px] text-[#8B848C]">
+      <p className="text-[11px] text-[var(--db-text-muted)]">
         Leave the replacement field blank to keep the stored key.
       </p>
       {errors.root?.message && (
-        <div className="p-2.5 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545]">
+        <div className="p-2.5 bg-[var(--db-danger-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-danger)]">
           {errors.root.message}
         </div>
       )}
@@ -204,18 +204,18 @@ function ConnectionEdit({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors disabled:opacity-50"
         >
           <Save size={13} />
-          <span>{isSubmitting ? 'Saving…' : 'Save Changes'}</span>
+          <span>{isSubmitting ? 'Saving…' : 'Save changes'}</span>
         </button>
         {connection.has_api_key && (
           <button
             type="button"
-            className="px-3 py-1.5 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#625C64] border border-[#DAD5CD] rounded text-xs font-medium transition-colors"
+            className="px-3 py-1.5 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-secondary)] border border-[var(--db-border-default)] rounded text-xs font-medium transition-colors"
             onClick={() => void api.updateConnection(connection.id, { clear_api_key: true }).then(onSaved)}
           >
-            Clear Stored Key
+            Clear stored key
           </button>
         )}
       </div>

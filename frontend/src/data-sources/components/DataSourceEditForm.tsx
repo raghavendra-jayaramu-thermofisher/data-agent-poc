@@ -379,7 +379,7 @@ export function DataSourceEditForm({
             variant="secondary"
             isDisabled={isSubmitting}
           >
-            Save &amp; Test Connection
+            Save and test connection
           </Button>
         )}
       </div>

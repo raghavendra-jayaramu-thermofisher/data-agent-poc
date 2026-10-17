@@ -21,6 +21,7 @@ function primitive(value: unknown): string | number | null {
 
 export function compatibleChartTypes(model: ChartableModel): CartesianChartType[] {
   if (isCircularChart(model)) return [];
+  if (model.chartType === 'combo') return ['combo'];
   if (model.stacked || model.orientation === 'horizontal') return ['bar'];
   return ['line', 'bar', 'area'];
 }

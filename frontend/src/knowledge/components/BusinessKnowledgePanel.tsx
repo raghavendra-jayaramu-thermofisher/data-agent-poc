@@ -48,31 +48,31 @@ export function BusinessKnowledgePanel({
   };
 
   return (
-    <div className="detail-panel my-6 bg-[#FFFDFC] border border-[#DAD5CD] rounded-xl p-5 shadow-xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-[#E7E3DC]">
+    <div className="detail-panel my-6 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-xl p-5 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--db-border-subtle)]">
         <div className="flex items-center gap-2">
-          <BookOpen size={18} className="text-[#4B123F]" />
-          <h2 className="text-base font-semibold text-[#252127] m-0">Business Knowledge Annotations</h2>
+          <BookOpen size={18} className="text-[var(--db-primary)]" />
+          <h2 className="text-base font-semibold text-[var(--db-text-primary)] m-0">Business Knowledge Annotations</h2>
         </div>
         <div className="flex items-center gap-2">
           {annotations.length > 0 && (
             <button
               type="button"
               onClick={toggleAll}
-              className="inline-flex items-center gap-1 text-xs text-[#4B123F] hover:text-[#3F0E35] font-medium px-2 py-1 rounded hover:bg-[#F4E8F0] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs text-[var(--db-primary)] hover:text-[var(--db-primary-hover)] font-medium px-2 py-1 rounded hover:bg-[var(--db-primary-soft)] transition-colors cursor-pointer"
             >
               <ChevronsUpDown size={13} />
               <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
             </button>
           )}
-          <span className="text-xs font-mono px-2 py-0.5 bg-[#F0EEE9] text-[#625C64] rounded font-medium border border-[#DAD5CD]">
+          <span className="text-xs font-mono px-2 py-0.5 bg-[var(--db-surface-muted)] text-[var(--db-text-secondary)] rounded font-medium border border-[var(--db-border-default)]">
             {annotations.length} annotation{annotations.length === 1 ? '' : 's'}
           </span>
           {canManage && (
             <button
               type="button"
               onClick={() => setIsAdding((prev) => !prev)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] text-xs font-semibold rounded transition-colors cursor-pointer ml-1"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] text-xs font-semibold rounded transition-colors cursor-pointer ml-1"
             >
               {isAdding ? <X size={12} /> : <Plus size={12} />}
               <span>{isAdding ? 'Close form' : 'Add Knowledge'}</span>
@@ -82,8 +82,8 @@ export function BusinessKnowledgePanel({
       </div>
 
       {canManage && isAdding && (
-        <div className="mb-6 pb-6 border-b border-[#E7E3DC] bg-[#FBFAF7] p-4 rounded-lg border">
-          <h3 className="text-xs font-semibold text-[#625C64] uppercase tracking-wider mb-3">
+        <div className="mb-6 pb-6 border-b border-[var(--db-border-subtle)] bg-[var(--db-surface)] p-4 rounded-lg border">
+          <h3 className="text-xs font-semibold text-[var(--db-text-secondary)] uppercase tracking-wider mb-3">
             Add New Business Knowledge
           </h3>
           <AnnotationForm
@@ -108,14 +108,14 @@ export function BusinessKnowledgePanel({
           />
         ))}
         {annotations.length === 0 ? (
-          <div className="text-center py-10 text-[#8B848C]">
-            <BookOpen size={28} className="mx-auto text-[#DAD5CD] mb-2" />
+          <div className="text-center py-10 text-[var(--db-text-muted)]">
+            <BookOpen size={28} className="mx-auto text-[var(--db-border-default)] mb-2" />
             <p className="text-xs">No business annotations added yet.</p>
             {canManage && (
               <button
                 type="button"
                 onClick={() => setIsAdding(true)}
-                className="mt-2 text-xs text-[#4B123F] font-semibold hover:underline"
+                className="mt-2 text-xs text-[var(--db-primary)] font-semibold hover:underline"
               >
                 + Add the first business knowledge item
               </button>

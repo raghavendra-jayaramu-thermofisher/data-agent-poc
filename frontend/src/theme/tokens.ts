@@ -1,27 +1,36 @@
 export const designTokens = {
   colors: {
-    primary: '#4B123F',
-    primaryHover: '#3F0E35',
-    primaryPressed: '#340B2C',
-    primarySoft: '#F4E8F0',
-    onPrimary: '#FFF9FD',
+    primary: '#5B5FC7',
+    primaryHover: '#4F52B2',
+    primaryPressed: '#444791',
+    primarySoft: '#ECECF9',
+    onPrimary: '#FFFFFF',
     signal: '#E3AC19',
     signalHover: '#CB970E',
     signalSoft: '#FFF4CC',
-    canvas: '#F6F4EF',
-    background: '#F6F4EF',
-    surface: '#FBFAF7',
-    surfaceRaised: '#FFFDFC',
-    surfaceMuted: '#F0EEE9',
-    surfaceHover: '#EAE7E1',
-    foreground: '#252127',
-    textPrimary: '#252127',
-    textSecondary: '#625C64',
-    textMuted: '#8B848C',
-    border: '#DAD5CD',
-    borderSubtle: '#E7E3DC',
-    borderStrong: '#C5BFB6',
-    focusRing: '#9A4D86',
+    canvas: '#F5F7FB',
+    background: '#F5F7FB',
+    ambientStart: '#EEF1FC',
+    ambientEnd: '#F7F9FC',
+    sidebarSurface: '#F0F2FA',
+    userMessage: '#ECEEF9',
+    surface: '#FFFFFF',
+    surfaceRaised: '#FFFFFF',
+    surfaceMuted: '#F3F4F8',
+    surfaceHover: '#EAECF3',
+    foreground: '#262626',
+    textPrimary: '#262626',
+    textSecondary: '#626268',
+    textMuted: '#727278',
+    textDisabled: '#AAAAB0',
+    surfaceSelected: '#E9EAFB',
+    chartGrid: '#E9ECF3',
+    chartAxis: '#727278',
+    border: '#E2E5ED',
+    borderDefault: '#E2E5ED',
+    borderSubtle: '#EDF0F5',
+    borderStrong: '#C9CDDA',
+    focusRing: '#5B5FC7',
     success: '#32745A',
     successSoft: '#E5F1EB',
     warning: '#8C5A00',
@@ -31,21 +40,36 @@ export const designTokens = {
     info: '#346495',
     infoSoft: '#E7EEF6',
     chart: [
-      '#5C274F',
-      '#D9A214',
-      '#4F817B',
-      '#5B73AE',
-      '#C66F43',
-      '#708A4D',
-      '#A95F7C',
-      '#766F79',
+      '#588CCC',
+      '#4E948C',
+      '#8A7FB0',
+      '#D0A348',
+      '#CF7F87',
+      '#718F66',
+      '#9B6C8F',
+      '#79818E',
     ] as const,
   },
   radius: { default: 4, sm: 4, md: 6, lg: 8, status: 9999 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 24, page: 20 },
   typography: {
-    ui: '"Source Sans 3", system-ui, sans-serif',
-    serif: '"Source Serif 4", Georgia, serif',
+    ui: '"IBM Plex Sans", system-ui, sans-serif',
     code: '"Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace',
   },
 } as const;
+
+/** The app and ECharts share this palette; CSS consumes the variables set before React mounts. */
+export function applyDesignTokens(root: HTMLElement) {
+  for (const [name, value] of Object.entries(designTokens.colors)) {
+    if (typeof value === 'string')
+      root.style.setProperty(
+        '--db-' + name.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase()),
+        value,
+      );
+  }
+  designTokens.colors.chart.forEach((color, index) =>
+    root.style.setProperty('--db-chart-' + (index + 1), color),
+  );
+  root.style.setProperty('--db-font-ui', designTokens.typography.ui);
+  root.style.setProperty('--db-font-mono', designTokens.typography.code);
+}

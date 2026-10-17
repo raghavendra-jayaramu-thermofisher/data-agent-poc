@@ -976,6 +976,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Matrix */
+        post: operations["export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1293,7 +1310,7 @@ export interface components {
              * Widget Type
              * @enum {string}
              */
-            widget_type: "metric" | "table" | "bar" | "line" | "area" | "pie" | "donut";
+            widget_type: "metric" | "table" | "bar" | "line" | "area" | "pie" | "donut" | "combo";
         };
         /** DashboardWidgetResponse */
         DashboardWidgetResponse: {
@@ -2543,6 +2560,13 @@ export interface components {
              * @default false
              */
             truncated: boolean;
+        };
+        /** MatrixViewState */
+        MatrixViewState: {
+            /** Collapsed Rows */
+            collapsed_rows?: string[];
+            /** Collapsed Columns */
+            collapsed_columns?: string[];
         };
     };
     responses: never;
@@ -5128,6 +5152,44 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                job_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixViewState"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
                 };
             };
             /** @description Validation Error */

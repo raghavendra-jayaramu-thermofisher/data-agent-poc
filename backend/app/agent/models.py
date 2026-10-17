@@ -101,7 +101,7 @@ class ModelExecution(Base):
 class JobArtifact(Base):
     __tablename__ = "job_artifacts"
     __table_args__ = (
-        CheckConstraint("kind IN ('text','table','chart','html')", name="valid_kind"),
+        CheckConstraint("kind IN ('text','table','chart','html','matrix')", name="valid_kind"),
         Index("ix_job_artifacts_job_created", "job_id", "created_at"),
         Index("ix_job_artifacts_source_sql", "source_sql_execution_id"),
     )

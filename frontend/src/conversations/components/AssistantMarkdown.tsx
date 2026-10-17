@@ -41,13 +41,13 @@ export function AssistantMarkdown({ content }: { content: string }) {
           th: ({ children, ...props }) => (
             <th
               {...props}
-              className="sticky top-0 bg-[#F0EEE9] px-3 py-2 text-left text-xs font-semibold text-[#252127] border-b border-[#DAD5CD] z-10"
+              className="sticky top-0 bg-[var(--db-surface-muted)] px-3 py-2 text-left text-xs font-semibold text-[var(--db-text-primary)] border-b border-[var(--db-border-default)] z-10"
             >
               {children}
             </th>
           ),
           td: ({ children, ...props }) => (
-            <td {...props} className="px-3 py-2 text-xs text-[#252127] border-b border-[#EAE7E1]">
+            <td {...props} className="px-3 py-2 text-xs text-[var(--db-text-primary)] border-b border-[var(--db-surface-hover)]">
               {children}
             </td>
           ),

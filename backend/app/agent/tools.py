@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
 
 from app.agent.html_artifacts import HtmlArtifactStorage, HtmlArtifactValidationError
+from app.agent.matrix import CreateMatrixArgs, MatrixError, build_matrix
 from app.agent.models import JobArtifact, SQLExecution, ToolExecution
 from app.agent.repository import AgentExecutionRepository
 from app.agent.serialization import bound_query_result, model_result_preview
@@ -558,6 +559,12 @@ async def create_chart(
                 "CHART_SOURCE_NOT_FOUND", "The SQL result is unavailable for charting."
             )
         payload = table_artifact.payload
+        if parsed.chart_type == "combo" and (sql_item.truncated or payload.get("truncated")):
+            raise AgentToolError(
+                "CHART_SOURCE_TRUNCATED",
+                "Combo charts require a complete SQL result. Aggregate or limit the categories in SQL.",
+                retryable=True,
+            )
         columns = payload.get("columns")
         rows = payload.get("rows")
         if not isinstance(columns, list) or not all(isinstance(item, str) for item in columns):
@@ -603,6 +610,89 @@ async def create_chart(
         "source_sql_execution_id": str(parsed.sql_execution_id),
         "row_count": len(records),
         "renderer": "frontend",
+    }
+
+
+async def create_matrix(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    _tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    """Build an immutable matrix from this job's complete persisted SQL result."""
+    if not context.settings.agent_matrix_enabled:
+        raise AgentToolError("MATRIX_DISABLED", "Matrix creation is not enabled.")
+    try:
+        parsed = CreateMatrixArgs.model_validate(arguments)
+    except ValidationError as exc:
+        raise AgentToolError("MATRIX_SPEC_INVALID", str(exc), retryable=True) from exc
+    async with get_session_factory()() as session:
+        repo = AgentExecutionRepository(session)
+        source = await repo.get_sql_for_job(parsed.sql_execution_id, context.job_id)
+        if (
+            source is None
+            or source.status != "succeeded"
+            or source.data_source_id not in context.allowed_data_source_ids
+        ):
+            raise AgentToolError(
+                "MATRIX_SOURCE_NOT_FOUND",
+                "Use a successful authorized SQL execution from this job.",
+            )
+        table = await repo.get_table_artifact_for_sql(context.job_id, source.id)
+        if table is None:
+            raise AgentToolError("MATRIX_SOURCE_NOT_FOUND", "The stored SQL result is unavailable.")
+        from app.agent.evidence import _valid_table_artifact
+
+        if not _valid_table_artifact(table.payload, source):
+            raise AgentToolError("MATRIX_SOURCE_INVALID", "The stored SQL result is inconsistent.")
+        try:
+            payload = await asyncio.to_thread(
+                build_matrix,
+                parsed,
+                table.payload["columns"],
+                table.payload["rows"],
+                truncated=source.truncated or table.payload.get("stored_result_truncated") is True,
+                max_nodes=context.settings.agent_matrix_max_nodes,
+                max_columns=context.settings.agent_matrix_max_columns,
+                max_cells=context.settings.agent_matrix_max_cells,
+                max_bytes=context.settings.agent_result_max_bytes,
+            )
+        except MatrixError as exc:
+            raise AgentToolError(exc.code, str(exc), retryable=True) from exc
+        existing = await repo.list_artifacts(context.job_id)
+        artifact = next(
+            (item for item in existing if item.kind == "matrix" and item.payload == payload), None
+        )
+        if artifact is None:
+            artifact = JobArtifact(
+                job_id=context.job_id,
+                kind="matrix",
+                name=parsed.title,
+                source_sql_execution_id=source.id,
+                payload=payload,
+                created_at=utc_now(),
+            )
+            repo.add_artifact(artifact)
+        # A failed matrix leaves the table intact. Hide it only after successful construction.
+        table.payload = {**table.payload, "display": "hidden"}
+        await session.commit()
+        artifact_id = artifact.id
+    await append_agent_event(
+        context.job_id,
+        "matrix.generated",
+        {
+            "artifact_id": str(artifact_id),
+            "sql_execution_id": str(parsed.sql_execution_id),
+            "source_rows": payload["source_row_count"],
+            "cell_count": len(payload["cells"]),
+        },
+    )
+    return {
+        "ok": True,
+        "matrix_artifact_id": str(artifact_id),
+        "title": parsed.title,
+        "source_sql_execution_id": str(parsed.sql_execution_id),
+        "renderer": "frontend",
+        "presentation_guidance": "Reference this matrix artifact once. Do not reproduce it in Markdown.",
     }
 
 
@@ -697,7 +787,7 @@ def build_frontend_chart_payload(
             f"The chart references unavailable SQL result column(s): {', '.join(missing)}.",
         )
 
-    if parsed.chart_type in ("bar", "line", "area"):
+    if parsed.chart_type in ("bar", "line", "area", "combo"):
         series_fields = [item.field for item in parsed.series]
         repeated_fields = sorted(
             field for field, count in Counter(series_fields).items() if count > 1
@@ -743,7 +833,7 @@ def build_frontend_chart_payload(
             "instead of creating a chart.",
         )
 
-    if parsed.chart_type in ("bar", "line", "area"):
+    if parsed.chart_type in ("bar", "line", "area", "combo"):
         dimension_field = parsed.x_field or ""
         dimension_values = [record.get(dimension_field) for record in records]
         if any(value is None for value in dimension_values):
@@ -800,9 +890,12 @@ def build_frontend_chart_payload(
         "source_sql_execution_id": str(parsed.sql_execution_id),
         "data": records,
     }
-    if parsed.chart_type == "bar":
+    if parsed.chart_type in ("bar", "combo"):
         chart_payload["orientation"] = parsed.orientation
         chart_payload["stacked"] = parsed.stacked
+    if parsed.chart_type == "combo":
+        chart_payload["y_label"] = parsed.y_label
+        chart_payload["secondary_y_label"] = parsed.secondary_y_label
     numeric_fields = (
         [parsed.value_field or ""]
         if parsed.chart_type in ("pie", "donut", "metric")
@@ -814,7 +907,11 @@ def build_frontend_chart_payload(
         for record in records:
             value = record.get(field)
             if value is None:
-                if parsed.chart_type == "donut" or parsed.stacked:
+                is_column = (
+                    parsed.chart_type != "combo"
+                    or next(item for item in parsed.series if item.field == field).type == "bar"
+                )
+                if parsed.chart_type == "donut" or (parsed.stacked and is_column):
                     raise AgentToolError(
                         "CHART_VALUE_MISSING",
                         "Donut and stacked charts require complete numeric values. "
@@ -878,7 +975,19 @@ def build_frontend_chart_payload(
     else:
         chart_payload["encoding"] = {
             "x": {"field": parsed.x_field, "label": parsed.x_label},
-            "series": [item.model_dump() for item in parsed.series],
+            "series": [
+                {
+                    "field": item.field,
+                    "label": item.label,
+                    **({"unit": item.unit} if item.unit is not None else {}),
+                    **(
+                        {"type": item.type, "axis": item.axis}
+                        if parsed.chart_type == "combo"
+                        else {}
+                    ),
+                }
+                for item in parsed.series
+            ],
         }
     return chart_payload, records
 
@@ -956,7 +1065,10 @@ def build_default_tool_registry() -> AgentToolRegistry:
                 "Use metric for one headline value, line or area for an ordered trend, bar for category "
                 "comparison, and pie or donut for a small part-to-whole result. Bar charts support "
                 "orientation='horizontal' or 'vertical' and stacked=true for additive components "
-                "in the same unit. Reference exact output "
+                "in the same unit. Use combo with stacked=true for a line and stacked column chart: "
+                "each series declares type='bar' or 'line', columns use axis='primary', and lines "
+                "use primary for a shared scale or secondary for another scale/unit. Multiple lines "
+                "and columns are supported. Units on each axis must agree. Reference exact output "
                 "fields; this tool reads persisted rows and never accepts invented values. The SQL must "
                 "already have the final grain, ordering, and manageable category count. For bar, line, "
                 "and area charts, return one row per x-axis value and one distinct numeric output column "
@@ -967,6 +1079,22 @@ def build_default_tool_registry() -> AgentToolRegistry:
             handler=create_chart,
         )
     )
+    if get_settings().agent_matrix_enabled:
+        registry.register(AgentToolDefinition(
+            name="create_matrix",
+            description=(
+                "Present exact comparisons across two or more dimensions as an interactive matrix. "
+                "Reference one complete successful execute_sql result in this job; supply only field "
+                "mappings, never numbers or HTML. SQL must return unique detail cells and every requested "
+                "subtotal with row_depth_field/column_depth_field integers (active prefix lengths; "
+                "0 means grand total). Totals are SQL values, never sums of visible cells. "
+                "Use SQL GROUPING flags to distinguish totals from real NULL categories. Use sort_field "
+                "for ordering and numeric/date sort_type for numeric/date dimensions. "
+                "All grouping and measure definitions come from SQL and knowledge. Turn off totals for "
+                "a leaf-only result. Prefer ordinary tables for lists and lookups, a sentence/metric "
+                "for one value, and charts for visual trends."
+            ), args_schema=CreateMatrixArgs, handler=create_matrix,
+        ))
     registry.register(
         AgentToolDefinition(
             name="create_html_artifact",

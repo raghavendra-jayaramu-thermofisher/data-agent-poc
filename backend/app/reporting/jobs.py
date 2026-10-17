@@ -60,6 +60,8 @@ def _chart_args(
             series=series,
             orientation=config.get("orientation", "vertical"),
             stacked=config.get("stacked", False),
+            y_label=config.get("y_label"),
+            secondary_y_label=config.get("secondary_y_label"),
         )
     except ValidationError as exc:
         raise JobFailureError(
@@ -247,11 +249,15 @@ async def _refresh_widget(
         raise JobFailureError(exc.code, exc.public_message, retryable=exc.retryable) from exc
 
     chart_payload: dict[str, object] | None = None
-    if widget_type in {"bar", "line", "area", "pie", "donut"}:
+    if widget_type in {"bar", "line", "area", "pie", "donut", "combo"}:
         parsed = _chart_args(
             widget_type, widget_title, sql_execution_id, visualization_config
         )
         try:
+            if widget_type == "combo" and truncated:
+                raise AgentToolError(
+                    "CHART_SOURCE_TRUNCATED", "Combo charts require a complete SQL result."
+                )
             chart_payload, _ = build_frontend_chart_payload(parsed, columns, rows)
         except AgentToolError as exc:
             await _mark_query_succeeded_tool_failed(

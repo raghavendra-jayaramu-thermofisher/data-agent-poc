@@ -18,13 +18,13 @@ export function JobDiagnosticsPanel({ job, trace, unavailable }: { job: Job; tra
       notifications.error('Unable to copy diagnostics. Select and copy the details below.');
     }
   };
-  return <section aria-label="Job diagnostics" className="bg-[#FFFDFC] border border-[#E8B4B4] rounded-lg p-5 mb-6">
+  return <section aria-label="Job diagnostics" className="bg-[var(--db-surface-raised)] border border-[#E8B4B4] rounded-lg p-5 mb-6">
     <div className="flex items-center justify-between gap-3">
-      <h2 className="text-sm font-semibold text-[#A84545]">Failure diagnostics</h2>
-      <button type="button" onClick={() => void copy()} className="text-xs text-[#4B123F] underline">Copy Diagnostics</button>
+      <h2 className="text-sm font-semibold text-[var(--db-danger)]">Failure diagnostics</h2>
+      <button type="button" onClick={() => void copy()} className="text-xs text-[var(--db-primary)] underline">Copy Diagnostics</button>
     </div>
     <p className="text-xs mt-2">{job.error_code}: {job.error_message}</p>
-    {failures.map((failure) => <div key={failure.id} className="mt-3 text-xs border-t border-[#DAD5CD] pt-3">
+    {failures.map((failure) => <div key={failure.id} className="mt-3 text-xs border-t border-[var(--db-border-default)] pt-3">
       <p className="font-semibold">{failure.stage}{'model' in failure ? ` · ${failure.model}` : ''}</p>
       <p>{failure.code}</p>
       <pre className="whitespace-pre-wrap break-words mt-2">{failure.message || 'No detailed error was recorded for this step.'}</pre>
@@ -33,6 +33,6 @@ export function JobDiagnosticsPanel({ job, trace, unavailable }: { job: Job; tra
         <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(failure.provider_error_response, null, 2)}</pre>
       </details>}
     </div>)}
-    {(unavailable || !failures.length) && <p className="text-xs text-[#625C64] mt-3">{unavailable ? 'Execution details could not be loaded. The job error is still available to copy.' : 'Only recorded diagnostics can be shown. Older failures may not include the underlying provider error.'}</p>}
+    {(unavailable || !failures.length) && <p className="text-xs text-[var(--db-text-secondary)] mt-3">{unavailable ? 'Execution details could not be loaded. The job error is still available to copy.' : 'Only recorded diagnostics can be shown. Older failures may not include the underlying provider error.'}</p>}
   </section>;
 }

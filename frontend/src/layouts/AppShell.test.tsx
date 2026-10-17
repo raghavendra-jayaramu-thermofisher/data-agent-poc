@@ -3,42 +3,83 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell';
-vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { email: 'user@example.com', display_name: 'Alex' }, signOut: vi.fn() }) }));
-vi.mock('../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ organizations: [{ id: 'org-1', name: 'Acme' }], activeOrganization: { id: 'org-1', name: 'Acme' }, setActiveOrganization: vi.fn() }) }));
+vi.mock('../auth/AuthProvider', () => ({
+  useAuth: () => ({ user: { email: 'user@example.com', display_name: 'Alex' }, signOut: vi.fn() }),
+}));
+vi.mock('../organizations/OrganizationProvider', () => ({
+  useOrganization: () => ({
+    organizations: [{ id: 'org-1', name: 'Acme' }],
+    activeOrganization: { id: 'org-1', name: 'Acme' },
+    setActiveOrganization: vi.fn(),
+  }),
+}));
 vi.mock('../conversations/hooks/useConversations', () => ({
-    useConversationList: () => ({ data: [] }),
-    useDeleteConversation: () => ({ mutate: vi.fn() }),
+  useConversationList: () => ({ data: [] }),
+  useDeleteConversation: () => ({ mutate: vi.fn() }),
 }));
 describe('AppShell', () => {
-    beforeEach(() => localStorage.clear());
+  beforeEach(() => localStorage.clear());
 
-    it('exposes desktop and mobile navigation controls semantically', () => {
-        render(<MemoryRouter initialEntries={['/ask']}><Routes><Route element={<AppShell />}><Route path="/ask" element={<div>Ask content</div>}/></Route></Routes></MemoryRouter>);
-        expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Open navigation' })).toBeInTheDocument();
-        expect(screen.getByText('Ask content')).toBeInTheDocument();
-        expect(screen.getByText('Acme')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/skills');
-    });
+  it('exposes desktop and mobile navigation controls semantically', () => {
+    render(
+      <MemoryRouter initialEntries={['/ask']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/ask" element={<div>Ask content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open navigation' })).toBeInTheDocument();
+    expect(screen.getByText('Ask content')).toBeInTheDocument();
+    expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Ask$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show recent chats' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More navigation' })).toBeInTheDocument();
+  });
 
-    it('keeps Templates outside the Settings navigation', () => {
-        render(<MemoryRouter initialEntries={['/settings']}><Routes><Route element={<AppShell />}><Route path="/settings" element={<div>Settings content</div>}/></Route></Routes></MemoryRouter>);
-        expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/skills');
-        expect(screen.queryByText('AI Instructions & Commands')).not.toBeInTheDocument();
-    });
+  it('keeps less frequent tools accessible from More', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/settings" element={<div>Settings content</div>} />
+            <Route path="/skills" element={<div>Templates content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'More navigation' }));
+    await userEvent.setup().click(screen.getByRole('menuitem', { name: /^Templates$/ }));
+    expect(screen.getByText('Templates content')).toBeInTheDocument();
+    expect(screen.queryByText('AI Instructions & Commands')).not.toBeInTheDocument();
+  });
 
-    it('hides and restores chat history while persisting the collapsed state', async () => {
-        const user = userEvent.setup();
-        render(<MemoryRouter initialEntries={['/ask']}><Routes><Route element={<AppShell />}><Route path="/ask" element={<div>Ask content</div>}/></Route></Routes></MemoryRouter>);
+  it('hides and restores chat history while persisting the collapsed state', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/ask']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/ask" element={<div>Ask content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
 
-        expect(screen.getByLabelText('Search conversation history')).toHaveClass('db-icon-search__input');
-        await user.click(screen.getByRole('button', { name: 'Hide chat history' }));
-        expect(screen.queryByText('Recent Analyses')).not.toBeInTheDocument();
-        expect(screen.queryByLabelText('Search conversation history')).not.toBeInTheDocument();
-        expect(localStorage.getItem('db-assistant.preferences.v1')).toContain('"sidebarCollapsed":true');
+    expect(
+      screen.getByRole('textbox', { name: 'Search conversation history' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.queryByText('Recent chats')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Search conversation history')).not.toBeInTheDocument();
+    expect(localStorage.getItem('db-assistant.preferences.v1')).toContain(
+      '"navigationCollapsed":true',
+    );
 
-        await user.click(screen.getByRole('button', { name: 'Show chat history' }));
-        expect(screen.getByText('Recent Analyses')).toBeInTheDocument();
-        expect(screen.getByLabelText('Search conversation history')).toBeInTheDocument();
-    });
+    await user.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(screen.getByText('Recent chats')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search conversation history')).toBeInTheDocument();
+  });
 });

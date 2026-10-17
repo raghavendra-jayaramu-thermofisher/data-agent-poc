@@ -7,10 +7,15 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { useMemo, useRef, useState } from 'react';
-import { Copy, Check, Maximize2, X, Search, Table } from 'lucide-react';
-import { ExcelExportButton } from './ExcelExportButton';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import { Copy, Download, Search, Table } from 'lucide-react';
+import {
+  ArtifactFrame,
+  type ArtifactAction,
+  type ArtifactMetadata,
+} from '../components/ArtifactFrame';
 import { excelTableFromModel } from './excel-export';
+import { useExcelExport } from './useExcelExport';
 import { notifications } from '../../components/notifications';
 import {
   formatAnalyticalValue,
@@ -22,13 +27,22 @@ import {
   type AnalyticalValue,
 } from './table-domain';
 
+export type TableViewState = { sorting: SortingState; globalFilter: string };
+
 export function AnalyticalTable({
   model,
   label = 'Analytical result',
   hideToolbar = false,
-  fullscreen: controlledFullscreen,
+  fullscreen,
   onFullscreen,
   onCloseFullscreen,
+  defaultOpen = true,
+  metadata,
+  extraActions = [],
+  className = '',
+  viewState,
+  onViewStateChange,
+  scrollPosition: controlledScroll,
 }: {
   model: AnalyticalTableModel;
   label?: string;
@@ -36,16 +50,29 @@ export function AnalyticalTable({
   fullscreen?: boolean;
   onFullscreen?(): void;
   onCloseFullscreen?(): void;
+  defaultOpen?: boolean;
+  metadata?: ArtifactMetadata;
+  extraActions?: ArtifactAction[];
+  className?: string;
+  viewState?: TableViewState;
+  onViewStateChange?(state: TableViewState): void;
+  scrollPosition?: RefObject<{ top: number; left: number }>;
 }) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [copied, setCopied] = useState(false);
-  const [internalFullscreen, setInternalFullscreen] = useState(false);
-  const [globalFilter, setGlobalFilter] = useState('');
-
-  const isFullscreen = controlledFullscreen !== undefined ? controlledFullscreen : internalFullscreen;
-  const openFullscreen = onFullscreen ?? (() => setInternalFullscreen(true));
-  const closeFullscreen = onCloseFullscreen ?? (() => setInternalFullscreen(false));
-
+  const [localState, setLocalState] = useState<TableViewState>({ sorting: [], globalFilter: '' });
+  const state = viewState ?? localState;
+  const changeState = onViewStateChange ?? setLocalState;
+  const [showSearch, setShowSearch] = useState(false);
+  const localScroll = useRef({ top: 0, left: 0 });
+  const scrollPosition = controlledScroll ?? localScroll;
+  const attachScroll = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element) {
+        element.scrollTop = scrollPosition.current.top;
+        element.scrollLeft = scrollPosition.current.left;
+      }
+    },
+    [scrollPosition],
+  );
   const columnDefs = useMemo<ColumnDef<AnalyticalRow>[]>(
     () =>
       model.columns.map((column) => ({
@@ -55,235 +82,171 @@ export function AnalyticalTable({
         cell: (info) => formatAnalyticalValue(info.getValue() as AnalyticalValue),
         sortingFn: 'alphanumeric',
       })),
-    [model.columns, model.columnLabels]
+    [model.columns, model.columnLabels],
   );
-
   const table = useReactTable({
     data: model.rows,
     columns: columnDefs,
-    state: { sorting, globalFilter },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    state,
+    onSortingChange: (updater) =>
+      changeState({
+        ...state,
+        sorting: typeof updater === 'function' ? updater(state.sorting) : updater,
+      }),
+    onGlobalFilterChange: (updater) =>
+      changeState({
+        ...state,
+        globalFilter: typeof updater === 'function' ? updater(state.globalFilter) : updater,
+      }),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getRowId: (row) => row.id,
   });
-
-  const renderedRows = table.getRowModel().rows;
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   const numericColumns = useMemo(
     () => new Set(model.columns.filter((column) => isNumericColumn(model.rows, column))),
-    [model.columns, model.rows]
+    [model.columns, model.rows],
   );
-
-  async function copyTable() {
+  const { pending, exportExcel } = useExcelExport(() => excelTableFromModel(model, label));
+  async function copy() {
     try {
       await navigator.clipboard.writeText(toTsv(model));
-      setCopied(true);
       notifications.success('Copied table to clipboard');
-      setTimeout(() => setCopied(false), 1500);
     } catch {
       notifications.error('Unable to copy table');
     }
   }
-
-  return (
-    <div className="analytical-table-shell">
-      {!hideToolbar && (
-        <div className="analytical-table-toolbar flex items-center justify-between gap-2 p-2 border-b border-[#DAD5CD] bg-[#FBFAF7]">
-          <div className="flex items-center gap-2">
-            <strong className="text-xs font-semibold text-[#252127]">
-              {model.rowCount.toLocaleString()} row{model.rowCount === 1 ? '' : 's'}
-            </strong>
-            {model.truncated && (
-              <span className="text-[10px] px-1.5 py-0.2 bg-[#F8EDCF] text-[#8C5A00] rounded font-medium">
-                Truncated
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <ExcelExportButton getTable={() => excelTableFromModel(model, label)} disabled={!model.columns.length} />
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-medium transition-colors"
-              onClick={() => void copyTable()}
-              title="Copy as TSV"
-            >
-              {copied ? <Check size={12} className="text-[#32745A]" /> : <Copy size={12} />}
-              <span>{copied ? 'Copied' : 'Copy table'}</span>
-            </button>
-
-            <button
-              type="button"
-              className="p-1 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded transition-colors"
-              onClick={openFullscreen}
-              title="Expand to full screen"
-            >
-              <Maximize2 size={13} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!model.rows.length && (
-        <div className="artifact-empty text-center py-6 text-xs text-[#8B848C]" role="status">
-          No rows returned.
-        </div>
-      )}
-
-      {model.rows.length > 0 && (
-        <div ref={scrollRef} className="analytical-table-scroll overflow-auto max-h-[480px]">
-          <table className="analytical-table w-full border-collapse" aria-label={label}>
-            <thead className="bg-[#F0EEE9] border-b border-[#DAD5CD] shadow-xs sticky top-0 z-10">
-              {table.getHeaderGroups().map((group) => (
-                <tr key={group.id}>
-                  {group.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className={`sticky top-0 bg-[#F0EEE9] z-10 px-3.5 py-2.5 text-xs font-semibold text-[#252127] border-b border-[#DAD5CD] select-none ${
-                        numericColumns.has(header.column.id) ? 'text-right' : 'text-left'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        className={`font-semibold text-xs text-[#252127] hover:text-[#4B123F] inline-flex items-center gap-1 cursor-pointer w-full ${
-                          numericColumns.has(header.column.id) ? 'justify-end' : 'justify-start'
-                        }`}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                        <span>
-                          {header.column.getIsSorted() === 'asc'
-                            ? ' ↑'
-                            : header.column.getIsSorted() === 'desc'
-                            ? ' ↓'
-                            : ''}
-                        </span>
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {renderedRows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-[#EAE7E1] hover:bg-[#F0EDE6] transition-colors odd:bg-[#FFFFFF] even:bg-[#FAF8F5]"
+  const grid = !model.rows.length ? (
+    <p className="artifact-empty" role="status">
+      No rows returned.
+    </p>
+  ) : (
+    <div
+      ref={attachScroll}
+      className="analytical-table-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label={`${label} scrollable table`}
+      onScroll={(event) => {
+        scrollPosition.current = {
+          top: event.currentTarget.scrollTop,
+          left: event.currentTarget.scrollLeft,
+        };
+      }}
+    >
+      <table className="analytical-table" aria-label={label}>
+        <thead>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              {group.headers.map((header) => (
+                <th
+                  key={header.id}
+                  scope="col"
+                  className={numericColumns.has(header.column.id) ? 'numeric-cell' : undefined}
+                  aria-sort={
+                    header.column.getIsSorted() === 'asc'
+                      ? 'ascending'
+                      : header.column.getIsSorted() === 'desc'
+                        ? 'descending'
+                        : 'none'
+                  }
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={`px-3.5 py-2 text-xs text-[#252127] ${
-                        numericColumns.has(cell.column.id) ? 'text-right font-mono tabular-nums' : 'text-left'
-                      }`}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
+                  <button
+                    type="button"
+                    className="analytical-table-sort"
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    <span className="analytical-cell-value">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </span>
+                    <span aria-hidden="true">
+                      {header.column.getIsSorted() === 'asc'
+                        ? '↑'
+                        : header.column.getIsSorted() === 'desc'
+                          ? '↓'
+                          : ''}
+                    </span>
+                  </button>
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Fullscreen Table Modal */}
-      {isFullscreen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#DAD5CD] bg-[#FBFAF7]">
-              <div className="flex items-center gap-2.5">
-                <Table size={18} className="text-[#4B123F]" />
-                <div>
-                  <h3 className="font-semibold text-base text-[#252127]">{label}</h3>
-                  <p className="text-xs text-[#625C64]">
-                    {renderedRows.length.toLocaleString()} matching rows of {model.rowCount.toLocaleString()} total
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-2.5 text-[#8B848C]" />
-                  <input
-                    type="text"
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Search across all columns…"
-                    className="w-40 sm:w-64 h-8 pl-8 pr-2.5 bg-[#FFFDFC] border border-[#DAD5CD] rounded text-xs text-[#252127] outline-none focus:border-[#9A4D86]"
-                  />
-                </div>
-
-                <ExcelExportButton getTable={() => excelTableFromModel(model, label)} disabled={!model.columns.length} />
-
-                <button
-                  type="button"
-                  className="p-1.5 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded cursor-pointer"
-                  aria-label="Close expanded table"
-                  onClick={closeFullscreen}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <td
+                  key={cell.id}
+                  className={numericColumns.has(cell.column.id) ? 'numeric-cell' : undefined}
                 >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-auto p-4">
-              <table className="analytical-table w-full">
-                <thead className="bg-[#F0EEE9] shadow-xs">
-                  {table.getHeaderGroups().map((group) => (
-                    <tr key={group.id}>
-                      {group.headers.map((header) => (
-                        <th
-                          key={header.id}
-                          className={`px-3 py-2 text-left font-semibold text-xs text-[#252127] border-b border-[#DAD5CD] sticky top-0 bg-[#F0EEE9] z-10 ${
-                            numericColumns.has(header.column.id) ? 'numeric-cell' : ''
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            className="font-semibold text-xs text-left hover:text-[#4B123F] inline-flex items-center gap-1 cursor-pointer"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                            <span>
-                              {header.column.getIsSorted() === 'asc'
-                                ? ' ↑'
-                                : header.column.getIsSorted() === 'desc'
-                                ? ' ↓'
-                                : ''}
-                            </span>
-                          </button>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {renderedRows.map((row) => (
-                    <tr key={row.id} className="border-b border-[#EAE7E1] hover:bg-[#F6F4EF] transition-colors">
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className={`px-3 py-2 text-xs text-[#252127] ${
-                            numericColumns.has(cell.column.id) ? 'numeric-cell' : ''
-                          }`}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+                  <span className="analytical-cell-value">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  );
+  if (hideToolbar) return grid;
+  return (
+    <ArtifactFrame
+      title={label}
+      kind="table"
+      icon={Table}
+      defaultOpen={defaultOpen}
+      className={`analytical-table-shell ${className}`}
+      metadata={{ rowCount: model.rowCount, ...metadata }}
+      warning={
+        model.truncated || metadata?.sources?.some((source) => source.truncated)
+          ? 'Truncated result'
+          : undefined
+      }
+      fullscreen={fullscreen}
+      onFullscreenChange={
+        fullscreen === undefined
+          ? undefined
+          : (open) => (open ? onFullscreen?.() : onCloseFullscreen?.())
+      }
+      actions={[
+        { id: 'copy', label: 'Copy table', icon: Copy, run: copy },
+        {
+          id: 'export',
+          label: 'Export to Excel',
+          icon: Download,
+          busy: pending,
+          disabled: !model.columns.length,
+          run: exportExcel,
+        },
+        ...extraActions,
+      ]}
+      moreActions={[
+        {
+          id: 'search',
+          label: 'Search table',
+          icon: Search,
+          run: () => setShowSearch((show) => !show),
+        },
+      ]}
+      tools={(expanded) =>
+        (expanded || showSearch) && (
+          <div className="artifact-search-bar">
+            <Search size={14} aria-hidden="true" />
+            <input
+              aria-label="Search table"
+              placeholder="Search across all columns…"
+              value={state.globalFilter}
+              onChange={(event) => table.setGlobalFilter(event.target.value)}
+            />
+            <span>{table.getRowModel().rows.length.toLocaleString()} matching rows</span>
+          </div>
+        )
+      }
+    >
+      {grid}
+    </ArtifactFrame>
   );
 }

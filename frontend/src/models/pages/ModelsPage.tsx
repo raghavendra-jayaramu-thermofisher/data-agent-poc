@@ -44,10 +44,10 @@ export function ModelsPage() {
       <div className="page-header">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Cpu size={20} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">Model Connections & Profiles</h1>
+            <Cpu size={20} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">Model Connections & Profiles</h1>
           </div>
-          <p className="text-xs text-[#625C64]">
+          <p className="text-xs text-[var(--db-text-secondary)]">
             OpenAI-compatible LLM endpoints and reasoning profiles used for SQL query generation.
           </p>
         </div>
@@ -55,12 +55,12 @@ export function ModelsPage() {
 
       {/* Connections Section */}
       <div className="mb-6">
-        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#DAD5CD]">
-          <h2 className="text-sm font-semibold text-[#252127]">Endpoints & Connections</h2>
+        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--db-border-default)]">
+          <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Endpoints & Connections</h2>
           {canManage && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
               onClick={() => navigate('/models/connections/new')}
             >
               <Plus size={13} />
@@ -86,25 +86,25 @@ export function ModelsPage() {
                     <td>
                       <Link
                         to={`/models/connections/${connection.id}`}
-                        className="font-medium text-[#4B123F] hover:underline"
+                        className="font-medium text-[var(--db-primary)] hover:underline"
                       >
                         {connection.name}
                       </Link>
-                      <div className="text-[11px] text-[#8B848C] font-mono">{connection.base_url}</div>
+                      <div className="text-[11px] text-[var(--db-text-muted)] font-mono">{connection.base_url}</div>
                     </td>
                     <td>
                       <StatusChip status={connection.status} />
                     </td>
-                    <td className="text-xs text-[#625C64]">
+                    <td className="text-xs text-[var(--db-text-secondary)]">
                       {connection.has_api_key ? (
-                        <span className="inline-flex items-center gap-1 text-[#32745A]">
+                        <span className="inline-flex items-center gap-1 text-[var(--db-success)]">
                           <Key size={11} /> Stored securely
                         </span>
                       ) : (
                         'Not configured'
                       )}
                     </td>
-                    <td className="text-xs text-[#625C64]">
+                    <td className="text-xs text-[var(--db-text-secondary)]">
                       {connection.last_tested_at ? formatLocalDateTime(connection.last_tested_at) : 'Never'}
                     </td>
                   </tr>
@@ -122,12 +122,12 @@ export function ModelsPage() {
 
       {/* Profiles Section */}
       <div>
-        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#DAD5CD]">
-          <h2 className="text-sm font-semibold text-[#252127]">Model Profiles</h2>
+        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--db-border-default)]">
+          <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Model Profiles</h2>
           {canManage && connections.data?.length ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-medium"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded text-xs font-medium"
               onClick={() => navigate('/models/profiles/new')}
             >
               <Plus size={13} />
@@ -153,19 +153,19 @@ export function ModelsPage() {
                     <td>
                       <Link
                         to={`/models/profiles/${profile.id}`}
-                        className="font-medium text-[#4B123F] hover:underline flex items-center gap-1.5"
+                        className="font-medium text-[var(--db-primary)] hover:underline flex items-center gap-1.5"
                       >
-                        <Sparkles size={12} className="text-[#8B848C]" />
+                        <Sparkles size={12} className="text-[var(--db-text-muted)]" />
                         <span>{profile.display_name}</span>
                       </Link>
                     </td>
-                    <td className="font-mono text-xs text-[#252127]">{profile.model_name}</td>
+                    <td className="font-mono text-xs text-[var(--db-text-primary)]">{profile.model_name}</td>
                     <td>
                       <span
                         className={`inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-medium ${
                           profile.enabled
-                            ? 'bg-[#E5F1EB] text-[#32745A]'
-                            : 'bg-[#F0EEE9] text-[#8B848C]'
+                            ? 'bg-[var(--db-success-soft)] text-[var(--db-success)]'
+                            : 'bg-[var(--db-surface-muted)] text-[var(--db-text-muted)]'
                         }`}
                       >
                         {profile.enabled ? 'Enabled' : 'Disabled'}
@@ -173,7 +173,7 @@ export function ModelsPage() {
                     </td>
                     <td>
                       {profile.is_default ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[11px] font-semibold bg-[#FFF4CC] text-[#8C5A00]">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[11px] font-semibold bg-[var(--db-signal-soft)] text-[var(--db-warning)]">
                           <CheckCircle2 size={11} /> Default
                         </span>
                       ) : (
@@ -186,7 +186,7 @@ export function ModelsPage() {
             </table>
           </div>
         ) : (
-          <p className="text-xs text-[#8B848C] p-4 bg-[#FFFDFC] border border-[#DAD5CD] rounded">
+          <p className="text-xs text-[var(--db-text-muted)] p-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded">
             No profiles configured.
           </p>
         )}

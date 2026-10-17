@@ -60,25 +60,25 @@ export function JobsPage() {
       <div className="page-header">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Activity size={20} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">Job Ledger</h1>
+            <Activity size={20} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">Job Ledger</h1>
           </div>
-          <p className="text-xs text-[#625C64]">
+          <p className="text-xs text-[var(--db-text-secondary)]">
             Durable background execution records, analytical job tasks, and error audits.
           </p>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 mb-4 pb-2 border-b border-[#DAD5CD]" aria-label="Job status filters">
+      <div className="flex items-center gap-1.5 mb-4 pb-2 border-b border-[var(--db-border-default)]" aria-label="Job status filters">
         {filters.map((status) => (
           <button
             key={status}
             type="button"
             className={`px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors ${
               filter === status
-                ? 'bg-[#4B123F] text-[#FFF9FD] font-semibold'
-                : 'bg-[#FFFDFC] text-[#252127] border border-[#DAD5CD] hover:bg-[#F0EEE9]'
+                ? 'bg-[var(--db-primary)] text-[var(--db-on-primary)] font-semibold'
+                : 'bg-[var(--db-surface-raised)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] hover:bg-[var(--db-surface-muted)]'
             }`}
             onClick={() => setParams(status === 'all' ? {} : { status })}
           >
@@ -102,30 +102,30 @@ export function JobsPage() {
             </thead>
             <tbody>
               {jobs.map((job) => (
-                <tr key={job.id} className="cursor-pointer hover:bg-[#F8EFF5]/60 transition-colors">
+                <tr key={job.id} className="cursor-pointer hover:bg-[var(--db-surface-selected)]/60 transition-colors">
                   <td>
                     <Link
                       to={`/jobs/${job.id}`}
-                      className="font-medium text-[#4B123F] hover:underline flex items-center gap-1.5"
+                      className="font-medium text-[var(--db-primary)] hover:underline flex items-center gap-1.5"
                     >
-                      <Activity size={12} className="text-[#8B848C]" />
+                      <Activity size={12} className="text-[var(--db-text-muted)]" />
                       <span>{job.job_type.replaceAll('_', ' ')}</span>
                     </Link>
                   </td>
                   <td>
                     <StatusChip status={job.status} />
                   </td>
-                  <td className="text-xs text-[#625C64] max-w-md truncate">
+                  <td className="text-xs text-[var(--db-text-secondary)] max-w-md truncate">
                     {manager.currentLabel(job.id) ?? job.error_message ?? '—'}
                   </td>
-                  <td className="text-xs text-[#625C64]">
+                  <td className="text-xs text-[var(--db-text-secondary)]">
                     <span title={formatLocalDateTime(job.created_at)}>{formatRelativeTime(job.created_at)}</span>
                   </td>
-                  <td className="text-xs text-[#625C64]">{formatJobDuration(job.duration_ms)}</td>
+                  <td className="text-xs text-[var(--db-text-secondary)]">{formatJobDuration(job.duration_ms)}</td>
                   <td>
                     <Link
                       to={`/jobs/${job.id}`}
-                      className="text-xs text-[#4B123F] font-semibold hover:underline flex items-center gap-1"
+                      className="text-xs text-[var(--db-primary)] font-semibold hover:underline flex items-center gap-1"
                     >
                       <span>Details</span>
                       <ArrowRight size={11} />

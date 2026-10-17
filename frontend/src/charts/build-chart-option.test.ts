@@ -112,7 +112,7 @@ describe('controlled ECharts option builder', () => {
         orientation === 'horizontal' ? { x: 'online', y: 'month' } : { x: 'month', y: 'online' },
       );
       if (orientation === 'horizontal') {
-        expect(option.xAxis).toEqual([{ type: 'value', name: 'USD' }]);
+        expect(option.xAxis).toMatchObject([{ type: 'value', name: 'USD' }]);
         expect(option.yAxis).toMatchObject({ type: 'category', inverse: true });
       } else {
         expect(option.xAxis).toMatchObject({ type: 'category' });

@@ -16,7 +16,7 @@ export function ExecutionTimeline({
 
   if (!entries.length) {
     return (
-      <div className="p-3 text-center text-xs text-[#8B848C] bg-[#F0EEE9] rounded-lg border border-[#DAD5CD]">
+      <div className="p-3 text-center text-xs text-[var(--db-text-muted)] bg-[var(--db-surface-muted)] rounded-lg border border-[var(--db-border-default)]">
         No persisted execution records are available for this job.
       </div>
     );
@@ -25,7 +25,7 @@ export function ExecutionTimeline({
   return (
     <div className="execution-timeline space-y-2 mt-2" aria-label="Execution trace">
       {allEntries.length > entries.length ? (
-        <p className="text-[11px] text-[#8B848C] mb-2" role="status">
+        <p className="text-[11px] text-[var(--db-text-muted)] mb-2" role="status">
           Showing the first 500 persisted execution records.
         </p>
       ) : null}

@@ -3,10 +3,12 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.agent.html_artifacts import HTML_CONTENT_SECURITY_POLICY, HtmlArtifactStorage
+from app.agent.matrix import CreateMatrixArgs, MatrixError, MatrixViewState, validate_stored_matrix
 from app.agent.repository import AgentExecutionRepository
 from app.agent.schemas import (
     JobArtifactResponse,
@@ -20,10 +22,71 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
 from app.core.errors import AppError
 from app.core.redis import get_redis
+from app.exports.excel import export_filename
+from app.exports.matrix import build_matrix_excel
 from app.jobs.service import JobService
 from app.organizations.models import Organization, OrganizationMembership
 
 router = APIRouter(prefix="/jobs", tags=["job execution"])
+
+
+@router.post(
+    "/{job_id}/artifacts/{artifact_id}/matrix/excel",
+    response_class=Response,
+    responses={
+        200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}}
+    },
+)
+async def export_matrix(
+    job_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    state: MatrixViewState,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    organization, _ = context
+    await JobService(session, get_redis(), settings).get_for_org(job_id, organization.id)
+    artifact = await AgentExecutionRepository(session).get_artifact_for_job(job_id, artifact_id)
+    if artifact is None or artifact.kind != "matrix":
+        raise AppError("MATRIX_NOT_FOUND", "Matrix artifact not found.", 404)
+    from app.agent.evidence import _valid_table_artifact
+
+    repo = AgentExecutionRepository(session)
+    source = await repo.get_sql_for_job(artifact.source_sql_execution_id, job_id)
+    table = await repo.get_table_artifact_for_sql(job_id, artifact.source_sql_execution_id)
+    if (
+        source is None
+        or source.status != "succeeded"
+        or table is None
+        or not _valid_table_artifact(table.payload, source)
+        or not await run_in_threadpool(
+            validate_stored_matrix,
+            artifact.payload,
+            source.id,
+            table.payload,
+            truncated=source.truncated,
+        )
+    ):
+        raise AppError(
+            "MATRIX_INVALID", "Matrix source evidence is unavailable or inconsistent.", 422
+        )
+    try:
+        spec = CreateMatrixArgs.model_validate(artifact.payload.get("spec"))
+        content = await run_in_threadpool(build_matrix_excel, artifact.payload, state)
+    except MatrixError as exc:
+        raise AppError(exc.code, str(exc), 422) from exc
+    except (ValueError, KeyError, TypeError) as exc:
+        raise AppError("MATRIX_INVALID", "The stored matrix is invalid.", 422) from exc
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{export_filename(spec.title)}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get(
@@ -75,8 +138,14 @@ async def get_job_execution_trace(
     await JobService(session, get_redis(), settings).get_for_org(job_id, organization.id)
     repo = AgentExecutionRepository(session)
     return JobExecutionTraceResponse(
-        tools=[ToolExecutionResponse.model_validate(item) for item in await repo.list_tools(job_id)],
+        tools=[
+            ToolExecutionResponse.model_validate(item) for item in await repo.list_tools(job_id)
+        ],
         sql=[SQLExecutionResponse.model_validate(item) for item in await repo.list_sql(job_id)],
-        models=[ModelExecutionResponse.model_validate(item) for item in await repo.list_model(job_id)],
-        artifacts=[JobArtifactResponse.model_validate(item) for item in await repo.list_artifacts(job_id)],
+        models=[
+            ModelExecutionResponse.model_validate(item) for item in await repo.list_model(job_id)
+        ],
+        artifacts=[
+            JobArtifactResponse.model_validate(item) for item in await repo.list_artifacts(job_id)
+        ],
     )

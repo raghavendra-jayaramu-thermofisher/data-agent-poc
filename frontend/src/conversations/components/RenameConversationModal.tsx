@@ -4,11 +4,27 @@ import { useState } from 'react';
 import { FormField } from '../../auth/components/FormField';
 import { useRenameConversation } from '../hooks/useConversations';
 
-export function RenameConversationModal({ id, title }: { id: string; title: string | null }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState('');
+export function RenameConversationModal({
+  id,
+  title,
+  defaultOpen = false,
+  hideTrigger = false,
+  onClose,
+}: {
+  id: string;
+  title: string | null;
+  defaultOpen?: boolean;
+  hideTrigger?: boolean;
+  onClose?(): void;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [draft, setDraft] = useState(title ?? '');
   const [error, setError] = useState<string | null>(null);
   const rename = useRenameConversation();
+  function close() {
+    setOpen(false);
+    onClose?.();
+  }
 
   async function save() {
     const cleaned = draft.trim();
@@ -19,7 +35,7 @@ export function RenameConversationModal({ id, title }: { id: string; title: stri
     setError(null);
     try {
       await rename.mutateAsync({ id, title: cleaned });
-      setOpen(false);
+      close();
     } catch (caught) {
       setError((caught as { message?: string }).message ?? 'Unable to rename the chat.');
     }
@@ -27,29 +43,31 @@ export function RenameConversationModal({ id, title }: { id: string; title: stri
 
   return (
     <>
-      <button
-        type="button"
-        className="conversation-header-icon"
-        aria-label="Rename chat"
-        title="Rename chat"
-        onClick={() => {
-          setDraft(title ?? '');
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        <Pencil size={15} />
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          className="conversation-header-icon"
+          aria-label="Rename chat"
+          title="Rename chat"
+          onClick={() => {
+            setDraft(title ?? '');
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          <Pencil size={15} />
+        </button>
+      )}
       <Modal.Backdrop
         isOpen={open}
         isDismissable={!rename.isPending}
         isKeyboardDismissDisabled={rename.isPending}
         onOpenChange={(value) => {
-          if (!rename.isPending) setOpen(value);
+          if (!rename.isPending && !value) close();
         }}
       >
         <Modal.Container size="sm">
-          <Modal.Dialog>
+          <Modal.Dialog className="conversation-management-dialog">
             <Modal.CloseTrigger isDisabled={rename.isPending} />
             <Modal.Header>
               <Modal.Heading>Rename chat</Modal.Heading>
@@ -77,11 +95,7 @@ export function RenameConversationModal({ id, title }: { id: string; title: stri
               </form>
             </Modal.Body>
             <Modal.Footer>
-              <Button
-                variant="secondary"
-                isDisabled={rename.isPending}
-                onPress={() => setOpen(false)}
-              >
+              <Button variant="secondary" isDisabled={rename.isPending} onPress={close}>
                 Cancel
               </Button>
               <Button

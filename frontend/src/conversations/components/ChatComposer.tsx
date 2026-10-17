@@ -265,7 +265,7 @@ export function ChatComposer({
                       <span className="chat-skill-content">
                         <span className="chat-skill-name">{item.name}</span>
                       </span>
-                      {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[#4B123F]" aria-label="Selected template" />}
+                      {activeInstruction?.id === item.id && <Check size={15} className="shrink-0 text-[var(--db-primary)]" aria-label="Selected template" />}
                     </button>
                   );
                 })

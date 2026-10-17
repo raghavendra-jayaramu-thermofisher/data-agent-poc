@@ -25,29 +25,29 @@ describe('saved model edit values', () => {
   it('saves edits and allows optional settings to be cleared', async () => {
     const user = userEvent.setup();
     show('profiles');
-    await user.clear(screen.getByLabelText('Display Name'));
-    await user.type(screen.getByLabelText('Display Name'), 'Updated Model');
+    await user.clear(screen.getByLabelText('Display name'));
+    await user.type(screen.getByLabelText('Display name'), 'Updated Model');
     await user.clear(screen.getByLabelText('Temperature'));
-    await user.click(screen.getByRole('button', { name: 'Save Profile Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile changes' }));
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({ display_name: 'Updated Model', model_name: 'saved-model-id', settings: { max_tokens: 8000 } })));
   });
   it('saves the prefilled connection while preserving its stored key', async () => {
     const user = userEvent.setup();
     show('connections');
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(state.updateConnection).toHaveBeenCalledWith('c1', { name: 'Saved Provider', base_url: 'https://provider.example/v1', clear_api_key: false }));
   });
   it('prefills the model profile inputs', () => {
     show('profiles');
-    expect(screen.getByLabelText('Display Name')).toHaveValue('Saved Model');
-    expect(screen.getByLabelText('Model Identifier')).toHaveValue('saved-model-id');
+    expect(screen.getByLabelText('Display name')).toHaveValue('Saved Model');
+    expect(screen.getByLabelText('Model identifier')).toHaveValue('saved-model-id');
     expect(screen.getByLabelText('Temperature')).toHaveValue(0.7);
-    expect(screen.getByLabelText('Max Tokens')).toHaveValue(8000);
+    expect(screen.getByLabelText('Max tokens')).toHaveValue(8000);
   });
   it('prefills the connection name and endpoint while leaving the replacement key empty', () => {
     show('connections');
-    expect(screen.getByLabelText('Connection Name')).toHaveValue('Saved Provider');
+    expect(screen.getByLabelText('Connection name')).toHaveValue('Saved Provider');
     expect(screen.getByLabelText('Base URL')).toHaveValue('https://provider.example/v1');
-    expect(screen.getByLabelText('Replace API Key')).toHaveValue('');
+    expect(screen.getByLabelText('Replace API key')).toHaveValue('');
   });
 });

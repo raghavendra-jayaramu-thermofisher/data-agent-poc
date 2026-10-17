@@ -132,12 +132,12 @@ export function AskPage() {
         </div>
         <div className="w-full max-w-3xl mx-auto">
           {submitError && (
-            <div className="p-3 mb-4 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545]" role="alert">
+            <div className="p-3 mb-4 bg-[var(--db-danger-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-danger)]" role="alert">
               {submitError}
             </div>
           )}
           {activeSources.length === 0 && (
-            <div className="p-4 mb-6 bg-[#F8EDCF] border border-[#DAD5CD] rounded text-xs text-[#8C5A00]">
+            <div className="p-4 mb-6 bg-[var(--db-warning-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-warning)]">
               No active data sources found. Connect or activate a data source to begin.
             </div>
           )}

@@ -17,7 +17,7 @@ export function MarkdownTable({ children }: { children: ReactNode }) {
       truncated: false,
     };
   }
-  return <div className="markdown-table-wrapper border border-[#DAD5CD] rounded-lg my-3 shadow-2xs bg-[#FFFDFC] overflow-hidden">
+  return <div className="markdown-table-wrapper border border-[var(--db-border-default)] rounded-lg my-3 shadow-2xs bg-[var(--db-surface-raised)] overflow-hidden">
     <div className="markdown-table-actions"><ExcelExportButton getTable={getTable} /></div>
     <div className="markdown-table-scroll max-h-[480px] overflow-auto">
       <table ref={ref} className="w-full text-xs">{children}</table>

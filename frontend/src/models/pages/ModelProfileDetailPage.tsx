@@ -57,27 +57,27 @@ export function ModelProfileDetailPage() {
         <div>
           <Link
             to="/models"
-            className="inline-flex items-center gap-1 text-xs text-[#8B848C] hover:text-[#4B123F] mb-1 font-medium"
+            className="inline-flex items-center gap-1 text-xs text-[var(--db-text-muted)] hover:text-[var(--db-primary)] mb-1 font-medium"
           >
             <ArrowLeft size={12} />
             <span>Back to Models</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Cpu size={22} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">{item.display_name}</h1>
+            <Cpu size={22} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">{item.display_name}</h1>
           </div>
-          <p className="text-xs text-[#625C64] font-mono mt-0.5">{item.model_name}</p>
+          <p className="text-xs text-[var(--db-text-secondary)] font-mono mt-0.5">{item.model_name}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {item.is_default ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#FFF4CC] text-[#8C5A00] font-semibold text-xs border border-[#E3AC19]/40">
-              <Star size={12} className="fill-[#8C5A00]" /> Default Profile
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--db-signal-soft)] text-[var(--db-warning)] font-semibold text-xs border border-[var(--db-signal)]/40">
+              <Star size={12} className="fill-[var(--db-warning)]" /> Default profile
             </span>
           ) : canManage ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded text-xs font-semibold transition-colors"
               onClick={() =>
                 void api.setDefaultProfile(profileId).then(async () => {
                   await invalidate();
@@ -86,7 +86,7 @@ export function ModelProfileDetailPage() {
               }
             >
               <Star size={13} />
-              <span>Make Default</span>
+              <span>Make default</span>
             </button>
           ) : null}
         </div>
@@ -94,9 +94,9 @@ export function ModelProfileDetailPage() {
 
       {/* Edit Form Card */}
       {canManage && connections.data ? (
-        <div className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg p-6 shadow-xs mb-6">
-          <h2 className="text-sm font-semibold text-[#252127] pb-2 mb-4 border-b border-[#E7E3DC]">
-            Profile Parameters
+        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg p-6 shadow-xs mb-6">
+          <h2 className="text-sm font-semibold text-[var(--db-text-primary)] pb-2 mb-4 border-b border-[var(--db-border-subtle)]">
+            Profile parameters
           </h2>
           <ProfileEdit
             key={item.id}
@@ -109,19 +109,19 @@ export function ModelProfileDetailPage() {
           />
         </div>
       ) : (
-        <div className="p-4 bg-[#FFFDFC] border border-[#DAD5CD] rounded-lg text-xs text-[#8B848C] mb-6">
+        <div className="p-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg text-xs text-[var(--db-text-muted)] mb-6">
           This profile is read-only for your workspace role.
         </div>
       )}
 
-      {/* Danger Zone */}
+      {/* Danger zone */}
       {canManage && (
-        <div className="bg-[#FFFDFC] border border-[#A84545]/30 rounded-lg p-5 shadow-xs">
-          <div className="flex items-center gap-2 mb-1 text-[#A84545]">
+        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-danger)]/30 rounded-lg p-5 shadow-xs">
+          <div className="flex items-center gap-2 mb-1 text-[var(--db-danger)]">
             <AlertTriangle size={16} />
-            <h2 className="text-sm font-semibold">Danger Zone</h2>
+            <h2 className="text-sm font-semibold">Danger zone</h2>
           </div>
-          <p className="text-xs text-[#625C64] mb-3">
+          <p className="text-xs text-[var(--db-text-secondary)] mb-3">
             Delete this reusable AI reasoning profile. The backend will reject deletion if it is currently set as the organization default.
           </p>
           <ConfirmationDialog
@@ -204,7 +204,7 @@ function ProfileEdit({
         name="connectionId"
         render={({ field }) => (
           <SingleSelect
-            label="Backend Provider Connection"
+            label="Backend provider connection"
             value={field.value}
             onChange={field.onChange}
             options={connections.map((connection) => ({
@@ -217,12 +217,12 @@ function ProfileEdit({
       <Controller
         control={control}
         name="displayName"
-        render={({ field }) => <FormField label="Display Name" {...field} error={errors.displayName?.message} />}
+        render={({ field }) => <FormField label="Display name" {...field} error={errors.displayName?.message} />}
       />
       <Controller
         control={control}
         name="modelName"
-        render={({ field }) => <FormField label="Model Identifier" {...field} error={errors.modelName?.message} />}
+        render={({ field }) => <FormField label="Model identifier" {...field} error={errors.modelName?.message} />}
       />
 
       <div className="grid grid-cols-2 gap-4">
@@ -234,7 +234,7 @@ function ProfileEdit({
         <Controller
           control={control}
           name="maxTokens"
-          render={({ field }) => <FormField label="Max Tokens" type="number" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.maxTokens?.message} />}
+          render={({ field }) => <FormField label="Max tokens" type="number" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.maxTokens?.message} />}
         />
       </div>
 
@@ -248,7 +248,7 @@ function ProfileEdit({
                 <Switch.Thumb />
               </Switch.Control>
               <Switch.Content>
-                <Label>Enable Profile for Analysis</Label>
+                <Label>Enable profile for analysis</Label>
               </Switch.Content>
             </Switch>
           )}
@@ -262,7 +262,7 @@ function ProfileEdit({
                 <Switch.Thumb />
               </Switch.Control>
               <Switch.Content>
-                <Label>Set as Default Workspace Profile</Label>
+                <Label>Set as default workspace profile</Label>
               </Switch.Content>
             </Switch>
           )}
@@ -270,7 +270,7 @@ function ProfileEdit({
       </div>
 
       {errors.root?.message && (
-        <div className="p-2.5 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545]">
+        <div className="p-2.5 bg-[var(--db-danger-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-danger)]">
           {errors.root.message}
         </div>
       )}
@@ -279,10 +279,10 @@ function ProfileEdit({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors disabled:opacity-50"
         >
           <Save size={13} />
-          <span>{isSubmitting ? 'Saving…' : 'Save Profile Changes'}</span>
+          <span>{isSubmitting ? 'Saving…' : 'Save profile changes'}</span>
         </button>
       </div>
     </form>

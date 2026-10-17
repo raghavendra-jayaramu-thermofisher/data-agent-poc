@@ -8,7 +8,11 @@ import { server } from '../../test/server';
 import { queryKeys } from '../../api/queryKeys';
 import type { ManagedJob } from '../../jobs/types';
 
-const manager = vi.hoisted(() => ({ jobs: [] as ManagedJob[], registerJob: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined) }));
+const manager = vi.hoisted(() => ({
+  jobs: [] as ManagedJob[],
+  registerJob: vi.fn(async () => undefined),
+  cancel: vi.fn(async () => undefined),
+}));
 const answerRenders = vi.hoisted(() => vi.fn());
 vi.mock('../components/AssistantMarkdown', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../components/AssistantMarkdown')>();
@@ -24,17 +28,62 @@ vi.mock('../components/AssistantMarkdown', async (importOriginal) => {
 // Resolve fetch after MSW starts instead of capturing the original fetch during imports.
 vi.mock('openapi-fetch', async (importOriginal) => {
   const actual = await importOriginal<typeof import('openapi-fetch')>();
-  return { ...actual, default: (options: Parameters<typeof actual.default>[0]) => actual.default({ ...options, fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) }) };
+  return {
+    ...actual,
+    default: (options: Parameters<typeof actual.default>[0]) =>
+      actual.default({
+        ...options,
+        fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+      }),
+  };
 });
-vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { id: 'org-1', name: 'Org', role: 'owner' } }) }));
-vi.mock('../../jobs/JobManagerProvider', () => ({ useJobManager: () => ({ ...manager, activeJobs: manager.jobs.filter((entry) => entry.job.status === 'running' || entry.job.status === 'queued'), latestEvent: () => undefined, currentLabel: () => null, isLoading: false }) }));
+vi.mock('../../organizations/OrganizationProvider', () => ({
+  useOrganization: () => ({ activeOrganization: { id: 'org-1', name: 'Org', role: 'owner' } }),
+}));
+vi.mock('../../auth/AuthProvider', () => ({
+  useAuth: () => ({ user: { display_name: 'Alex Morgan', email: 'alex@example.com' } }),
+}));
+vi.mock('../../jobs/JobManagerProvider', () => ({
+  useJobManager: () => ({
+    ...manager,
+    activeJobs: manager.jobs.filter(
+      (entry) => entry.job.status === 'running' || entry.job.status === 'queued',
+    ),
+    latestEvent: () => undefined,
+    currentLabel: () => null,
+    isLoading: false,
+  }),
+}));
 
 import { ConversationPage } from './ConversationPage';
 import { RecentConversations } from '../components/RecentConversations';
 import { useConversationList } from '../hooks/useConversations';
 
-const conversation = { id: 'c1', organization_id: 'org-1', title: 'Revenue analysis', created_by: 'u1', model_profile_id: null, data_source_ids: ['ds1'], created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z' };
-const source = { id: 'ds1', organization_id: 'org-1', name: 'Warehouse', kind: 'postgres', display_type: 'postgres', status: 'active', config: {}, created_by: 'u1', last_tested_at: null, last_error_code: null, created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z', active_file: null };
+const conversation = {
+  id: 'c1',
+  organization_id: 'org-1',
+  title: 'Revenue analysis',
+  created_by: 'u1',
+  model_profile_id: null,
+  data_source_ids: ['ds1'],
+  created_at: '2026-08-24T12:00:00Z',
+  updated_at: '2026-08-24T12:00:00Z',
+};
+const source = {
+  id: 'ds1',
+  organization_id: 'org-1',
+  name: 'Warehouse',
+  kind: 'postgres',
+  display_type: 'postgres',
+  status: 'active',
+  config: {},
+  created_by: 'u1',
+  last_tested_at: null,
+  last_error_code: null,
+  created_at: '2026-08-24T12:00:00Z',
+  updated_at: '2026-08-24T12:00:00Z',
+  active_file: null,
+};
 
 function RecentChats() {
   const chats = useConversationList();
@@ -43,32 +92,59 @@ function RecentChats() {
 
 function renderPage(state?: object, withRecent = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[{ pathname: '/conversations/c1', state }]}>{withRecent ? <RecentChats/> : null}<Routes><Route path="/conversations/:conversationId" element={<ConversationPage/>}/><Route path="/ask" element={<div>Ask page</div>}/></Routes></MemoryRouter></QueryClientProvider>);
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[{ pathname: '/conversations/c1', state }]}>
+        {withRecent ? <RecentChats /> : null}
+        <Routes>
+          <Route path="/conversations/:conversationId" element={<ConversationPage />} />
+          <Route path="/ask" element={<div>Ask page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
   return client;
 }
 
 function baseHandlers(messageProvider: () => unknown[] = () => []) {
   server.use(
-    http.get('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ ...conversation, messages: [] })),
-    http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json(messageProvider())),
-    http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([conversation])),
+    http.get('http://localhost:12201/api/v1/conversations/c1', () =>
+      HttpResponse.json({ ...conversation, messages: [] }),
+    ),
+    http.get('http://localhost:12201/api/v1/conversations/c1/messages', () =>
+      HttpResponse.json(messageProvider()),
+    ),
+    http.get('http://localhost:12201/api/v1/conversations', () =>
+      HttpResponse.json([conversation]),
+    ),
     http.get('http://localhost:12201/api/v1/data-sources', () => HttpResponse.json([source])),
     http.get('http://localhost:12201/api/v1/models/profiles', () => HttpResponse.json([])),
     http.get('http://localhost:12201/api/v1/instructions', () => HttpResponse.json([])),
-    http.get('http://localhost:12201/api/v1/jobs/:jobId/execution', () => HttpResponse.json({ tools: [], sql: [], models: [], artifacts: [] })),
+    http.get('http://localhost:12201/api/v1/jobs/:jobId/execution', () =>
+      HttpResponse.json({ tools: [], sql: [], models: [], artifacts: [] }),
+    ),
   );
 }
 
 describe('durable conversation workspace', () => {
   beforeEach(() => {
-    manager.jobs = []; manager.registerJob.mockClear(); manager.cancel.mockClear();
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+    manager.jobs = [];
+    manager.registerJob.mockClear();
+    manager.cancel.mockClear();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
   });
 
   it('updates a follow-up draft without rerendering the report, and still renders new answer data', async () => {
     const answer = {
-      id: 'm-answer', conversation_id: 'c1', role: 'assistant',
-      content: '# Customer report\n\nCurrent backlog.', job_id: null, metadata: {},
+      id: 'm-answer',
+      conversation_id: 'c1',
+      role: 'assistant',
+      content: '# Customer report\n\nCurrent backlog.',
+      job_id: null,
+      metadata: {},
       created_at: '2026-08-24T12:00:00Z',
     };
     baseHandlers(() => [answer]);
@@ -95,13 +171,17 @@ describe('durable conversation workspace', () => {
   it('preserves a new draft typed while the previous submission is pending', async () => {
     baseHandlers();
     let release!: () => void;
-    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const received = vi.fn();
-    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
-      received(await request.json());
-      await pending;
-      return HttpResponse.json({ message_id: 'm-new', job_id: 'j-new' }, { status: 202 });
-    }));
+    server.use(
+      http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+        received(await request.json());
+        await pending;
+        return HttpResponse.json({ message_id: 'm-new', job_id: 'j-new' }, { status: 202 });
+      }),
+    );
     renderPage();
     const user = userEvent.setup();
     const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
@@ -114,19 +194,42 @@ describe('durable conversation workspace', () => {
     release();
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-new'));
     expect(input).toHaveValue('Next question draft');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Send question' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send question' })).toBeEnabled(),
+    );
   });
 
   it('submits the latest answer suggestion in the same conversation without clearing a composer draft', async () => {
     baseHandlers(() => [
-      { id: 'old', conversation_id: 'c1', role: 'assistant', content: 'Old answer', job_id: null, metadata: { follow_up_suggestions: ['Old suggestion?'] }, created_at: '2026-08-24T12:00:00Z' },
-      { id: 'latest', conversation_id: 'c1', role: 'assistant', content: 'Latest answer', job_id: 'answer-job', metadata: { follow_up_suggestions: ['Compare customers?'] }, created_at: '2026-08-24T12:01:00Z' },
+      {
+        id: 'old',
+        conversation_id: 'c1',
+        role: 'assistant',
+        content: 'Old answer',
+        job_id: null,
+        metadata: { follow_up_suggestions: ['Old suggestion?'] },
+        created_at: '2026-08-24T12:00:00Z',
+      },
+      {
+        id: 'latest',
+        conversation_id: 'c1',
+        role: 'assistant',
+        content: 'Latest answer',
+        job_id: 'answer-job',
+        metadata: { follow_up_suggestions: ['Compare customers?'] },
+        created_at: '2026-08-24T12:01:00Z',
+      },
     ]);
     const received = vi.fn();
-    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
-      received(await request.json());
-      return HttpResponse.json({ message_id: 'm-suggestion', job_id: 'j-suggestion' }, { status: 202 });
-    }));
+    server.use(
+      http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+        received(await request.json());
+        return HttpResponse.json(
+          { message_id: 'm-suggestion', job_id: 'j-suggestion' },
+          { status: 202 },
+        );
+      }),
+    );
     renderPage();
     const user = userEvent.setup();
     const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
@@ -134,7 +237,10 @@ describe('durable conversation workspace', () => {
     expect(screen.queryByRole('button', { name: 'Old suggestion?' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Compare customers?' }));
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-suggestion'));
-    expect(received).toHaveBeenCalledWith({ content: 'Compare customers?', model_profile_id: null });
+    expect(received).toHaveBeenCalledWith({
+      content: 'Compare customers?',
+      model_profile_id: null,
+    });
     expect(input).toHaveValue('My draft');
   });
 
@@ -142,7 +248,9 @@ describe('durable conversation workspace', () => {
     baseHandlers();
     let saved = { ...conversation };
     server.use(
-      http.get('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ ...saved, messages: [] })),
+      http.get('http://localhost:12201/api/v1/conversations/c1', () =>
+        HttpResponse.json({ ...saved, messages: [] }),
+      ),
       http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([saved])),
       http.patch('http://localhost:12201/api/v1/conversations/c1', async ({ request }) => {
         expect(await request.json()).toEqual({ title: 'Monthly revenue review' });
@@ -152,19 +260,25 @@ describe('durable conversation workspace', () => {
     );
     const client = renderPage(undefined, true);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    await user.click(await screen.findByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename chat' }));
     const input = screen.getByRole('textbox', { name: 'Chat title' });
     expect(input).toHaveValue('Revenue analysis');
     await user.clear(input);
     await user.type(input, '  Monthly revenue review  ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByRole('heading', { name: 'Monthly revenue review' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Monthly revenue review' }),
+    ).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /Monthly revenue review/ })).toBeInTheDocument();
     await client.invalidateQueries({ queryKey: ['conversations', 'org-1'] });
     expect(screen.getByRole('heading', { name: 'Monthly revenue review' })).toBeInTheDocument();
     expect(manager.registerJob).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Rename chat' }));
-    expect(screen.getByRole('textbox', { name: 'Chat title' })).toHaveValue('Monthly revenue review');
+    await user.click(screen.getByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename chat' }));
+    expect(screen.getByRole('textbox', { name: 'Chat title' })).toHaveValue(
+      'Monthly revenue review',
+    );
   });
 
   it('cancels a rename and rejects a blank title without saving', async () => {
@@ -173,12 +287,14 @@ describe('durable conversation workspace', () => {
     server.use(http.patch('http://localhost:12201/api/v1/conversations/c1', patch));
     renderPage();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    await user.click(await screen.findByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename chat' }));
     await user.clear(screen.getByRole('textbox', { name: 'Chat title' }));
     await user.type(screen.getByRole('textbox', { name: 'Chat title' }), 'Other title');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('heading', { name: 'Revenue analysis' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Rename chat' }));
+    await user.click(screen.getByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename chat' }));
     const input = screen.getByRole('textbox', { name: 'Chat title' });
     expect(input).toHaveValue('Revenue analysis');
     await user.clear(input);
@@ -190,42 +306,87 @@ describe('durable conversation workspace', () => {
 
   it('keeps the old title and editable draft when a rename fails', async () => {
     baseHandlers();
-    server.use(http.patch('http://localhost:12201/api/v1/conversations/c1', () => HttpResponse.json({ error: { code: 'RENAME_FAILED', message: 'Unable to save the title.' } }, { status: 503 })));
+    server.use(
+      http.patch('http://localhost:12201/api/v1/conversations/c1', () =>
+        HttpResponse.json(
+          { error: { code: 'RENAME_FAILED', message: 'Unable to save the title.' } },
+          { status: 503 },
+        ),
+      ),
+    );
     renderPage();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Rename chat' }));
+    await user.click(await screen.findByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename chat' }));
     const input = screen.getByRole('textbox', { name: 'Chat title' });
     await user.clear(input);
     await user.type(input, 'New title');
     await user.type(input, '{Enter}');
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to save the title.');
     expect(input).toHaveValue('New title');
-    expect(screen.getByRole('heading', { name: 'Revenue analysis', hidden: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Revenue analysis', hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it('submits the pending first question once, renders the durable user ID immediately, and registers its global job', async () => {
     baseHandlers();
     let submissions = 0;
-    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
-      submissions += 1;
-      expect(await request.json()).toEqual({ content: 'Why did revenue fall?', model_profile_id: null });
-      return HttpResponse.json({ message_id: 'm-durable', job_id: 'j-chat' }, { status: 202 });
-    }));
+    server.use(
+      http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+        submissions += 1;
+        expect(await request.json()).toEqual({
+          content: 'Why did revenue fall?',
+          model_profile_id: null,
+        });
+        return HttpResponse.json({ message_id: 'm-durable', job_id: 'j-chat' }, { status: 202 });
+      }),
+    );
     renderPage({ pendingQuestion: 'Why did revenue fall?', modelProfileId: null });
     expect(await screen.findByText('Why did revenue fall?')).toBeInTheDocument();
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-chat'));
     expect(submissions).toBe(1);
     expect(document.querySelector('[data-message-id="m-durable"]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Delete analysis' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conversation actions' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New Analysis' })).not.toBeInTheDocument();
   });
 
   it('refetches and renders the persisted assistant answer after query reconciliation', async () => {
     let completed = false;
-    baseHandlers(() => completed ? [
-      { id: 'm1', conversation_id: 'c1', role: 'user', content: 'Revenue?', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' },
-      { id: 'm2', conversation_id: 'c1', role: 'assistant', content: '**Revenue declined 8%.**', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:03Z' },
-    ] : [{ id: 'm1', conversation_id: 'c1', role: 'user', content: 'Revenue?', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' }]);
+    baseHandlers(() =>
+      completed
+        ? [
+            {
+              id: 'm1',
+              conversation_id: 'c1',
+              role: 'user',
+              content: 'Revenue?',
+              job_id: 'j1',
+              metadata: {},
+              created_at: '2026-08-24T12:00:00Z',
+            },
+            {
+              id: 'm2',
+              conversation_id: 'c1',
+              role: 'assistant',
+              content: '**Revenue declined 8%.**',
+              job_id: 'j1',
+              metadata: {},
+              created_at: '2026-08-24T12:00:03Z',
+            },
+          ]
+        : [
+            {
+              id: 'm1',
+              conversation_id: 'c1',
+              role: 'user',
+              content: 'Revenue?',
+              job_id: 'j1',
+              metadata: {},
+              created_at: '2026-08-24T12:00:00Z',
+            },
+          ],
+    );
     const client = renderPage();
     expect(await screen.findByText('Revenue?')).toBeInTheDocument();
     completed = true;
@@ -235,38 +396,49 @@ describe('durable conversation workspace', () => {
     expect(assistantCard?.querySelector('.assistant-card-header')).toBeNull();
     expect(assistantCard?.querySelector('.assistant-card-content')).not.toBeNull();
     expect(assistantCard?.querySelector('.assistant-card-footer')).not.toBeNull();
-    expect(assistantCard?.querySelector('.assistant-card-footer .assistant-card-actions')).not.toBeNull();
+    expect(
+      assistantCard?.querySelector('.assistant-card-footer .assistant-card-actions'),
+    ).not.toBeNull();
     expect(screen.queryByRole('button', { name: /execution ledger/i })).not.toBeInTheDocument();
   });
 
-  it('jumps to either end of the conversation', async () => {
-    baseHandlers(() => [
-      { id: 'm1', conversation_id: 'c1', role: 'assistant', content: 'Earlier answer', job_id: null, metadata: {}, created_at: '2026-08-24T12:00:00Z' },
-      { id: 'm2', conversation_id: 'c1', role: 'assistant', content: 'Latest answer', job_id: null, metadata: {}, created_at: '2026-08-24T12:00:03Z' },
-    ]);
+  it('keeps source context behind the conversation menu and removes scrolling controls', async () => {
+    baseHandlers();
     renderPage();
     const user = userEvent.setup();
-    await screen.findByText('Latest answer');
-
-    const workspace = document.querySelector<HTMLElement>('.chat-workspace')!;
-    const scrollRoot = workspace.parentElement!;
-    scrollRoot.classList.add('main-content');
-    Object.defineProperty(scrollRoot, 'scrollHeight', { configurable: true, value: 1800 });
-    const scrollTo = vi.fn();
-    Object.defineProperty(scrollRoot, 'scrollTo', { configurable: true, value: scrollTo });
-
-    await user.click(screen.getByRole('button', { name: 'Scroll to top' }));
-    await user.click(screen.getByRole('button', { name: 'Scroll to bottom' }));
-    expect(scrollTo).toHaveBeenNthCalledWith(1, expect.objectContaining({ top: 0 }));
-    expect(scrollTo).toHaveBeenNthCalledWith(2, expect.objectContaining({ top: 1800 }));
+    await screen.findByRole('heading', { name: 'Revenue analysis' });
+    expect(screen.queryByRole('button', { name: 'Scroll to top' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Scroll to bottom' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Warehouse')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Conversation actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Conversation details' }));
+    expect(screen.getByRole('dialog', { name: 'Conversation details' })).toHaveTextContent(
+      'Warehouse',
+    );
+    await user.keyboard('{Escape}');
   });
 
   it('creates an independent durable job for a follow-up without waiting for an earlier answer', async () => {
-    baseHandlers(() => [{ id: 'm1', conversation_id: 'c1', role: 'user', content: 'Initial question', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' }]);
-    server.use(http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
-      expect(await request.json()).toEqual({ content: 'Now compare enterprise customers.', model_profile_id: null });
-      return HttpResponse.json({ message_id: 'm-follow', job_id: 'j-follow' }, { status: 202 });
-    }));
+    baseHandlers(() => [
+      {
+        id: 'm1',
+        conversation_id: 'c1',
+        role: 'user',
+        content: 'Initial question',
+        job_id: 'j1',
+        metadata: {},
+        created_at: '2026-08-24T12:00:00Z',
+      },
+    ]);
+    server.use(
+      http.post('http://localhost:12201/api/v1/conversations/c1/messages', async ({ request }) => {
+        expect(await request.json()).toEqual({
+          content: 'Now compare enterprise customers.',
+          model_profile_id: null,
+        });
+        return HttpResponse.json({ message_id: 'm-follow', job_id: 'j-follow' }, { status: 202 });
+      }),
+    );
     renderPage();
     const user = userEvent.setup();
     const input = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
@@ -278,12 +450,39 @@ describe('durable conversation workspace', () => {
 
   it('keeps a running analysis alive when live updates are reconnecting', async () => {
     baseHandlers();
-    manager.jobs = [{
-      job: { id: 'j1', organization_id: 'org-1', job_type: 'chat_query', status: 'running', requested_by: 'u1', conversation_id: 'c1', input: {}, result: null, attempt_count: 1, max_attempts: 3, cancel_requested_at: null, error_code: null, error_message: null, created_at: '2026-08-24T12:00:00Z', started_at: '2026-08-24T12:00:01Z', finished_at: null },
-      events: [{ sequence: 2, event_type: 'sql.started', level: 'info', payload: {}, created_at: '2026-08-24T12:00:02Z' }],
-      lastSeenSequence: 2,
-      connectionState: 'reconnecting',
-    }];
+    manager.jobs = [
+      {
+        job: {
+          id: 'j1',
+          organization_id: 'org-1',
+          job_type: 'chat_query',
+          status: 'running',
+          requested_by: 'u1',
+          conversation_id: 'c1',
+          input: {},
+          result: null,
+          attempt_count: 1,
+          max_attempts: 3,
+          cancel_requested_at: null,
+          error_code: null,
+          error_message: null,
+          created_at: '2026-08-24T12:00:00Z',
+          started_at: '2026-08-24T12:00:01Z',
+          finished_at: null,
+        },
+        events: [
+          {
+            sequence: 2,
+            event_type: 'sql.started',
+            level: 'info',
+            payload: {},
+            created_at: '2026-08-24T12:00:02Z',
+          },
+        ],
+        lastSeenSequence: 2,
+        connectionState: 'reconnecting',
+      },
+    ];
     renderPage();
     expect(await screen.findByText('Executing SQL…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Stop/i })).toBeEnabled();
@@ -292,12 +491,39 @@ describe('durable conversation workspace', () => {
 
   it('shows a safe failed-job state without rendering hidden event payloads', async () => {
     baseHandlers();
-    manager.jobs = [{
-      job: { id: 'j1', organization_id: 'org-1', job_type: 'chat_query', status: 'failed', requested_by: 'u1', conversation_id: 'c1', input: {}, result: null, attempt_count: 1, max_attempts: 3, cancel_requested_at: null, error_code: 'QUERY_TIMEOUT', error_message: 'The query exceeded the allowed duration.', created_at: '2026-08-24T12:00:00Z', started_at: '2026-08-24T12:00:01Z', finished_at: '2026-08-24T12:00:05Z' },
-      events: [{ sequence: 1, event_type: 'tool.started', level: 'info', payload: { hidden_prompt: 'SECRET_REASONING' }, created_at: '2026-08-24T12:00:01Z' }],
-      lastSeenSequence: 1,
-      connectionState: 'closed',
-    }];
+    manager.jobs = [
+      {
+        job: {
+          id: 'j1',
+          organization_id: 'org-1',
+          job_type: 'chat_query',
+          status: 'failed',
+          requested_by: 'u1',
+          conversation_id: 'c1',
+          input: {},
+          result: null,
+          attempt_count: 1,
+          max_attempts: 3,
+          cancel_requested_at: null,
+          error_code: 'QUERY_TIMEOUT',
+          error_message: 'The query exceeded the allowed duration.',
+          created_at: '2026-08-24T12:00:00Z',
+          started_at: '2026-08-24T12:00:01Z',
+          finished_at: '2026-08-24T12:00:05Z',
+        },
+        events: [
+          {
+            sequence: 1,
+            event_type: 'tool.started',
+            level: 'info',
+            payload: { hidden_prompt: 'SECRET_REASONING' },
+            created_at: '2026-08-24T12:00:01Z',
+          },
+        ],
+        lastSeenSequence: 1,
+        connectionState: 'closed',
+      },
+    ];
     renderPage();
     expect(await screen.findByText('This analysis took too long')).toBeInTheDocument();
     expect(screen.queryByText('SECRET_REASONING')).not.toBeInTheDocument();

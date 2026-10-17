@@ -5,7 +5,7 @@ const STORAGE_KEY = 'data_agent_sidebar_display';
 export const ALL_SIDEBAR_TABS = [
   { key: '/ask', label: 'Ask', fixed: true },
   { key: '/dashboards', label: 'Dashboards', fixed: false },
-  { key: '/data-sources', label: 'Data Sources', fixed: false },
+  { key: '/data-sources', label: 'Data sources', fixed: false },
   { key: '/knowledge', label: 'Knowledge', fixed: false },
   { key: '/skills', label: 'Templates', fixed: false },
   { key: '/models', label: 'Models', fixed: false },

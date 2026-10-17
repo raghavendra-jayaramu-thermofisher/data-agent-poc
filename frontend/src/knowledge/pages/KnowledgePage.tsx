@@ -46,7 +46,7 @@ export function KnowledgePage() {
           canManage ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
               onClick={() => navigate('/data-sources/new')}
             >
               <Plus size={14} />
@@ -63,10 +63,10 @@ export function KnowledgePage() {
       <div className="page-header">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <BrainCircuit size={20} className="text-[#4B123F]" />
-            <h1 className="text-xl font-semibold text-[#252127]">Knowledge Bases & Schemas</h1>
+            <BrainCircuit size={20} className="text-[var(--db-primary)]" />
+            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">Knowledge Bases & Schemas</h1>
           </div>
-          <p className="text-xs text-[#625C64]">
+          <p className="text-xs text-[var(--db-text-secondary)]">
             Deterministic schema introspection, table definitions, and business annotations.
           </p>
         </div>
@@ -91,23 +91,23 @@ export function KnowledgePage() {
                   <td>
                     <Link
                       to={`/knowledge/${source.id}`}
-                      className="font-medium text-[#4B123F] hover:underline flex items-center gap-1.5"
+                      className="font-medium text-[var(--db-primary)] hover:underline flex items-center gap-1.5"
                     >
-                      <Database size={13} className="text-[#8B848C]" />
+                      <Database size={13} className="text-[var(--db-text-muted)]" />
                       <span>{source.name}</span>
                     </Link>
                   </td>
                   <td>
                     <StatusChip status={status?.status ?? (statuses[index]?.isLoading ? 'loading' : 'empty')} />
                   </td>
-                  <td className="font-mono text-[#625C64]">{status?.object_count ?? '—'}</td>
-                  <td className="text-[#625C64]">
+                  <td className="font-mono text-[var(--db-text-secondary)]">{status?.object_count ?? '—'}</td>
+                  <td className="text-[var(--db-text-secondary)]">
                     {status?.generated_at ? formatLocalDateTime(status.generated_at) : 'Never'}
                   </td>
                   <td>
                     <Link
                       to={`/knowledge/${source.id}`}
-                      className="text-xs text-[#4B123F] font-semibold hover:underline"
+                      className="text-xs text-[var(--db-primary)] font-semibold hover:underline"
                     >
                       Inspect / Train →
                     </Link>

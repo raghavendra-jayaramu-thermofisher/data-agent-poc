@@ -730,7 +730,8 @@
               "line",
               "area",
               "pie",
-              "donut"
+              "donut",
+              "combo"
             ],
             "title": "Widget Type",
             "type": "string"
@@ -4024,6 +4025,31 @@
           "rows"
         ],
         "title": "ExcelTableExport"
+      },
+      "MatrixViewState": {
+        "properties": {
+          "collapsed_rows": {
+            "items": {
+              "type": "string",
+              "pattern": "^r[a-f0-9]{24}$"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Collapsed Rows"
+          },
+          "collapsed_columns": {
+            "items": {
+              "type": "string",
+              "pattern": "^c[a-f0-9]{24}$"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Collapsed Columns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MatrixViewState"
       }
     },
     "securitySchemes": {
@@ -8989,6 +9015,86 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
+      "post": {
+        "operationId": "export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatrixViewState"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Matrix",
+        "tags": [
+          "job execution"
+        ]
       }
     }
   }

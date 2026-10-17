@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs } from '@heroui/react';
 import type { ReactNode } from 'react';
 import { createAnswerOutline } from './answer-outline';
+import { BrandLogo } from '../../components/BrandLogo';
+import { BRANDING } from '../../lib/branding';
 
 export function AnswerNavigation({
   content,
@@ -9,12 +11,14 @@ export function AnswerNavigation({
   onSectionChange,
   selectedKey,
   onSelectedKeyChange,
+  showIdentity = true,
 }: {
   content: string;
   renderContent: (markdown: string) => ReactNode;
   onSectionChange?: () => void;
   selectedKey?: string;
   onSelectedKeyChange?: (key: string) => void;
+  showIdentity?: boolean;
 }) {
   const outline = useMemo(() => createAnswerOutline(content), [content]);
   const [selected, setSelected] = useState('document');
@@ -65,11 +69,29 @@ export function AnswerNavigation({
   }, [active]);
 
   if (outline.sections.length < 2) {
-    return <div className="answer-main-content">{renderContent(content)}</div>;
+    return (
+      <>
+        {showIdentity && (
+          <div className="answer-identity">
+            <BrandLogo />
+            <span>{BRANDING.name}</span>
+          </div>
+        )}
+        <div className="answer-main-content">{renderContent(content)}</div>
+      </>
+    );
   }
 
   return (
-    <div ref={navigationRef} className="answer-navigation">
+    <div
+      ref={navigationRef}
+      className={`answer-navigation${showIdentity ? ' answer-navigation--identified' : ''}`}
+    >
+      {showIdentity && (
+        <span className="answer-brand-mark">
+          <BrandLogo />
+        </span>
+      )}
       <Tabs
         className="answer-section-tabs"
         variant="secondary"

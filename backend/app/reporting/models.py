@@ -33,7 +33,7 @@ class DashboardWidget(TimestampMixin, Base):
     __tablename__ = "dashboard_widgets"
     __table_args__ = (
         CheckConstraint(
-            "widget_type IN ('metric','table','bar','line','area','pie','donut')",
+            "widget_type IN ('metric','table','bar','line','area','pie','donut','combo')",
             name="valid_widget_type",
         ),
         Index("ix_dashboard_widgets_dashboard_created", "dashboard_id", "created_at"),

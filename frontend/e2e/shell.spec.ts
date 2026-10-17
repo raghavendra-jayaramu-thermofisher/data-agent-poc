@@ -43,7 +43,7 @@ test.describe('Task 1 shell', () => {
         const openNavigation = page.getByRole('button', { name: 'Open navigation' });
         await expect(openNavigation).toBeVisible();
         await openNavigation.click();
-        await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
         await expect(page.getByRole('link', { name: 'Dashboards' })).toBeVisible();
     });
 });

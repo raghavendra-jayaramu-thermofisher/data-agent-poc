@@ -21,9 +21,9 @@ function AuditContent() {
 
   return (
     <div>
-      <div className="pb-3 mb-4 border-b border-[#DAD5CD]">
-        <h2 className="text-sm font-semibold text-[#252127]">Audit Trail</h2>
-        <p className="text-xs text-[#625C64]">Most recent immutable organization audit logs.</p>
+      <div className="pb-3 mb-4 border-b border-[var(--db-border-default)]">
+        <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Audit Trail</h2>
+        <p className="text-xs text-[var(--db-text-secondary)]">Most recent immutable organization audit logs.</p>
       </div>
 
       <div className="analytical-table-shell">
@@ -40,24 +40,24 @@ function AuditContent() {
           <tbody>
             {query.data.map((entry) => (
               <tr key={entry.id}>
-                <td className="text-xs text-[#625C64] whitespace-nowrap">
+                <td className="text-xs text-[var(--db-text-secondary)] whitespace-nowrap">
                   {formatLocalDateTime(entry.created_at)}
                 </td>
-                <td className="font-semibold text-xs text-[#4B123F]">{entry.action}</td>
-                <td className="text-xs text-[#252127]">
+                <td className="font-semibold text-xs text-[var(--db-primary)]">{entry.action}</td>
+                <td className="text-xs text-[var(--db-text-primary)]">
                   <span>{entry.resource_type}</span>
                   {entry.resource_id ? (
-                    <div className="font-mono text-[10px] text-[#8B848C]">{entry.resource_id}</div>
+                    <div className="font-mono text-[10px] text-[var(--db-text-muted)]">{entry.resource_id}</div>
                   ) : null}
                 </td>
-                <td className="font-mono text-xs text-[#625C64]">
+                <td className="font-mono text-xs text-[var(--db-text-secondary)]">
                   {entry.user_id ? entry.user_id : 'System'}
                 </td>
                 <td className="text-xs">
                   {Object.keys(entry.metadata).length ? (
                     <details className="cursor-pointer">
-                      <summary className="text-[#4B123F] hover:underline font-medium">View JSON</summary>
-                      <pre className="p-2 mt-1 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[10px] font-mono overflow-x-auto max-w-xs">
+                      <summary className="text-[var(--db-primary)] hover:underline font-medium">View JSON</summary>
+                      <pre className="p-2 mt-1 bg-[var(--db-surface-muted)] border border-[var(--db-border-default)] rounded text-[10px] font-mono overflow-x-auto max-w-xs">
                         {safeJsonStringify(entry.metadata)}
                       </pre>
                     </details>

@@ -1,4 +1,5 @@
 import { SingleSelect } from '../../components/SingleSelect';
+import { FormField } from '../../auth/components/FormField';
 import type { WidgetMappingValues, WidgetType } from '../schemas/dashboard-schemas';
 
 export function WidgetMappingFields({
@@ -41,16 +42,27 @@ export function WidgetMappingFields({
         />
       </div>
     );
-  const series = values.series?.length
+  const rawSeries = values.series?.length
     ? values.series
     : [{ field: values.valueField, label: values.valueField }];
+  const series = rawSeries.map((item) =>
+    widgetType === 'combo'
+      ? { ...item, type: item.type ?? 'bar', axis: item.axis ?? 'primary' }
+      : item,
+  );
+  function updateSeries(index: number, changes: Partial<(typeof series)[number]>) {
+    onChange(
+      'series',
+      series.map((item, i) => (i === index ? { ...item, ...changes } : item)),
+    );
+  }
   const unused = columns.find(
     (column) => column !== values.xField && !series.some((item) => item.field === column),
   );
   function changeSeries(index: number, field: string) {
     onChange(
       'series',
-      series.map((item, i) => (i === index ? { field, label: field } : item)),
+      series.map((item, i) => (i === index ? { ...item, field, label: field } : item)),
     );
     if (index === 0) onChange('valueField', field);
   }
@@ -70,6 +82,46 @@ export function WidgetMappingFields({
             onChange={(value) => changeSeries(index, value)}
             options={options}
           />
+          {widgetType === 'combo' && (
+            <>
+              <SingleSelect
+                label={`Series ${index + 1} type`}
+                value={item.type ?? 'bar'}
+                onChange={(value) =>
+                  updateSeries(index, { type: value as 'bar' | 'line', axis: 'primary' })
+                }
+                options={[
+                  { value: 'bar', label: 'Column' },
+                  { value: 'line', label: 'Line' },
+                ]}
+              />
+              <SingleSelect
+                label={`Series ${index + 1} axis`}
+                value={item.axis ?? 'primary'}
+                onChange={(value) =>
+                  updateSeries(index, { axis: value as 'primary' | 'secondary' })
+                }
+                options={
+                  item.type === 'line'
+                    ? [
+                        { value: 'primary', label: 'Primary (shared scale)' },
+                        { value: 'secondary', label: 'Secondary (right)' },
+                      ]
+                    : [{ value: 'primary', label: 'Primary (left)' }]
+                }
+              />
+              <FormField
+                label={`Series ${index + 1} label`}
+                value={item.label ?? ''}
+                onChange={(event) => updateSeries(index, { label: event.target.value })}
+              />
+              <FormField
+                label={`Series ${index + 1} unit`}
+                value={item.unit ?? ''}
+                onChange={(event) => updateSeries(index, { unit: event.target.value })}
+              />
+            </>
+          )}
           {index > 0 ? (
             <button
               type="button"
@@ -88,22 +140,33 @@ export function WidgetMappingFields({
       {series.length < 8 && unused ? (
         <button
           type="button"
-          onClick={() => onChange('series', [...series, { field: unused, label: unused }])}
+          onClick={() =>
+            onChange('series', [
+              ...series,
+              {
+                field: unused,
+                label: unused,
+                ...(widgetType === 'combo' ? ({ type: 'bar', axis: 'primary' } as const) : {}),
+              },
+            ])
+          }
         >
           Add series
         </button>
       ) : null}
-      {widgetType === 'bar' ? (
+      {widgetType === 'bar' || widgetType === 'combo' ? (
         <div className="form-grid-2">
-          <SingleSelect
-            label="Orientation"
-            value={values.orientation ?? 'vertical'}
-            onChange={(value) => onChange('orientation', value as 'vertical' | 'horizontal')}
-            options={[
-              { value: 'vertical', label: 'Vertical columns' },
-              { value: 'horizontal', label: 'Horizontal bars' },
-            ]}
-          />
+          {widgetType === 'bar' && (
+            <SingleSelect
+              label="Orientation"
+              value={values.orientation ?? 'vertical'}
+              onChange={(value) => onChange('orientation', value as 'vertical' | 'horizontal')}
+              options={[
+                { value: 'vertical', label: 'Vertical columns' },
+                { value: 'horizontal', label: 'Horizontal bars' },
+              ]}
+            />
+          )}
           <SingleSelect
             label="Series layout"
             value={values.stacked ? 'stacked' : 'grouped'}
@@ -115,6 +178,20 @@ export function WidgetMappingFields({
           />
         </div>
       ) : null}
+      {widgetType === 'combo' && (
+        <div className="form-grid-2">
+          <FormField
+            label="Primary y-axis title"
+            value={values.yLabel ?? ''}
+            onChange={(event) => onChange('yLabel', event.target.value)}
+          />
+          <FormField
+            label="Secondary y-axis title"
+            value={values.secondaryYLabel ?? ''}
+            onChange={(event) => onChange('secondaryYLabel', event.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 }

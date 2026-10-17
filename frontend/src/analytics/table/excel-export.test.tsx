@@ -36,7 +36,7 @@ describe('Excel table export', () => {
   it('exports all rows from the expanded table even when search filters the view', async () => {
     const user = userEvent.setup();
     render(<AnalyticalTable model={model} label="Orders" />);
-    await user.click(screen.getByTitle('Expand to full screen'));
+    await user.click(screen.getByRole('button', { name: 'Expand table to full screen' }));
     await user.type(screen.getByPlaceholderText('Search across all columns…'), 'Alice');
     await user.click(screen.getAllByRole('button', { name: 'Export to Excel' }).at(-1)!);
     await waitFor(() => expect(downloadExcel).toHaveBeenCalledWith(excelTableFromModel(model, 'Orders')));

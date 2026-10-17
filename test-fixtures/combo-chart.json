@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "renderer": "frontend",
+  "chart_type": "combo",
+  "title": "Orders and fulfilment by month",
+  "source_sql_execution_id": "44444444-4444-4444-8444-444444444444",
+  "orientation": "vertical",
+  "stacked": true,
+  "y_label": "Orders (count)",
+  "secondary_y_label": "Fulfilment (%)",
+  "encoding": {
+    "x": {"field": "month", "label": "Month"},
+    "series": [
+      {"field": "online", "label": "Online", "type": "bar", "axis": "primary", "unit": "count"},
+      {"field": "store", "label": "Store", "type": "bar", "axis": "primary", "unit": "count"},
+      {"field": "fulfilled", "label": "Fulfilment", "type": "line", "axis": "secondary", "unit": "%"},
+      {"field": "target", "label": "Target", "type": "line", "axis": "secondary", "unit": "%"}
+    ]
+  },
+  "data": [
+    {"month": "Jan", "online": "120", "store": 80, "fulfilled": "72.5", "target": 90},
+    {"month": "Feb", "online": 160, "store": 95, "fulfilled": null, "target": 90},
+    {"month": "Mar", "online": 145, "store": 110, "fulfilled": 88, "target": 90},
+    {"month": "Apr", "online": 200, "store": 120, "fulfilled": 94, "target": 90},
+    {"month": "May", "online": 185, "store": 130, "fulfilled": 91, "target": 90},
+    {"month": "Jun", "online": 230, "store": 140, "fulfilled": 96, "target": 90}
+  ]
+}

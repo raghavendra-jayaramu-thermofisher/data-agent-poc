@@ -1,6 +1,6 @@
 import type { JobArtifact, SqlExecution } from '../agent/api/execution-api';
 
-export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'metric';
+export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'metric' | 'combo';
 export type CartesianChartType = Exclude<ChartType, 'pie' | 'donut' | 'metric'>;
 export type ChartPoint = Record<string, string | number | null>;
 export type AnalyticalSeries = {
@@ -10,6 +10,8 @@ export type AnalyticalSeries = {
   metric: string;
   label: string;
   unit?: string | null;
+  type?: 'bar' | 'line';
+  axis?: 'primary' | 'secondary';
   dimension: string;
   points: ChartPoint[];
 };
@@ -19,6 +21,8 @@ export type MultiSourceChartModel = {
   chartType: CartesianChartType;
   orientation?: 'vertical' | 'horizontal';
   stacked?: boolean;
+  yLabel?: string | null;
+  secondaryYLabel?: string | null;
   dimension: string;
   dimensionLabel?: string | null;
   series: AnalyticalSeries[];
@@ -79,7 +83,11 @@ function numeric(value: unknown): number | null {
   }
   return null;
 }
-function points(value: unknown, numericFields: Set<string>): ChartPoint[] | null {
+function points(
+  value: unknown,
+  numericFields: Set<string>,
+  nullableFields = new Set<string>(),
+): ChartPoint[] | null {
   if (!Array.isArray(value)) return null;
   const result: ChartPoint[] = [];
   for (const raw of value) {
@@ -90,12 +98,49 @@ function points(value: unknown, numericFields: Set<string>): ChartPoint[] | null
       if (cell == null || typeof cell === 'string' || typeof cell === 'number') {
         point[key] =
           numericFields.has(key) && cell != null ? numeric(cell) : (cell as string | number | null);
+        if (numericFields.has(key) && cell != null && point[key] == null) return null;
       }
     }
-    if ([...numericFields].some((field) => point[field] == null)) return null;
+    if (
+      [...numericFields].some(
+        (field) => !(field in point) || (point[field] == null && !nullableFields.has(field)),
+      )
+    )
+      return null;
     result.push(point);
   }
   return result;
+}
+
+export function validComboSeries(
+  series: Array<{ type?: unknown; axis?: unknown; unit?: unknown }>,
+): boolean {
+  if (!series.some((item) => item.type === 'bar') || !series.some((item) => item.type === 'line'))
+    return false;
+  if (
+    series.some(
+      (item) =>
+        !['bar', 'line'].includes(String(item.type)) ||
+        !['primary', 'secondary'].includes(String(item.axis ?? 'primary')) ||
+        (item.type === 'bar' && item.axis === 'secondary'),
+    )
+  )
+    return false;
+  return ['primary', 'secondary'].every(
+    (axis) =>
+      new Set(
+        series
+          .filter((item) => (item.axis ?? 'primary') === axis)
+          .map((item) => text(item.unit))
+          .filter(Boolean),
+      ).size <= 1,
+  );
+}
+
+export function chartTypeLabel(type: ChartType, stacked = false): string {
+  return type === 'combo'
+    ? `Line + ${stacked ? 'stacked ' : ''}columns`
+    : type[0]!.toUpperCase() + type.slice(1);
 }
 
 export function normalizeChartArtifact(
@@ -113,7 +158,7 @@ export function normalizeChartArtifact(
   )
     return null;
   const chartType = text(payload.chart_type) as ChartType | null;
-  if (!chartType || !['bar', 'line', 'area', 'pie', 'donut', 'metric'].includes(chartType))
+  if (!chartType || !['bar', 'line', 'area', 'pie', 'donut', 'metric', 'combo'].includes(chartType))
     return null;
   if (
     payload.orientation !== undefined &&
@@ -124,7 +169,9 @@ export function normalizeChartArtifact(
   if (payload.stacked !== undefined && typeof payload.stacked !== 'boolean') return null;
   const orientation = payload.orientation === 'horizontal' ? 'horizontal' : 'vertical';
   const stacked = payload.stacked === true;
-  if (chartType !== 'bar' && (orientation !== 'vertical' || stacked)) return null;
+  if (!['bar', 'combo'].includes(chartType) && (orientation !== 'vertical' || stacked)) return null;
+  if (chartType === 'combo' && orientation !== 'vertical') return null;
+  if (chartType === 'combo' && sql && (sql.truncated || sql.status !== 'succeeded')) return null;
   const sourceId = sql?.data_source_id ?? text(payload.data_source_id) ?? 'datasource';
   const encoding = object(payload.encoding);
   if (!encoding) return null;
@@ -190,7 +237,9 @@ export function normalizeChartArtifact(
   const rawSeries = Array.isArray(encoding.series) ? encoding.series : null;
   if (!xField || !rawSeries?.length) return null;
   const seriesSpecs = rawSeries.map(object);
-  if (seriesSpecs.some((item) => !item || !text(item.field))) return null;
+  if (seriesSpecs.length > 8 || seriesSpecs.some((item) => !item || !text(item.field))) return null;
+  if (chartType === 'combo' && !validComboSeries(seriesSpecs as Record<string, unknown>[]))
+    return null;
   const seriesFields = seriesSpecs.map((item) => text(item!.field)!);
   const numericFields = new Set(seriesFields);
   // Every series must represent a distinct measure. Labels are presentation-only and cannot
@@ -201,16 +250,31 @@ export function normalizeChartArtifact(
       seriesSpecs.map((item) => text(item!.unit)).filter((unit): unit is string => Boolean(unit)),
     ),
   ];
-  if (units.length > 2 || (stacked && units.length > 1)) return null;
-  const chartPoints = points(payload.data, numericFields);
+  if (chartType !== 'combo' && (units.length > 2 || (stacked && units.length > 1))) return null;
+  const nullableFields = new Set(
+    chartType === 'combo'
+      ? seriesSpecs
+          .filter((item) => item!.type === 'line' || !stacked)
+          .map((item) => text(item!.field)!)
+      : [],
+  );
+  const chartPoints = points(payload.data, numericFields, nullableFields);
   if (!chartPoints || chartPoints.some((point) => point[xField] == null)) return null;
+  if (
+    chartType === 'combo' &&
+    [...numericFields].some((field) => !chartPoints.some((point) => point[field] != null))
+  )
+    return null;
   const dimensionValues = chartPoints.map((point) => String(point[xField]));
   if (new Set(dimensionValues).size !== dimensionValues.length) return null;
   return {
     id: artifact.id,
     title,
     chartType,
-    ...(chartType === 'bar' ? { orientation, stacked } : {}),
+    ...(['bar', 'combo'].includes(chartType) ? { orientation, stacked } : {}),
+    ...(chartType === 'combo'
+      ? { yLabel: text(payload.y_label), secondaryYLabel: text(payload.secondary_y_label) }
+      : {}),
     dimension: xField,
     dimensionLabel: text(x?.label),
     comparisonKey: text(payload.comparison_key),
@@ -223,6 +287,12 @@ export function normalizeChartArtifact(
         metric: field,
         label: text(item!.label) ?? field,
         unit: text(item!.unit),
+        ...(chartType === 'combo'
+          ? {
+              type: item!.type as 'bar' | 'line',
+              axis: (item!.axis ?? 'primary') as 'primary' | 'secondary',
+            }
+          : {}),
         dimension: xField,
         points: chartPoints,
       };
@@ -235,7 +305,12 @@ export function combineCompatibleCharts(models: NormalizedChartModel[]): Normali
   const result: NormalizedChartModel[] = [];
   const grouped = new Map<string, MultiSourceChartModel[]>();
   for (const model of models) {
-    if (isCircularChart(model) || model.chartType === 'metric' || !model.comparisonKey) {
+    if (
+      isCircularChart(model) ||
+      model.chartType === 'metric' ||
+      model.chartType === 'combo' ||
+      !model.comparisonKey
+    ) {
       result.push(model);
       continue;
     }

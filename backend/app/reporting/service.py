@@ -326,7 +326,7 @@ class ReportingService:
         if job_id is None:
             return None
         desired = (
-            "chart" if item.widget_type in {"bar", "line", "area", "pie", "donut"} else "table"
+            "chart" if item.widget_type in {"bar", "line", "area", "pie", "donut", "combo"} else "table"
         )
         conditions = [JobArtifact.job_id == job_id, JobArtifact.kind == desired]
         if item.last_refresh_job_id is None and item.created_from_sql_execution_id is not None:
@@ -384,6 +384,8 @@ class ReportingService:
             raise AppError("WIDGET_SOURCE_RESULT_MISSING", "The source result is unavailable.", 400)
         columns = artifact.payload.get("columns")
         rows = artifact.payload.get("rows")
+        if widget_type == "combo" and artifact.payload.get("truncated"):
+            raise AppError("CHART_SOURCE_TRUNCATED", "Combo charts require a complete SQL result.", 400)
         if not isinstance(columns, list) or not all(isinstance(item, str) for item in columns) or not isinstance(rows, list):
             raise AppError("WIDGET_SOURCE_RESULT_INVALID", "The source result is invalid.", 400)
         if widget_type == "metric":
@@ -422,6 +424,8 @@ class ReportingService:
                     series=series,
                     orientation=config.get("orientation", "vertical"),
                     stacked=config.get("stacked", False),
+                    y_label=config.get("y_label"),
+                    secondary_y_label=config.get("secondary_y_label"),
                 )
         except (ValidationError, ValueError, TypeError) as exc:
             raise AppError("WIDGET_CONFIG_INVALID", "The widget visualization configuration is invalid.", 400) from exc

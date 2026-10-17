@@ -1,3 +1,4 @@
+from app.agent.matrix import CreateMatrixArgs, MatrixDimension, MatrixMeasure
 from app.agent.tool_schemas import (
     ChartSeriesInput,
     CreateChartArgs,
@@ -20,6 +21,7 @@ def test_agent_tool_surface_contains_frontend_chart_tool() -> None:
         "read_table_schema",
         "execute_sql",
         "create_chart",
+        "create_matrix",
         "create_html_artifact",
         "read_saved_context",
         "save_knowledge",
@@ -44,6 +46,9 @@ def test_every_agent_tool_argument_has_a_clear_description() -> None:
         ChartSeriesInput,
         CreateChartArgs,
         CreateHtmlArtifactArgs,
+        CreateMatrixArgs,
+        MatrixDimension,
+        MatrixMeasure,
     )
     for schema in schemas:
         for field_name, field in schema.model_fields.items():

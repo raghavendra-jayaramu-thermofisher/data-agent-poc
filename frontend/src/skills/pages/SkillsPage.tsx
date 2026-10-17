@@ -177,12 +177,12 @@ export function SkillsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-[#DAD5CD] gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-[var(--db-border-default)] gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[#252127]">Templates</h1>
-          <p className="text-xs text-[#625C64]">
+          <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">Templates</h1>
+          <p className="text-xs text-[var(--db-text-secondary)]">
             Set an always-on workspace template, or create command templates invoked with slash commands (e.g.{' '}
-            <code className="text-[#4B123F] font-mono font-semibold">/retention</code>) for on-demand
+            <code className="text-[var(--db-primary)] font-mono font-semibold">/retention</code>) for on-demand
             specialized analysis.
           </p>
         </div>
@@ -190,20 +190,20 @@ export function SkillsPage() {
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors shrink-0"
           >
             <Plus size={14} />
-            <span>New Template</span>
+            <span>New template</span>
           </button>
         )}
       </div>
 
       {/* Instructions list */}
       {instructions.length === 0 ? (
-        <div className="p-8 text-center bg-[#FBFAF7] border border-[#DAD5CD] rounded-lg">
-          <LayoutTemplate size={28} className="mx-auto mb-2 text-[#8B848C]" />
-          <h3 className="text-sm font-semibold text-[#252127] mb-1">No templates configured</h3>
-          <p className="text-xs text-[#625C64] max-w-md mx-auto mb-4">
+        <div className="p-8 text-center bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded-lg">
+          <LayoutTemplate size={28} className="mx-auto mb-2 text-[var(--db-text-muted)]" />
+          <h3 className="text-sm font-semibold text-[var(--db-text-primary)] mb-1">No templates configured</h3>
+          <p className="text-xs text-[var(--db-text-secondary)] max-w-md mx-auto mb-4">
             Add custom instructions to guide the data assistant on company-wide metric definitions,
             fiscal calendar rules, or create slash commands for quick analytical tasks.
           </p>
@@ -211,10 +211,10 @@ export function SkillsPage() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors"
             >
               <Plus size={14} />
-              <span>Create First Template</span>
+              <span>Create first template</span>
             </button>
           )}
         </div>
@@ -226,49 +226,49 @@ export function SkillsPage() {
               className={`p-4 rounded-lg border transition-all ${
                 item.is_default
                   ? 'bg-[#FDFBF7] border-[#D4A373]/50 shadow-xs'
-                  : 'bg-[#FFFDFC] border-[#DAD5CD] hover:border-[#8B848C]/40'
+                  : 'bg-[var(--db-surface-raised)] border-[var(--db-border-default)] hover:border-[var(--db-text-muted)]/40'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="text-sm font-semibold text-[#252127]">{item.name}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--db-text-primary)]">{item.name}</h3>
 
                     {item.is_default && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
-                        <Star size={11} className="fill-current" /> Always-on · Workspace Default
+                        <Star size={11} className="fill-current" /> Always-on · Workspace default
                       </span>
                     )}
 
                     {item.command && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[#F4E8F0] text-[#4B123F] border border-[#E9D5E5]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[var(--db-primary-soft)] text-[var(--db-primary)] border border-[#E9D5E5]">
                         <Terminal size={11} /> /{item.command}
                       </span>
                     )}
 
                     {!item.enabled && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#EAE7E1] text-[#8B848C]">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--db-surface-hover)] text-[var(--db-text-muted)]">
                         Disabled
                       </span>
                     )}
                   </div>
 
                   {item.description && (
-                    <p className="text-xs text-[#625C64] mb-2">{item.description}</p>
+                    <p className="text-xs text-[var(--db-text-secondary)] mb-2">{item.description}</p>
                   )}
 
                   {item.prompt_template && (
-                    <div className="text-[11px] font-mono text-[#625C64] bg-[#F0EEE9] px-2 py-1 rounded inline-block mb-2 max-w-full truncate">
+                    <div className="text-[11px] font-mono text-[var(--db-text-secondary)] bg-[var(--db-surface-muted)] px-2 py-1 rounded inline-block mb-2 max-w-full truncate">
                       Template: {item.prompt_template}
                     </div>
                   )}
 
                   <div className="mt-1">
-                    <details className="text-xs text-[#625C64] group">
-                      <summary className="cursor-pointer text-[#4B123F] hover:underline font-medium list-none flex items-center gap-1 select-none">
-                        <span>View Template Instructions</span>
+                    <details className="text-xs text-[var(--db-text-secondary)] group">
+                      <summary className="cursor-pointer text-[var(--db-primary)] hover:underline font-medium list-none flex items-center gap-1 select-none">
+                        <span>View template instructions</span>
                       </summary>
-                      <pre className="mt-2 p-3 bg-[#FBFAF7] border border-[#DAD5CD] rounded text-xs font-mono text-[#252127] whitespace-pre-wrap max-h-48 overflow-y-auto">
+                      <pre className="mt-2 p-3 bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded text-xs font-mono text-[var(--db-text-primary)] whitespace-pre-wrap max-h-48 overflow-y-auto">
                         {item.content}
                       </pre>
                     </details>
@@ -282,16 +282,16 @@ export function SkillsPage() {
                         type="button"
                         onClick={() => handleMakeDefault(item)}
                         title="Set as workspace default"
-                        className="px-2 py-1 text-[11px] font-medium text-[#4B123F] hover:bg-[#F4E8F0] rounded border border-[#DAD5CD] transition-colors"
+                        className="px-2 py-1 text-[11px] font-medium text-[var(--db-primary)] hover:bg-[var(--db-primary-soft)] rounded border border-[var(--db-border-default)] transition-colors"
                       >
-                        Make Default
+                        Make default
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => openEditModal(item)}
                       title="Edit template"
-                      className="p-1.5 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] rounded transition-colors"
+                      className="p-1.5 text-[var(--db-text-secondary)] hover:text-[var(--db-text-primary)] hover:bg-[var(--db-surface-hover)] rounded transition-colors"
                     >
                       <Edit2 size={13} />
                     </button>
@@ -299,7 +299,7 @@ export function SkillsPage() {
                       type="button"
                       onClick={() => handleDelete(item)}
                       title="Delete template"
-                      className="p-1.5 text-[#8B848C] hover:text-[#A84545] hover:bg-[#F7E7E5] rounded transition-colors"
+                      className="p-1.5 text-[var(--db-text-muted)] hover:text-[var(--db-danger)] hover:bg-[var(--db-danger-soft)] rounded transition-colors"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -315,22 +315,22 @@ export function SkillsPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div
-            className="bg-[#FFFDFC] border border-[#DAD5CD] rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
             role="dialog"
             aria-modal="true"
             aria-labelledby="instruction-modal-title"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#DAD5CD]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--db-border-default)]">
               <div className="flex items-center gap-2">
-                <LayoutTemplate size={16} className="text-[#4B123F]" />
-                <h3 id="instruction-modal-title" className="text-sm font-semibold text-[#252127]">
-                  {editingItem ? 'Edit Template' : 'New Template'}
+                <LayoutTemplate size={16} className="text-[var(--db-primary)]" />
+                <h3 id="instruction-modal-title" className="text-sm font-semibold text-[var(--db-text-primary)]">
+                  {editingItem ? 'Edit template' : 'New template'}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 text-[#8B848C] hover:text-[#252127] rounded transition-colors"
+                className="p-1 text-[var(--db-text-muted)] hover:text-[var(--db-text-primary)] rounded transition-colors"
                 aria-label="Close dialog"
               >
                 <X size={16} />
@@ -340,7 +340,7 @@ export function SkillsPage() {
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
               {formError && (
                 <div
-                  className="flex items-center gap-2 p-3 bg-[#F7E7E5] border border-[#E8B4B4] rounded text-xs text-[#A84545]"
+                  className="flex items-center gap-2 p-3 bg-[var(--db-danger-soft)] border border-[#E8B4B4] rounded text-xs text-[var(--db-danger)]"
                   role="alert"
                 >
                   <AlertCircle size={14} className="shrink-0" />
@@ -349,26 +349,26 @@ export function SkillsPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Template Name <span className="text-[#A84545]">*</span>
+                <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1">
+                  Template name <span className="text-[var(--db-danger)]">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Workspace Default or Cohort Retention Guidelines"
+                  placeholder="e.g. Workspace default or Cohort retention guidelines"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-1.5 text-xs bg-[#FBFAF7] border border-[#DAD5CD] rounded focus:border-[#4B123F] focus:outline-hidden"
+                  className="w-full px-3 py-1.5 text-xs bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded focus:border-[var(--db-primary)] focus:outline-hidden"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#252127] mb-1">
-                    Slash Command <span className="text-[#8B848C] font-normal">(Optional)</span>
+                  <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1">
+                    Slash command <span className="text-[var(--db-text-muted)] font-normal">(optional)</span>
                   </label>
                   <div className="flex items-center">
-                    <span className="px-2 py-1.5 bg-[#EAE7E1] border border-r-0 border-[#DAD5CD] rounded-l text-xs font-mono text-[#625C64]">
+                    <span className="px-2 py-1.5 bg-[var(--db-surface-hover)] border border-r-0 border-[var(--db-border-default)] rounded-l text-xs font-mono text-[var(--db-text-secondary)]">
                       /
                     </span>
                     <input
@@ -381,47 +381,47 @@ export function SkillsPage() {
                           command: e.target.value.replace(/^\/+/, '').toLowerCase(),
                         })
                       }
-                      className="w-full px-3 py-1.5 text-xs font-mono bg-[#FBFAF7] border border-[#DAD5CD] rounded-r focus:border-[#4B123F] focus:outline-hidden"
+                      className="w-full px-3 py-1.5 text-xs font-mono bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded-r focus:border-[var(--db-primary)] focus:outline-hidden"
                     />
                   </div>
-                  <p className="text-[11px] text-[#8B848C] mt-1">
+                  <p className="text-[11px] text-[var(--db-text-muted)] mt-1">
                     Enables typing <code className="font-mono">/command</code> in the chat input.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#252127] mb-1">
-                    Description <span className="text-[#8B848C] font-normal">(Optional)</span>
+                  <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1">
+                    Description <span className="text-[var(--db-text-muted)] font-normal">(optional)</span>
                   </label>
                   <input
                     type="text"
                     placeholder="Short summary shown in autocomplete"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-[#FBFAF7] border border-[#DAD5CD] rounded focus:border-[#4B123F] focus:outline-hidden"
+                    className="w-full px-3 py-1.5 text-xs bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded focus:border-[var(--db-primary)] focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Prompt Template <span className="text-[#8B848C] font-normal">(Optional)</span>
+                <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1">
+                  Prompt template <span className="text-[var(--db-text-muted)] font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
                   placeholder="e.g. Perform a cohort retention analysis for: {prompt}"
                   value={formData.prompt_template}
                   onChange={(e) => setFormData({ ...formData, prompt_template: e.target.value })}
-                  className="w-full px-3 py-1.5 text-xs bg-[#FBFAF7] border border-[#DAD5CD] rounded focus:border-[#4B123F] focus:outline-hidden"
+                  className="w-full px-3 py-1.5 text-xs bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded focus:border-[var(--db-primary)] focus:outline-hidden"
                 />
-                <p className="text-[11px] text-[#8B848C] mt-1">
+                <p className="text-[11px] text-[var(--db-text-muted)] mt-1">
                   Wraps the user query. Use <code className="font-mono">{'{prompt}'}</code> as the placeholder for the additional text.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#252127] mb-1">
-                  Template Instructions <span className="text-[#A84545]">*</span>
+                <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1">
+                  Template instructions <span className="text-[var(--db-danger)]">*</span>
                 </label>
                 <textarea
                   required
@@ -432,11 +432,11 @@ export function SkillsPage() {
 - Always format currency in USD`}
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  className="w-full p-3 text-xs font-mono bg-[#FBFAF7] border border-[#DAD5CD] rounded focus:border-[#4B123F] focus:outline-hidden leading-relaxed"
+                  className="w-full p-3 text-xs font-mono bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded focus:border-[var(--db-primary)] focus:outline-hidden leading-relaxed"
                 />
               </div>
 
-              <div className="pt-2 space-y-2 border-t border-[#DAD5CD]/60">
+              <div className="pt-2 space-y-2 border-t border-[var(--db-border-default)]/60">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -448,11 +448,11 @@ export function SkillsPage() {
                         enabled: e.target.checked ? true : formData.enabled,
                       })
                     }
-                    className="rounded border-[#DAD5CD] text-[#4B123F] focus:ring-[#4B123F]"
+                    className="rounded border-[var(--db-border-default)] text-[var(--db-primary)] focus:ring-[var(--db-primary)]"
                   />
                   <div className="text-xs">
-                    <span className="font-semibold text-[#252127]">Set as Workspace Default (always-on)</span>
-                    <span className="text-[#625C64] block">
+                    <span className="font-semibold text-[var(--db-text-primary)]">Set as workspace default (always-on)</span>
+                    <span className="text-[var(--db-text-secondary)] block">
                       Always applied to every query asked in this workspace. Only one template can be the workspace default.
                     </span>
                   </div>
@@ -464,28 +464,28 @@ export function SkillsPage() {
                     checked={formData.enabled}
                     disabled={formData.is_default}
                     onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                    className="rounded border-[#DAD5CD] text-[#4B123F] focus:ring-[#4B123F]"
+                    className="rounded border-[var(--db-border-default)] text-[var(--db-primary)] focus:ring-[var(--db-primary)]"
                   />
-                  <span className="text-xs font-medium text-[#252127]">
-                    Template Enabled
+                  <span className="text-xs font-medium text-[var(--db-text-primary)]">
+                    Template enabled
                   </span>
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#DAD5CD]">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-[var(--db-border-default)]">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-[#625C64] hover:bg-[#EAE7E1] rounded transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-[var(--db-text-secondary)] hover:bg-[var(--db-surface-hover)] rounded transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="px-4 py-1.5 text-xs font-semibold bg-[#4B123F] hover:bg-[#3F0E35] text-[#FFF9FD] rounded transition-colors disabled:opacity-50"
+                  className="px-4 py-1.5 text-xs font-semibold bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded transition-colors disabled:opacity-50"
                 >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save Template'}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving…' : 'Save template'}
                 </button>
               </div>
             </form>

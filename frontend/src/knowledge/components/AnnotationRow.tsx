@@ -106,8 +106,8 @@ export function AnnotationRow({
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <ChevronDown
             size={16}
-            className={`text-[#8B848C] transition-transform duration-200 shrink-0 group-hover:text-[#4B123F] ${
-              isExpanded || editing ? 'rotate-180 text-[#4B123F]' : ''
+            className={`text-[var(--db-text-muted)] transition-transform duration-200 shrink-0 group-hover:text-[var(--db-primary)] ${
+              isExpanded || editing ? 'rotate-180 text-[var(--db-primary)]' : ''
             }`}
           />
           <span className="annotation-scope-badge shrink-0">{annotation.scope_type}</span>
@@ -115,7 +115,7 @@ export function AnnotationRow({
             <span className="annotation-scope-key font-mono text-xs shrink-0">{annotation.scope_key}</span>
           ) : null}
           {!isExpanded && !editing ? (
-            <span className="text-xs text-[#8B848C] truncate min-w-0 pr-2 italic">
+            <span className="text-xs text-[var(--db-text-muted)] truncate min-w-0 pr-2 italic">
               {previewSnippet || 'Empty annotation'}
             </span>
           ) : null}
@@ -149,11 +149,11 @@ export function AnnotationRow({
         editing ? (
           <form className="form-stack p-4" onSubmit={handleSave}>
             <div>
-              <label className="block text-xs font-semibold text-[#252127] mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1.5">
                 Content (Markdown supported)
               </label>
               <textarea
-                className="w-full min-h-[220px] p-3 text-xs font-mono bg-[#FBFAF7] border border-[#DAD5CD] rounded-md text-[#252127] placeholder:text-[#8B848C] outline-none focus:border-[#9A4D86] focus:ring-1 focus:ring-[#9A4D86]"
+                className="w-full min-h-[220px] p-3 text-xs font-mono bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded-md text-[var(--db-text-primary)] placeholder:text-[var(--db-text-muted)] outline-none focus:border-[var(--db-focus-ring)] focus:ring-1 focus:ring-[var(--db-focus-ring)]"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 disabled={isSubmitting}
@@ -161,7 +161,7 @@ export function AnnotationRow({
                 placeholder="Enter markdown knowledge content…"
                 required
               />
-              {error ? <p className="text-xs text-[#A84545] mt-1">{error}</p> : null}
+              {error ? <p className="text-xs text-[var(--db-danger)] mt-1">{error}</p> : null}
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" size="sm" variant="primary" isPending={isSubmitting}>

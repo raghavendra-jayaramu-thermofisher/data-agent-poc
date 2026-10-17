@@ -1,0 +1,178 @@
+.analysis-progress-card {
+  min-width: 0;
+  border: 1px solid var(--db-border-subtle);
+  border-radius: 8px;
+  background: var(--db-surface);
+  padding: 3px 8px;
+}
+.analysis-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+.analysis-progress-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--db-text-secondary);
+  cursor: pointer;
+}
+.analysis-progress-toggle:hover {
+  color: var(--db-text-primary);
+}
+.analysis-progress-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.brand-logo.analysis-progress-pie {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  fill: var(--db-primary);
+}
+.analysis-progress-pie path {
+  animation: analysis-pie-cycle 1.6s ease-in-out infinite;
+}
+.analysis-progress-pie path:nth-child(2) {
+  animation-delay: -1.2s;
+}
+.analysis-progress-pie path:nth-child(3) {
+  animation-delay: -0.8s;
+}
+.analysis-progress-pie path:nth-child(4) {
+  animation-delay: -0.4s;
+}
+.analysis-progress-pie[data-paused='true'] path {
+  animation-play-state: paused;
+}
+.analysis-progress-chevron {
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+.analysis-progress-toggle[aria-expanded='true'] .analysis-progress-chevron {
+  transform: rotate(90deg);
+}
+.analysis-progress-elapsed {
+  color: var(--db-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.analysis-progress-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--db-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.analysis-progress-stop:hover:not(:disabled) {
+  color: var(--db-danger);
+  background: var(--db-danger-soft);
+}
+.analysis-progress-stop:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.analysis-progress-history {
+  max-height: 180px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 3px 0 5px;
+  border-top: 1px solid var(--db-border-subtle);
+  padding: 5px 0 0;
+  scrollbar-gutter: stable;
+}
+.analysis-progress-log-heading,
+.analysis-progress-history li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 5px;
+  color: var(--db-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.analysis-progress-log-heading {
+  color: var(--db-text-muted);
+  font-size: 10px;
+}
+.analysis-progress-history ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.analysis-progress-history li > span {
+  overflow-wrap: anywhere;
+}
+.analysis-progress-history time {
+  color: var(--db-text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.analysis-progress-history li[data-current='true'] {
+  color: var(--db-primary);
+  font-weight: 500;
+}
+.analysis-progress-history li[data-level='error'] {
+  color: var(--db-danger);
+}
+.analysis-progress-empty {
+  margin: 4px;
+  font-size: 12px;
+  color: var(--db-text-muted);
+}
+.analysis-progress-error {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--db-danger);
+}
+@keyframes analysis-pie-cycle {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+@media (pointer: coarse) {
+  .analysis-progress-toggle,
+  .analysis-progress-stop {
+    min-height: 44px;
+  }
+  .analysis-progress-row {
+    gap: 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analysis-progress-pie path {
+    animation: none;
+    opacity: 0.65;
+  }
+  .analysis-progress-pie path:first-child {
+    opacity: 1;
+  }
+  .analysis-progress-chevron {
+    transition: none;
+  }
+}

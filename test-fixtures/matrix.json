@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "renderer": "frontend",
+  "totals_source": "sql",
+  "source_sql_execution_id": "11111111-1111-4111-8111-111111111111",
+  "spec": {
+    "sql_execution_id": "11111111-1111-4111-8111-111111111111",
+    "title": "Orders by period",
+    "rows": [
+      {
+        "field": "division",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "text",
+        "descending": false
+      },
+      {
+        "field": "category",
+        "label": null,
+        "sort_field": null,
+        "sort_type": "text",
+        "descending": false
+      }
+    ],
+    "columns": [
+      {
+        "field": "period",
+        "label": null,
+        "sort_field": "period_order",
+        "sort_type": "number",
+        "descending": false
+      }
+    ],
+    "measures": [
+      {
+        "field": "amount",
+        "label": null,
+        "decimal_places": 2,
+        "format": "number"
+      },
+      {
+        "field": "units",
+        "label": null,
+        "decimal_places": 0,
+        "format": "number"
+      }
+    ],
+    "row_depth_field": "rd",
+    "column_depth_field": "cd",
+    "show_row_subtotals": true,
+    "show_row_grand_total": true,
+    "show_column_subtotals": false,
+    "show_column_grand_total": false,
+    "initial_expansion_depth": 1
+  },
+  "row_nodes": [
+    {
+      "id": "rd53aa41244abaa4f70dff3c1",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "North"
+      ],
+      "label": "North"
+    },
+    {
+      "id": "r297ef9b15cb8c195123ccffb",
+      "parent_id": "rd53aa41244abaa4f70dff3c1",
+      "depth": 2,
+      "path": [
+        "North",
+        "Parts"
+      ],
+      "label": "Parts"
+    },
+    {
+      "id": "r233ba8c6a015bafaffbf3986",
+      "parent_id": "rd53aa41244abaa4f70dff3c1",
+      "depth": 2,
+      "path": [
+        "North",
+        null
+      ],
+      "label": "(Blank)"
+    },
+    {
+      "id": "r7b2c6cb48a8dbbbd7aa8492a",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "South"
+      ],
+      "label": "South"
+    },
+    {
+      "id": "r1fea8793b112ade169cabd7b",
+      "parent_id": "r7b2c6cb48a8dbbbd7aa8492a",
+      "depth": 2,
+      "path": [
+        "South",
+        "Parts"
+      ],
+      "label": "Parts"
+    },
+    {
+      "id": "r4f53cda18c2baa0c0354bb5f",
+      "parent_id": null,
+      "depth": 0,
+      "path": [],
+      "label": "Grand total"
+    }
+  ],
+  "column_nodes": [
+    {
+      "id": "c4b59f5fbbf99e46efa2b7278",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "Week 2"
+      ],
+      "label": "Week 2"
+    },
+    {
+      "id": "c4476e202f4047ec05f76c521",
+      "parent_id": null,
+      "depth": 1,
+      "path": [
+        "Week 10"
+      ],
+      "label": "Week 10"
+    }
+  ],
+  "cells": [
+    {
+      "row_id": "r1fea8793b112ade169cabd7b",
+      "column_id": "c4b59f5fbbf99e46efa2b7278",
+      "values": [
+        null,
+        "3"
+      ]
+    },
+    {
+      "row_id": "r233ba8c6a015bafaffbf3986",
+      "column_id": "c4b59f5fbbf99e46efa2b7278",
+      "values": [
+        "0.10",
+        "0"
+      ]
+    },
+    {
+      "row_id": "r297ef9b15cb8c195123ccffb",
+      "column_id": "c4476e202f4047ec05f76c521",
+      "values": [
+        "9007199254740993.12",
+        "2"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c4476e202f4047ec05f76c521",
+      "values": [
+        "9007199254740993.12",
+        "2"
+      ]
+    },
+    {
+      "row_id": "r4f53cda18c2baa0c0354bb5f",
+      "column_id": "c4b59f5fbbf99e46efa2b7278",
+      "values": [
+        "0.10",
+        "3"
+      ]
+    },
+    {
+      "row_id": "r7b2c6cb48a8dbbbd7aa8492a",
+      "column_id": "c4b59f5fbbf99e46efa2b7278",
+      "values": [
+        null,
+        "3"
+      ]
+    },
+    {
+      "row_id": "rd53aa41244abaa4f70dff3c1",
+      "column_id": "c4476e202f4047ec05f76c521",
+      "values": [
+        "9007199254740993.12",
+        "2"
+      ]
+    },
+    {
+      "row_id": "rd53aa41244abaa4f70dff3c1",
+      "column_id": "c4b59f5fbbf99e46efa2b7278",
+      "values": [
+        "0.10",
+        "0"
+      ]
+    }
+  ],
+  "source_row_count": 8,
+  "source_digest": "f26b240aa204bc7b784ffce708fb485be22f1f1b7493ed2c18b3ecf1b66f412a"
+}

@@ -112,7 +112,8 @@ describe('ArtifactRenderer', () => {
     expect(screen.queryByText('Same answer')).not.toBeInTheDocument();
     expect(screen.getByText('Unsupported artifact')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Save to dashboard' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'View SQL' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'View SQL' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /information$/ })).not.toBeInTheDocument();
   });
 
   it('renders a hidden table when an inline artifact directive explicitly references it', () => {
@@ -162,7 +163,7 @@ describe('ArtifactRenderer', () => {
     );
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Select chart point' }));
-    expect(screen.getByText('Feb')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Selected point' })).toHaveTextContent('Feb');
     expect(screen.getByText(/Revenue: 20/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Explain' }));
     expect(followUp).toHaveBeenCalledWith(
@@ -185,15 +186,18 @@ describe('ArtifactRenderer', () => {
     expect(
       JSON.parse(screen.getByTestId('echarts').getAttribute('data-option') ?? '{}').series[0].type,
     ).toBe('bar');
-    await user.click(screen.getByRole('button', { name: 'Line' }));
+    await user.click(screen.getByRole('button', { name: 'Chart actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View as line' }));
     expect(
       JSON.parse(screen.getByTestId('echarts').getAttribute('data-option') ?? '{}').series[0].type,
     ).toBe('line');
-    await user.click(screen.getByRole('button', { name: 'Data' }));
+    await user.click(screen.getByRole('button', { name: 'Show chart data' }));
     expect(screen.getByRole('table', { name: 'Revenue data' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Chart' }));
+    await user.click(screen.getByRole('button', { name: 'Show chart' }));
     expect(screen.getByTestId('echarts')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'View SQL' }));
+    await user.click(screen.getByRole('button', { name: 'Chart actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Chart information' }));
+    await user.click(screen.getByText('SQL query', { exact: true }));
     expect(screen.getByLabelText('SQL query')).toHaveTextContent('select month,revenue from x');
   });
 
@@ -242,7 +246,7 @@ describe('ArtifactRenderer', () => {
   });
 });
 
-it('does not silently save only one source from a combined multi-source chart', () => {
+it('does not silently save only one source from a combined multi-source chart', async () => {
   const sql2: SqlExecution = { ...sql[0]!, id: 's2', data_source_id: 'ds2' };
   const first = a('chart-1', 'chart', {
     schema_version: 1,
@@ -283,25 +287,45 @@ it('does not silently save only one source from a combined multi-source chart', 
       />
     </MemoryRouter>,
   );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Chart actions' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Chart information' }));
   expect(
-    screen.getByText(/Combined multi-source views remain separate when saved/i),
+    screen.getByText(/Combined views from multiple sources remain separate when saved/i),
   ).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save to dashboard' })).not.toBeInTheDocument();
 });
 
 it.each([
-  { chart_type: 'donut', encoding: { category: { field: 'month' }, value: { field: 'revenue', label: 'Revenue' } } },
-  { chart_type: 'bar', orientation: 'horizontal', stacked: true, encoding: { x: { field: 'month' }, series: [{ field: 'revenue', label: 'Revenue' }] } },
+  {
+    chart_type: 'donut',
+    encoding: { category: { field: 'month' }, value: { field: 'revenue', label: 'Revenue' } },
+  },
+  {
+    chart_type: 'bar',
+    orientation: 'horizontal',
+    stacked: true,
+    encoding: { x: { field: 'month' }, series: [{ field: 'revenue', label: 'Revenue' }] },
+  },
 ])('supports chart selection, data view and expansion for $chart_type artifacts', async (spec) => {
   const user = userEvent.setup();
   const artifact = a('chart-output', 'chart', { ...artifacts[1]!.payload, ...spec });
-  render(<MemoryRouter><ArtifactRenderer jobId="j1" artifacts={[artifact]} sql={sql} dataSourceNames={{ ds1: 'Warehouse' }}/></MemoryRouter>);
+  render(
+    <MemoryRouter>
+      <ArtifactRenderer
+        jobId="j1"
+        artifacts={[artifact]}
+        sql={sql}
+        dataSourceNames={{ ds1: 'Warehouse' }}
+      />
+    </MemoryRouter>,
+  );
   expect(screen.getByTestId('echarts')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Select chart point' }));
-  expect(screen.getByText('Selected Point')).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Data' }));
+  expect(screen.getByRole('status', { name: 'Selected point' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Show chart data' }));
   expect(screen.getByRole('table', { name: 'Revenue data' })).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Chart' }));
-  await user.click(screen.getByTitle('Expand chart full screen'));
-  expect(screen.getAllByTestId('echarts')).toHaveLength(2);
+  await user.click(screen.getByRole('button', { name: 'Show chart' }));
+  await user.click(screen.getByRole('button', { name: 'Expand chart to full screen' }));
+  expect(screen.getAllByTestId('echarts')).toHaveLength(1);
 });

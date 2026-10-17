@@ -21,12 +21,12 @@ describe('Templates', () => {
     render(<SkillsPage />);
     const user = userEvent.setup();
     expect(screen.getByRole('heading', { name: 'Templates' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'New Template' }));
+    await user.click(screen.getByRole('button', { name: 'New template' }));
     const inputs = screen.getAllByRole('textbox');
     await user.type(inputs[0]!, 'Retention');
     await user.type(inputs[1]!, 'retention');
     await user.type(inputs[4]!, 'Use monthly cohorts');
-    await user.click(screen.getByRole('button', { name: 'Save Template' }));
+    await user.click(screen.getByRole('button', { name: 'Save template' }));
     expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Retention', command: 'retention', content: 'Use monthly cohorts', enabled: true }));
   });
 
@@ -36,11 +36,11 @@ describe('Templates', () => {
     const user = userEvent.setup();
     expect(screen.getAllByText('/retention')).toHaveLength(2);
     await user.click(screen.getByTitle('Edit template'));
-    expect(screen.getByRole('dialog', { name: 'Edit Template' })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: 'Template Enabled' }));
-    await user.click(screen.getByRole('button', { name: 'Save Template' }));
+    expect(screen.getByRole('dialog', { name: 'Edit template' })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Template enabled' }));
+    await user.click(screen.getByRole('button', { name: 'Save template' }));
     expect(state.update).toHaveBeenCalledWith({ id: 's1', body: expect.objectContaining({ enabled: false }) });
-    await user.click(screen.getByRole('button', { name: 'Make Default' }));
+    await user.click(screen.getByRole('button', { name: 'Make default' }));
     expect(state.update).toHaveBeenCalledWith({ id: 's1', body: { is_default: true, enabled: true } });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await user.click(screen.getByTitle('Delete template'));
@@ -51,7 +51,7 @@ describe('Templates', () => {
     state.role = 'member'; state.items = [template];
     render(<SkillsPage />);
     expect(screen.getByText('Retention')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New Template' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New template' })).not.toBeInTheDocument();
     expect(screen.queryByTitle('Edit template')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Delete template')).not.toBeInTheDocument();
   });

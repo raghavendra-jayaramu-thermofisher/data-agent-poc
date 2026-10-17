@@ -15,6 +15,9 @@ node_modules/
 *.log
 logs/
 
+# Generated analysis artifacts and local runtime output
+backend/runtime-data/
+
 # Editor & OS
 .vscode/
 .idea/

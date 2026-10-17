@@ -85,6 +85,19 @@ class ChartSeriesInput(BaseModel):
         max_length=160,
         description="Optional business-friendly legend label for this numeric series.",
     )
+    type: Literal["bar", "line"] | None = Field(
+        default=None,
+        description="Combo charts only: render this measure as a column (bar) or line.",
+    )
+    axis: Literal["primary", "secondary"] = Field(
+        default="primary",
+        description="Combo charts only: columns use primary; lines may use either Y axis.",
+    )
+    unit: str | None = Field(
+        default=None,
+        max_length=80,
+        description="Optional unit shared by all measures on the same axis, e.g. USD or percent.",
+    )
 
 
 class CreateChartArgs(BaseModel):
@@ -97,10 +110,11 @@ class CreateChartArgs(BaseModel):
             "Exact sql_execution_id returned by a successful execute_sql call in this same job."
         )
     )
-    chart_type: Literal["bar", "line", "area", "pie", "donut", "metric"] = Field(
+    chart_type: Literal["bar", "line", "area", "pie", "donut", "metric", "combo"] = Field(
         description=(
             "Presentation type: metric for one headline value, line or area for ordered trends, "
-            "bar for category comparisons, and pie or donut for a small part-to-whole breakdown."
+            "bar for category comparisons, combo for line and column measures sharing an X-axis, "
+            "and pie or donut for a small part-to-whole breakdown."
         )
     )
     orientation: Literal["vertical", "horizontal"] = Field(
@@ -113,7 +127,7 @@ class CreateChartArgs(BaseModel):
     stacked: bool = Field(
         default=False,
         description=(
-            "Bar charts only: stack the numeric series within each category instead of grouping "
+            "Bar and combo charts: stack column series within each category instead of grouping "
             "them side by side. Stack additive components measured in the same unit."
         ),
     )
@@ -122,12 +136,22 @@ class CreateChartArgs(BaseModel):
         max_length=240,
         description="Concise business-facing statement of what the visualization shows.",
     )
+    y_label: str | None = Field(
+        default=None,
+        max_length=160,
+        description="Combo chart primary Y-axis title; defaults to the column unit.",
+    )
+    secondary_y_label: str | None = Field(
+        default=None,
+        max_length=160,
+        description="Combo chart secondary Y-axis title; defaults to the line unit.",
+    )
     x_field: str | None = Field(
         default=None,
         max_length=255,
         description=(
-            "Exact category or ordered-time output column for bar, line, or area charts; omit for "
-            "pie, donut and metric presentations."
+            "Exact category or ordered-time output column for bar, line, area, or combo charts; "
+            "omit for pie, donut and metric presentations."
         ),
     )
     x_label: str | None = Field(
@@ -139,7 +163,8 @@ class CreateChartArgs(BaseModel):
         default_factory=list,
         max_length=8,
         description=(
-            "One or more distinct numeric output columns for bar, line, or area charts; omit for "
+            "Distinct numeric output columns for bar, line, area, or combo charts; combo requires "
+            "at least one bar and one line with explicit type and axis. Omit for "
             "pie, donut and metric presentations. Multi-series data must be wide-form with "
             "one row per "
             "x_field value. Labels are presentation-only and do not filter long-form rows."
@@ -165,9 +190,37 @@ class CreateChartArgs(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_shape(self) -> "CreateChartArgs":
-        if self.chart_type != "bar" and (self.orientation != "vertical" or self.stacked):
-            raise ValueError("orientation and stacking options apply only to bar charts")
+    def validate_shape(self) -> CreateChartArgs:
+        if self.chart_type not in ("bar", "combo") and (
+            self.orientation != "vertical" or self.stacked
+        ):
+            raise ValueError("orientation and stacking options apply only to bar or combo charts")
+        if self.chart_type == "combo":
+            if self.orientation != "vertical":
+                raise ValueError("combo charts require vertical columns")
+            if {item.type for item in self.series} != {"bar", "line"}:
+                raise ValueError("combo charts require explicit bar and line series")
+            if any(item.type == "bar" and item.axis != "primary" for item in self.series):
+                raise ValueError("combo columns must use the primary axis")
+            for axis in ("primary", "secondary"):
+                units = {item.unit for item in self.series if item.axis == axis and item.unit}
+                if len(units) > 1:
+                    raise ValueError(
+                        "measures on the same combo axis must share a unit; "
+                        "assign a different line unit to secondary"
+                    )
+        elif any(item.type is not None or item.axis != "primary" for item in self.series):
+            raise ValueError("per-series type and axis apply only to combo charts")
+        if self.chart_type != "combo" and (
+            self.y_label is not None or self.secondary_y_label is not None
+        ):
+            raise ValueError("explicit Y-axis labels apply only to combo charts")
+        if (
+            self.chart_type == "bar"
+            and self.stacked
+            and len({item.unit for item in self.series if item.unit}) > 1
+        ):
+            raise ValueError("stacked measures must share a unit")
         if self.chart_type in ("pie", "donut"):
             if not self.category_field or not self.value_field:
                 raise ValueError("pie and donut charts require category_field and value_field")

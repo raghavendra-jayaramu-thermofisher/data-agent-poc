@@ -1,21 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  BookmarkPlus,
-  Code2,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Check,
-  Maximize2,
-  Table as TableIcon,
-} from 'lucide-react';
+import { BookmarkPlus } from 'lucide-react';
 import type { JobArtifact, SqlExecution } from '../api/execution-api';
 import { AnalyticalTable } from '../../analytics/table/AnalyticalTable';
-import { ExcelExportButton } from '../../analytics/table/ExcelExportButton';
-import { excelTableFromModel } from '../../analytics/table/excel-export';
-import { toTsv, type AnalyticalTableModel } from '../../analytics/table/table-domain';
-import { notifications } from '../../components/notifications';
+import type { AnalyticalTableModel } from '../../analytics/table/table-domain';
+import type { ArtifactAction, ArtifactMetadata } from '../../analytics/components/ArtifactFrame';
 import { AssistantMarkdown } from '../../conversations/components/AssistantMarkdown';
 import { AnalyticalChart } from '../../charts/AnalyticalChart';
 import { MetricCard } from '../../charts/MetricCard';
@@ -26,79 +15,42 @@ import {
 } from '../../charts/chart-domain';
 import { parseHtmlArtifact, parseTableArtifact, parseTextArtifact } from '../lib/artifacts';
 import { HtmlArtifactCard } from './HtmlArtifactCard';
+import { parseMatrixArtifact } from '../../analytics/matrix/matrix-domain';
+import { AnalyticalMatrix } from '../../analytics/matrix/AnalyticalMatrix';
 
-function SaveEntryPoint({
-  jobId,
-  sqlExecutionId,
-  artifactId,
-}: {
-  jobId: string;
-  sqlExecutionId?: string | null;
-  artifactId: string;
-}) {
-  const navigate = useNavigate();
-  if (!sqlExecutionId) return null;
-  const params = new URLSearchParams({
-    sourceJobId: jobId,
-    sourceSqlExecutionId: sqlExecutionId,
-    artifactId,
-  });
-  return (
-    <button
-      type="button"
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FFFDFC] hover:bg-[#F0EEE9] text-[#252127] border border-[#DAD5CD] rounded text-xs font-medium transition-colors"
-      onClick={() => navigate(`/dashboards?${params.toString()}`)}
-    >
-      <BookmarkPlus size={12} className="text-[#4B123F]" />
-      <span>Save to dashboard</span>
-    </button>
-  );
+function sourceMetadata(source: SqlExecution | undefined, dataSourceNames: Record<string, string>) {
+  return source
+    ? {
+        name: dataSourceNames[source.data_source_id] ?? 'Data source',
+        rowCount: source.row_count,
+        durationMs: source.duration_ms,
+        sql: source.sql_text,
+        executionId: source.id,
+        truncated: source.truncated,
+      }
+    : undefined;
 }
 
-function executionSummary(sql: SqlExecution | undefined, dataSourceNames: Record<string, string>) {
-  if (!sql) return null;
-  const source = dataSourceNames[sql.data_source_id] ?? 'Data source';
-  const rows =
-    sql.row_count == null
-      ? null
-      : `${sql.row_count.toLocaleString()} row${sql.row_count === 1 ? '' : 's'}`;
-  const duration = sql.duration_ms == null ? null : `${sql.duration_ms.toLocaleString()} ms`;
-  return [source, rows, duration, sql.truncated ? 'truncated' : null].filter(Boolean).join(' · ');
-}
-
-function ArtifactSource({
-  sql,
-  dataSourceNames,
-}: {
-  sql: SqlExecution | undefined;
-  dataSourceNames: Record<string, string>;
-}) {
-  const [sqlVisible, setSqlVisible] = useState(false);
-  if (!sql) return null;
-  return (
-    <div className="artifact-source mt-2 pt-2 border-t border-[#E7E3DC]">
-      <div className="flex items-center justify-between text-xs text-[#625C64]">
-        <span>{executionSummary(sql, dataSourceNames)}</span>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-[#4B123F] hover:underline"
-          onClick={() => setSqlVisible((value) => !value)}
-        >
-          <Code2 size={11} />
-          <span>{sqlVisible ? 'Hide SQL' : 'View SQL'}</span>
-          {sqlVisible ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-        </button>
-      </div>
-      {sqlVisible ? (
-        <pre
-          className="mt-2 p-2 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed"
-          aria-label="SQL query"
-        >
-          {sql.sql_text}
-        </pre>
-      ) : null}
-    </div>
-  );
+function dashboardAction(
+  navigate: ReturnType<typeof useNavigate>,
+  jobId: string,
+  artifactId: string,
+  sqlId?: string | null,
+): ArtifactAction | undefined {
+  if (!sqlId) return undefined;
+  return {
+    id: 'save',
+    label: 'Save to dashboard',
+    icon: BookmarkPlus,
+    run: () => {
+      const params = new URLSearchParams({
+        sourceJobId: jobId,
+        sourceSqlExecutionId: sqlId,
+        artifactId,
+      });
+      void navigate('/dashboards?' + params.toString());
+    },
+  };
 }
 
 function CollapsibleTableArtifact({
@@ -116,136 +68,24 @@ function CollapsibleTableArtifact({
   defaultOpen: boolean;
   jobId: string;
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [copied, setCopied] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [sqlVisible, setSqlVisible] = useState(false);
-  const sourceName = sourceSql
-    ? (dataSourceNames[sourceSql.data_source_id] ?? 'Data source')
-    : null;
-
-  async function handleCopy(e: React.MouseEvent) {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(toTsv(model));
-      setCopied(true);
-      notifications.success('Copied table to clipboard');
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      notifications.error('Unable to copy table');
-    }
-  }
-
+  const navigate = useNavigate();
+  const source = sourceMetadata(sourceSql, dataSourceNames);
+  const save = dashboardAction(navigate, jobId, artifact.id, artifact.source_sql_execution_id);
   return (
-    <section className="artifact-block table-artifact mb-3 border border-[#DAD5CD] rounded-none bg-[#FFFDFC] overflow-hidden transition-all">
-      <header
-        className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#FBFAF7] hover:bg-[#F0EEE9] border-b border-[#DAD5CD] cursor-pointer select-none transition-colors"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-expanded={isOpen}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <TableIcon size={14} className="text-[#4B123F] shrink-0" />
-          <span className="font-semibold text-xs text-[#252127] truncate">
-            {artifact.name || 'Query result'}
-          </span>
-          <span className="text-[11px] px-1.5 py-0.5 bg-[#EAE7E1] text-[#625C64] rounded font-medium shrink-0">
-            {model.rowCount.toLocaleString()} row{model.rowCount === 1 ? '' : 's'}
-            {model.truncated ? ' · truncated' : ''}
-          </span>
-          {sourceName ? (
-            <span className="text-[11px] text-[#8B848C] hidden sm:inline truncate">
-              · {sourceName}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <ExcelExportButton getTable={() => excelTableFromModel(model, artifact.name || 'Query result')} disabled={!model.columns.length} />
-          {isOpen && (
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFFDFC] hover:bg-[#EAE7E1] text-[#252127] border border-[#DAD5CD] rounded text-[11px] font-medium transition-colors cursor-pointer"
-                onClick={handleCopy}
-                title="Copy table to clipboard"
-              >
-                {copied ? <Check size={11} className="text-[#32745A]" /> : <Copy size={11} />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-
-              <button
-                type="button"
-                className="p-1 text-[#625C64] hover:text-[#252127] hover:bg-[#EAE7E1] border border-[#DAD5CD] bg-[#FFFDFC] rounded transition-colors cursor-pointer"
-                onClick={() => setFullscreen(true)}
-                title="Expand table to full screen"
-              >
-                <Maximize2 size={12} />
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-1 text-xs text-[#4B123F] font-medium pl-1">
-            <span className="text-[11px]">{isOpen ? 'Hide' : 'View'}</span>
-            {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </div>
-        </div>
-      </header>
-
-      {isOpen && (
-        <div>
-          <AnalyticalTable
-            model={model}
-            label={artifact.name || 'Query result'}
-            hideToolbar={true}
-            fullscreen={fullscreen}
-            onCloseFullscreen={() => setFullscreen(false)}
-          />
-
-          <div className="artifact-source border-t border-[#DAD5CD] px-3.5 py-2 flex items-center justify-between text-xs text-[#625C64] bg-[#FBFAF7]">
-            <div className="flex items-center gap-3">
-              {sourceSql?.duration_ms != null ? (
-                <span className="text-[11px] text-[#8B848C]">
-                  {sourceSql.duration_ms.toLocaleString()} ms
-                </span>
-              ) : null}
-              {sourceSql ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#4B123F] hover:underline cursor-pointer"
-                  onClick={() => setSqlVisible((v) => !v)}
-                >
-                  <Code2 size={11} />
-                  <span>{sqlVisible ? 'Hide SQL' : 'View SQL'}</span>
-                  {sqlVisible ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                </button>
-              ) : null}
-            </div>
-
-            <SaveEntryPoint
-              jobId={jobId}
-              sqlExecutionId={artifact.source_sql_execution_id}
-              artifactId={artifact.id}
-            />
-          </div>
-
-          {sqlVisible && sourceSql ? (
-            <pre
-              className="p-3 bg-[#F0EEE9] border-t border-[#DAD5CD] text-[11px] font-mono text-[#252127] overflow-x-auto leading-relaxed"
-              aria-label="SQL query"
-            >
-              {sourceSql.sql_text}
-            </pre>
-          ) : null}
-        </div>
-      )}
-    </section>
+    <AnalyticalTable
+      model={model}
+      label={artifact.name || 'Query result'}
+      defaultOpen={defaultOpen}
+      className="artifact-block table-artifact"
+      metadata={{
+        rowCount: model.rowCount,
+        jobId,
+        artifactId: artifact.id,
+        sources: source ? [source] : [],
+      }}
+      extraActions={save ? [save] : []}
+    />
   );
-}
-
-function chartSql(chart: NormalizedChartModel, sqlById: Map<string, SqlExecution>) {
-  if (chart.provenance.length !== 1) return undefined;
-  const id = chart.provenance[0]?.executionId;
-  return id ? sqlById.get(id) : undefined;
 }
 
 export function ArtifactRenderer({
@@ -265,6 +105,7 @@ export function ArtifactRenderer({
   renderReferencedHiddenTables?: boolean;
   onFollowUp?(question: string): Promise<void> | void;
 }) {
+  const navigate = useNavigate();
   const sqlById = new Map(sql.map((item) => [item.id, item]));
   const artifactOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
   const chartArtifacts = artifacts.filter((artifact) => artifact.kind === 'chart');
@@ -303,11 +144,19 @@ export function ArtifactRenderer({
   const allValidTextArtifactIds = artifacts
     .filter((artifact) => parseTextArtifact(artifact) != null)
     .map((artifact) => artifact.id);
+  const matrices = artifacts.flatMap((artifact) => {
+    const model = parseMatrixArtifact(artifact);
+    const source = sqlById.get(artifact.source_sql_execution_id ?? '');
+    return model && source?.status === 'succeeded' && !source.truncated
+      ? [{ artifact, model, source }]
+      : [];
+  });
   const supportedIds = new Set([
     ...tables.map((item) => item.artifact.id),
     ...allValidTextArtifactIds,
     ...chartArtifacts.map((item) => item.id),
     ...htmlArtifacts.map((item) => item.artifact.id),
+    ...matrices.map((item) => item.artifact.id),
   ]);
   const unsupported = artifacts.filter((artifact) => !supportedIds.has(artifact.id));
   if (!artifacts.length) return null;
@@ -328,7 +177,24 @@ export function ArtifactRenderer({
 
   const entries: Array<{ order: number; key: string; node: ReactNode }> = [];
   for (const chart of charts) {
-    const sourceSql = chartSql(chart, sqlById);
+    const metadata: ArtifactMetadata = {
+      jobId,
+      artifactId: chart.id,
+      sources: chart.provenance.map(
+        (item) =>
+          sourceMetadata(sqlById.get(item.executionId ?? ''), dataSourceNames) ?? {
+            name: item.dataSourceName,
+          },
+      ),
+      notes:
+        chart.provenance.length > 1
+          ? ['Combined views from multiple sources remain separate when saved.']
+          : [],
+    };
+    const single = chart.provenance.length === 1 ? chart.provenance[0] : undefined;
+    const save = single?.artifactId
+      ? dashboardAction(navigate, jobId, single.artifactId, single.executionId)
+      : undefined;
     const sourceIds = chart.provenance
       .map((item) => item.artifactId)
       .filter((id): id is string => Boolean(id));
@@ -341,24 +207,15 @@ export function ArtifactRenderer({
       node: (
         <section className="artifact-block chart-artifact mb-4">
           {chart.chartType === 'metric' ? (
-            <MetricCard model={chart} />
+            <MetricCard model={chart} metadata={metadata} extraActions={save ? [save] : []} />
           ) : (
-            <AnalyticalChart model={chart} onFollowUp={onFollowUp} />
+            <AnalyticalChart
+              model={chart}
+              onFollowUp={onFollowUp}
+              metadata={metadata}
+              extraActions={save ? [save] : []}
+            />
           )}
-          <ArtifactSource sql={sourceSql} dataSourceNames={dataSourceNames} />
-          {chart.provenance.length === 1 && chart.provenance[0]?.artifactId ? (
-            <div className="artifact-actions mt-2 flex justify-end">
-              <SaveEntryPoint
-                jobId={jobId}
-                sqlExecutionId={chart.provenance[0].executionId}
-                artifactId={chart.provenance[0].artifactId}
-              />
-            </div>
-          ) : chart.provenance.length > 1 ? (
-            <div className="artifact-actions mt-2 text-xs text-[#8B848C]">
-              <span>Combined multi-source views remain separate when saved.</span>
-            </div>
-          ) : null}
         </section>
       ),
     });
@@ -402,11 +259,33 @@ export function ArtifactRenderer({
       key: `text-${artifact.id}`,
       node: (
         <section className="artifact-text mb-4">
-          <h4 className="font-semibold text-xs text-[#252127] mb-2">
+          <h4 className="font-semibold text-xs text-[var(--db-text-primary)] mb-2">
             {artifact.name || 'Text output'}
           </h4>
           <AssistantMarkdown content={model!.markdown} />
         </section>
+      ),
+    });
+  }
+  for (const { artifact, model, source } of matrices) {
+    entries.push({
+      order: artifactOrder.get(artifact.id) ?? Number.MAX_SAFE_INTEGER,
+      key: `matrix-${artifact.id}`,
+      node: (
+        <div className="artifact-block matrix-artifact mb-4">
+          <AnalyticalMatrix
+            key={artifact.id}
+            model={model}
+            artifactId={artifact.id}
+            jobId={jobId}
+            dataSourceName={dataSourceNames[source.data_source_id] ?? 'Data source'}
+            metadata={{
+              jobId,
+              artifactId: artifact.id,
+              sources: [sourceMetadata(source, dataSourceNames)!],
+            }}
+          />
+        </div>
       ),
     });
   }
@@ -426,11 +305,11 @@ export function ArtifactRenderer({
       key: 'invalid-charts',
       node: (
         <div
-          className="p-3 bg-[#F7E7E5] border border-[#DAD5CD] rounded text-xs text-[#A84545] mb-2"
+          className="p-3 bg-[var(--db-danger-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-danger)] mb-2"
           role="status"
         >
           <strong>Chart unavailable</strong>
-          <p className="mt-1 text-[#625C64]">
+          <p className="mt-1 text-[var(--db-text-secondary)]">
             {invalidCharts.length} chart artifact{invalidCharts.length === 1 ? '' : 's'} could not
             be rendered because its field encoding or data is invalid.
           </p>
@@ -444,7 +323,7 @@ export function ArtifactRenderer({
       key: `unsupported-${artifact.id}`,
       node: (
         <div
-          className="p-3 bg-[#F0EEE9] border border-[#DAD5CD] rounded text-xs text-[#625C64] mb-2"
+          className="p-3 bg-[var(--db-surface-muted)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-text-secondary)] mb-2"
           role="status"
         >
           <strong>Unsupported artifact</strong>
