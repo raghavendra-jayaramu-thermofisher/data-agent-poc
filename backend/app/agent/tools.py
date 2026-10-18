@@ -770,6 +770,22 @@ async def create_html_artifact(
     return {"ok": True, **event_payload}
 
 
+def _finite_number(value: object) -> float | None:
+    """Return a finite float for a number or numeric text, otherwise None (booleans excluded)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if math.isfinite(float(value)) else None
+    if isinstance(value, str):
+        cleaned = value.replace(",", "").replace("$", "").replace(" ", "").strip()
+        try:
+            number = float(cleaned)
+        except ValueError:
+            return None
+        return number if math.isfinite(number) else None
+    return None
+
+
 def build_frontend_chart_payload(
     parsed: CreateChartArgs, columns: list[str], rows: list[object]
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -777,7 +793,7 @@ def build_frontend_chart_payload(
     if parsed.chart_type in ("pie", "donut"):
         required_fields = [parsed.category_field or "", parsed.value_field or ""]
     elif parsed.chart_type == "metric":
-        required_fields = [parsed.value_field or ""]
+        required_fields = [field for item in parsed.metrics for field in item.referenced_fields()]
     else:
         required_fields = [parsed.x_field or "", *[item.field for item in parsed.series]]
     missing = sorted({field for field in required_fields if field not in columns})
@@ -877,8 +893,8 @@ def build_frontend_chart_payload(
     elif parsed.chart_type == "metric" and len(records) != 1:
         raise AgentToolError(
             "CHART_METRIC_ROW_COUNT_INVALID",
-            "A metric card requires SQL that returns exactly one aggregate row. Aggregate the "
-            "result to one row, then retry the metric.",
+            "Metric cards require SQL that returns exactly one aggregate row with one numeric "
+            "column per figure. Aggregate the result to one row, then retry the metric.",
             retryable=True,
         )
 
@@ -896,11 +912,28 @@ def build_frontend_chart_payload(
     if parsed.chart_type == "combo":
         chart_payload["y_label"] = parsed.y_label
         chart_payload["secondary_y_label"] = parsed.secondary_y_label
-    numeric_fields = (
-        [parsed.value_field or ""]
-        if parsed.chart_type in ("pie", "donut", "metric")
-        else [item.field for item in parsed.series]
-    )
+    if parsed.chart_type == "metric":
+        numeric_fields = [item.field for item in parsed.metrics]
+        optional_numeric_fields = [
+            field
+            for item in parsed.metrics
+            for field in item.referenced_fields()
+            if field != item.field
+        ]
+        for field in optional_numeric_fields:
+            for record in records:
+                value = record.get(field)
+                if value is not None and _finite_number(value) is None:
+                    raise AgentToolError(
+                        "CHART_VALUE_NOT_NUMERIC",
+                        f"Metric field {field!r} contains non-numeric values.",
+                    )
+    else:
+        numeric_fields = (
+            [parsed.value_field or ""]
+            if parsed.chart_type in ("pie", "donut")
+            else [item.field for item in parsed.series]
+        )
     for field in numeric_fields:
         has_numeric_value = False
         has_positive_value = False
@@ -970,7 +1003,7 @@ def build_frontend_chart_payload(
         }
     elif parsed.chart_type == "metric":
         chart_payload["encoding"] = {
-            "value": {"field": parsed.value_field, "label": parsed.value_label},
+            "metrics": [item.model_dump(mode="json", exclude_none=True) for item in parsed.metrics],
         }
     else:
         chart_payload["encoding"] = {
@@ -1062,7 +1095,9 @@ def build_default_tool_registry() -> AgentToolRegistry:
             name="create_chart",
             description=(
                 "Create a frontend visualization from one successful execute_sql result in this job. "
-                "Use metric for one headline value, line or area for an ordered trend, bar for category "
+                "Use metric for a headline figure from one aggregate row: one to six cards, each with "
+                "an optional comparison column (the UI calculates the change), supporting figures, "
+                "format, icon and tone. Use line or area for an ordered trend, bar for category "
                 "comparison, and pie or donut for a small part-to-whole result. Bar charts support "
                 "orientation='horizontal' or 'vertical' and stacked=true for additive components "
                 "in the same unit. Use combo with stacked=true for a line and stacked column chart: "
@@ -1091,8 +1126,8 @@ def build_default_tool_registry() -> AgentToolRegistry:
                 "Use SQL GROUPING flags to distinguish totals from real NULL categories. Use sort_field "
                 "for ordering and numeric/date sort_type for numeric/date dimensions. "
                 "All grouping and measure definitions come from SQL and knowledge. Turn off totals for "
-                "a leaf-only result. Prefer ordinary tables for lists and lookups, a sentence/metric "
-                "for one value, and charts for visual trends."
+                "a leaf-only result. Prefer ordinary tables for lists and lookups, a metric card "
+                "for a headline figure, and charts for visual trends."
             ), args_schema=CreateMatrixArgs, handler=create_matrix,
         ))
     registry.register(

@@ -43,17 +43,29 @@ export function rowsFromPositional(columns: string[], rows: unknown[][]): Analyt
   }));
 }
 
+const analyticalNumberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 });
+
+/**
+ * Database decimals arrive as text ("17552267.65356"). Text with a decimal point is formatted like a
+ * number; whole-number text stays untouched because it is usually an identifier (order or SKU numbers).
+ */
+const DECIMAL_TEXT = /^-?\d+\.\d+$/;
+
 export function formatAnalyticalValue(value: AnalyticalValue | undefined): string {
   if (value == null) return '—';
-  if (typeof value === 'number') return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value);
+  if (typeof value === 'number') return analyticalNumberFormat.format(value);
   if (typeof value === 'boolean') return value ? 'True' : 'False';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string')
+    return DECIMAL_TEXT.test(value) ? analyticalNumberFormat.format(Number(value)) : value;
   try { return JSON.stringify(value); } catch { return 'Structured value'; }
 }
 
 export function isNumericColumn(rows: AnalyticalRow[], column: string): boolean {
   const values = rows.map((row) => row.values[column]).filter((value) => value != null).slice(0, 20);
-  return values.length > 0 && values.every((value) => typeof value === 'number');
+  return (
+    values.length > 0 &&
+    values.every((value) => typeof value === 'number' || (typeof value === 'string' && DECIMAL_TEXT.test(value)))
+  );
 }
 
 export function toTsv(model: AnalyticalTableModel): string {

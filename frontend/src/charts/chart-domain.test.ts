@@ -47,6 +47,111 @@ function linePayload(extra: Record<string, unknown> = {}) {
   };
 }
 
+function metricPayload(metrics: unknown, row: Record<string, unknown>) {
+  return {
+    schema_version: 1,
+    renderer: 'frontend',
+    chart_type: 'metric',
+    title: 'Backlog',
+    encoding: { metrics },
+    data: [row],
+  };
+}
+const normalizeMetric = (payload: Record<string, unknown>) =>
+  normalizeChartArtifact(chart('m1', 's1', payload), sql('s1', 'ds1'), 'Warehouse');
+
+describe('metric artifact normalization', () => {
+  it('builds a primary card with comparison, supporting figures and numeric text values', () => {
+    const model = normalizeMetric(
+      metricPayload(
+        [
+          {
+            field: 'backlog',
+            label: 'Backlog value',
+            format: 'currency',
+            unit: 'P$',
+            caption: 'Latest snapshot',
+            icon: 'package',
+            tone: 'warning',
+            comparison_field: 'previous',
+            comparison_label: 'vs previous week',
+            polarity: 'lower_is_better',
+            details: [{ field: 'lines', label: 'Open lines', format: 'count' }],
+          },
+          { field: 'quantity' },
+        ],
+        { backlog: '17552267.65356', previous: 17846061.87, lines: 17080, quantity: 1029962.2 },
+      ),
+    );
+    expect(model?.chartType).toBe('metric');
+    if (model?.chartType !== 'metric') throw new Error('expected a metric model');
+    expect(model.metrics).toHaveLength(2);
+    expect(model.metrics[0]).toMatchObject({
+      field: 'backlog',
+      label: 'Backlog value',
+      format: 'currency',
+      unit: 'P$',
+      icon: 'package',
+      tone: 'warning',
+      value: 17552267.65356,
+      polarity: 'lower_is_better',
+      comparison: { field: 'previous', label: 'vs previous week', value: 17846061.87 },
+      details: [{ field: 'lines', label: 'Open lines', format: 'count', value: 17080 }],
+    });
+    expect(model.metrics[1]).toMatchObject({
+      field: 'quantity',
+      label: 'quantity',
+      format: 'number',
+      tone: 'neutral',
+      polarity: 'neutral',
+      comparison: null,
+      details: [],
+    });
+  });
+
+  it('keeps a card when the comparison or a supporting figure is missing', () => {
+    const model = normalizeMetric(
+      metricPayload(
+        [{ field: 'backlog', comparison_field: 'previous', details: [{ field: 'lines' }] }],
+        { backlog: 10, previous: null, lines: null },
+      ),
+    );
+    if (model?.chartType !== 'metric') throw new Error('expected a metric model');
+    expect(model.metrics[0]!.comparison?.value).toBeNull();
+    expect(model.metrics[0]!.details[0]!.value).toBeNull();
+  });
+
+  it.each([
+    ['no metrics', []],
+    ['more than six cards', Array.from({ length: 7 }, (_, index) => ({ field: `m${index}` }))],
+    ['a repeated headline', [{ field: 'a' }, { field: 'a' }]],
+    ['an unknown tone', [{ field: 'a', tone: 'purple' }]],
+    ['an unknown icon', [{ field: 'a', icon: 'rocket' }]],
+    ['an unknown format', [{ field: 'a', format: 'money' }]],
+    ['an unknown polarity', [{ field: 'a', comparison_field: 'b', polarity: 'good' }]],
+    [
+      'too many supporting figures',
+      [{ field: 'a', details: ['b', 'c', 'd', 'e', 'f'].map((field) => ({ field })) }],
+    ],
+    ['a supporting figure without a field', [{ field: 'a', details: [{}] }]],
+  ])('rejects %s', (_name, metrics) => {
+    const row = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, m0: 1 };
+    expect(normalizeMetric(metricPayload(metrics, row))).toBeNull();
+  });
+
+  it('rejects a non-numeric headline, a missing column and a legacy single-value encoding', () => {
+    expect(normalizeMetric(metricPayload([{ field: 'a' }], { a: 'n/a' }))).toBeNull();
+    expect(normalizeMetric(metricPayload([{ field: 'a' }], { a: null }))).toBeNull();
+    expect(normalizeMetric(metricPayload([{ field: 'a' }], { b: 1 }))).toBeNull();
+    expect(
+      normalizeMetric({
+        ...metricPayload([], { revenue: 10 }),
+        encoding: { value: { field: 'revenue' } },
+      }),
+    ).toBeNull();
+  });
+});
+
 describe('chart artifact normalization', () => {
   it.each(['bar', 'line', 'area'] as const)(
     'accepts controlled %s field encodings and numeric strings',
@@ -150,7 +255,7 @@ describe('chart artifact normalization', () => {
       renderer: 'frontend',
       chart_type: 'metric',
       title: 'Revenue',
-      encoding: { value: { field: 'revenue' } },
+      encoding: { metrics: [{ field: 'revenue' }] },
       data: [{ revenue: 10 }, { revenue: 20 }],
     };
     expect(

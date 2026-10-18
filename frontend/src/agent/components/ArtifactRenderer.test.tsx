@@ -148,6 +148,42 @@ describe('ArtifactRenderer', () => {
     expect(screen.getByRole('table', { name: 'hidden-table' })).toBeInTheDocument();
   });
 
+  it('renders a metric group from one aggregate row without handing it to ECharts', () => {
+    const metric = a('metric-output', 'chart', {
+      schema_version: 1,
+      renderer: 'frontend',
+      chart_type: 'metric',
+      title: 'Latest backlog',
+      source_sql_execution_id: 's1',
+      encoding: {
+        metrics: [
+          {
+            field: 'backlog',
+            label: 'Backlog value',
+            format: 'currency',
+            unit: 'P$',
+            comparison_field: 'previous',
+            comparison_label: 'vs previous week',
+            details: [{ field: 'lines', label: 'Open lines', format: 'count' }],
+          },
+          { field: 'orders', label: 'Orders', format: 'count', tone: 'info' },
+        ],
+      },
+      data: [{ backlog: '17552267.65356', previous: 17846061.87, lines: 17080, orders: 9117 }],
+    });
+    render(
+      <MemoryRouter>
+        <ArtifactRenderer jobId="j1" artifacts={[metric]} sql={sql} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Latest backlog')).toBeInTheDocument();
+    expect(screen.getByText('P$17.55M')).toBeInTheDocument();
+    expect(screen.getByText('Down 1.65% vs previous week')).toBeInTheDocument();
+    expect(screen.getByText('Open lines').nextElementSibling).toHaveTextContent('17,080');
+    expect(screen.getByRole('article', { name: 'Orders: 9,117' })).toBeInTheDocument();
+    expect(screen.queryByTestId('echarts')).not.toBeInTheDocument();
+  });
+
   it('turns a selected chart point into an ordinary visible chat follow-up', async () => {
     const followUp = vi.fn(async () => undefined);
     render(

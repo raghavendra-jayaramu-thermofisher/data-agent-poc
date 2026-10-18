@@ -1793,29 +1793,6 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
   font-size: 13px;
 }
 
-.metric-widget-value {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 100px;
-  padding: 8px 4px;
-}
-
-.metric-widget-value span {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--db-text-secondary);
-}
-
-.metric-widget-value strong {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--db-text-primary);
-  line-height: 1.1;
-}
-
 .widget-provenance {
   margin-top: 12px;
   padding-top: 10px;

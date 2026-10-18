@@ -1,0 +1,195 @@
+/*
+ * Metric cards and groups.
+ * The group is a wrapping grid, so any number of cards stays inside the artifact width:
+ * no horizontal scrolling and no nested scroll area. Sizes follow the container (cqi), not the
+ * viewport, so the same layout works in the chat, a dashboard widget and fullscreen.
+ */
+/* Inset used by the chat artifact; equals the gap so spacing is even from the frame inwards. */
+.metric-card-body {
+  padding: 12px;
+}
+
+.metric-group-frame {
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+}
+
+.metric-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+@container (min-width: 520px) {
+  .metric-tile-primary {
+    grid-column: span 2;
+  }
+}
+
+.metric-tile {
+  --metric-accent: var(--db-border-strong);
+  --metric-soft: var(--db-surface-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--db-border-default);
+  border-left: 4px solid var(--metric-accent);
+  border-radius: var(--radius, 4px);
+  background: var(--metric-soft);
+}
+
+.metric-tile-primary {
+  --metric-accent: var(--db-primary);
+}
+
+.metric-tone-positive {
+  --metric-accent: var(--db-success);
+  --metric-soft: color-mix(in srgb, var(--db-success-soft) 55%, var(--db-surface-raised));
+}
+
+.metric-tone-negative {
+  --metric-accent: var(--db-danger);
+  --metric-soft: color-mix(in srgb, var(--db-danger-soft) 55%, var(--db-surface-raised));
+}
+
+.metric-tone-warning {
+  --metric-accent: var(--db-warning);
+  --metric-soft: color-mix(in srgb, var(--db-warning-soft) 55%, var(--db-surface-raised));
+}
+
+.metric-tone-info {
+  --metric-accent: var(--db-info);
+  --metric-soft: color-mix(in srgb, var(--db-info-soft) 55%, var(--db-surface-raised));
+}
+
+.metric-tile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  color: var(--db-text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.metric-tile-icon,
+.metric-tile-cue {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.metric-tile-cue {
+  margin-left: auto;
+  color: var(--metric-accent);
+}
+
+.metric-tile-label {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.metric-tile-value {
+  color: var(--db-text-primary);
+  font-size: clamp(22px, 7cqi, 30px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.metric-tile-primary .metric-tile-value {
+  font-size: clamp(26px, 9cqi, 38px);
+}
+
+.metric-tile-exact {
+  color: var(--db-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.metric-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  color: var(--db-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-change-positive {
+  color: var(--db-success);
+}
+
+.metric-change-negative {
+  color: var(--db-danger);
+}
+
+.metric-change-amount,
+.metric-change-label {
+  color: var(--db-text-muted);
+  font-weight: 400;
+}
+
+.metric-change-label {
+  flex-basis: 100%;
+}
+
+.metric-tile-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.metric-tile-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--db-border-subtle);
+}
+
+.metric-tile-detail {
+  min-width: 0;
+}
+
+.metric-tile-detail dt {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--db-text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-tile-detail dd {
+  margin: 0;
+  color: var(--db-text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.metric-tile-caption {
+  margin: 0;
+  color: var(--db-text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

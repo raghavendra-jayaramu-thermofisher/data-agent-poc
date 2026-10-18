@@ -66,7 +66,8 @@ export function findSaveSource(
       defaults.categoryField = text(object(encoding?.category)?.field) ?? '';
       defaults.valueField = text(object(encoding?.value)?.field) ?? '';
     } else if (defaultWidgetType === 'metric') {
-      defaults.metricField = text(object(encoding?.value)?.field) ?? '';
+      const metrics = Array.isArray(encoding?.metrics) ? encoding.metrics.map(object) : [];
+      defaults.metricField = text(metrics[0]?.field) ?? '';
     } else {
       defaults.xField = text(object(encoding?.x)?.field) ?? '';
       const series = Array.isArray(encoding?.series)

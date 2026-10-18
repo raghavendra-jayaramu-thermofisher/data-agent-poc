@@ -192,10 +192,20 @@ def _valid_chart_artifact(payload: dict[str, object], source: SQLExecution | Non
             return False
         fields = [category, value]
     elif chart_type == "metric":
-        value = encoded_field(encoding.get("value"))
-        if value is None:
+        from pydantic import ValidationError
+
+        from app.agent.tool_schemas import MAX_METRICS, MetricInput
+
+        raw_metrics = encoding.get("metrics")
+        if not isinstance(raw_metrics, list) or not 1 <= len(raw_metrics) <= MAX_METRICS:
             return False
-        fields = [value]
+        try:
+            metrics = [MetricInput.model_validate(item) for item in raw_metrics]
+        except ValidationError:
+            return False
+        if len(data) != 1:
+            return False
+        fields = [field for item in metrics for field in item.referenced_fields()]
     else:
         x_field = encoded_field(encoding.get("x"))
         series = encoding.get("series")

@@ -126,12 +126,13 @@ table or chart artifact. Multiple tables are allowed when they contain genuinely
 result sets needed by the explanation.
 
 Never present equivalent rows twice, even with different labels, ordering, formatting, or a
-shortened duplicate. For a simple lookup, listing, or ranking, prefer one expanded UI table plus
-a concise conclusion; do not add a Markdown copy of that table.
+shortened duplicate. For a listing or ranking, prefer one expanded UI table plus a concise
+conclusion; do not add a Markdown copy of that table. For a headline figure, use a `metric`
+presentation and collapse its source table.
 
 Use the presentation that makes the answer easiest to understand:
 
-* single important value → `metric`
+* headline figure, optionally with a comparison or a few related figures from one aggregate row → `metric`
 * category comparison/ranking → `bar`; use `orientation="horizontal"` for long category labels
 * composition within categories → `bar` with `stacked=true`, in either orientation
 * columns plus trend/target measures on the same X-axis → `combo`; use `stacked=true` for
@@ -160,9 +161,21 @@ it in SQL before creating a multi-series chart.
 
 Required chart fields:
 
-* `metric` → `title`, `sql_execution_id`, `value_field`, optional `value_label`
+* `metric` → `title`, `sql_execution_id`, `metrics` (one to six cards; the first is the primary)
 * `bar` / `line` / `area` → `title`, `sql_execution_id`, `x_field`, `series`
 * `pie` / `donut` → `title`, `sql_execution_id`, `category_field`, `value_field`
+
+Metric cards are built from exactly one SQL row with one numeric column per figure. Each card
+needs a headline `field` and may add `label`, `format`, a verified `unit`, `caption`, `icon`,
+`tone`, up to four supporting `details`, and a `comparison_field` (with `comparison_label`) when
+the question asks how a figure changed. For a change over time, return the current and the
+previous value as separate columns in the same row; the interface calculates the difference, so
+never write computed changes into labels or captions. Set `polarity` only when the question or the
+knowledge makes the preferred direction clear, and `tone` only when colour carries meaning.
+Use a metric group (several cards) only for related figures from the same result. Put counts or
+measures that describe a headline (for example lines or orders behind a value) in that card's
+`details`, not in separate prose. The artifact title is its heading, so do not add a Markdown
+heading that repeats it.
 
 Bar options default to `orientation="vertical"` and `stacked=false` (grouped columns).
 Stack mutually exclusive, additive components in the same unit. Keep overlapping measurements

@@ -1,4 +1,19 @@
 import type { JobArtifact, SqlExecution } from '../agent/api/execution-api';
+import {
+  MAX_METRIC_DETAILS,
+  MAX_METRICS,
+  METRIC_FORMATS,
+  METRIC_ICONS,
+  METRIC_POLARITIES,
+  METRIC_TONES,
+  toFiniteNumber,
+  type MetricCardModel,
+  type MetricDetailModel,
+  type MetricFormat,
+  type MetricIconName,
+  type MetricPolarity,
+  type MetricTone,
+} from './metric-domain';
 
 export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'metric' | 'combo';
 export type CartesianChartType = Exclude<ChartType, 'pie' | 'donut' | 'metric'>;
@@ -51,9 +66,8 @@ export type MetricChartModel = {
   id: string;
   title: string;
   chartType: 'metric';
-  field: string;
-  label: string;
-  value: string | number | null;
+  /** One to six cards; the first is the primary highlight. */
+  metrics: MetricCardModel[];
   dataSourceId: string;
   dataSourceName: string;
   provenance: MultiSourceChartModel['provenance'];
@@ -74,15 +88,93 @@ function object(value: unknown): Record<string, unknown> | null {
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
-function numeric(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const cleaned = value.replace(/[$,\s]/g, '').trim();
-    const parsed = Number(cleaned);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+const numeric = toFiniteNumber;
+
+function oneOf<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T | null {
+  if (value === undefined || value === null) return fallback;
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : null;
 }
+
+/** Parse the metric encoding into cards; null rejects the whole artifact. */
+function parseMetricCards(
+  encoding: Record<string, unknown>,
+  data: unknown,
+): MetricCardModel[] | null {
+  const raw = Array.isArray(encoding.metrics) ? encoding.metrics.map(object) : null;
+  if (!raw || raw.length < 1 || raw.length > MAX_METRICS || raw.some((item) => !item)) return null;
+  const specs = raw as Record<string, unknown>[];
+  const headlines = specs.map((item) => text(item.field));
+  if (headlines.some((field) => !field) || new Set(headlines).size !== headlines.length)
+    return null;
+  const optionalFields = new Set<string>();
+  const requiredFields = new Set<string>(headlines as string[]);
+  for (const item of specs) {
+    const comparisonField = text(item.comparison_field);
+    if (item.comparison_field != null && !comparisonField) return null;
+    if (comparisonField) optionalFields.add(comparisonField);
+    if (item.details != null && !Array.isArray(item.details)) return null;
+    for (const detail of (item.details as unknown[] | undefined) ?? []) {
+      const detailField = text(object(detail)?.field);
+      if (!detailField) return null;
+      optionalFields.add(detailField);
+    }
+  }
+  const chartPoints = points(data, new Set([...requiredFields, ...optionalFields]), optionalFields);
+  if (!chartPoints || chartPoints.length !== 1) return null;
+  const row = chartPoints[0]!;
+  const cards: MetricCardModel[] = [];
+  for (const item of specs) {
+    const field = text(item.field)!;
+    const format = oneOf<MetricFormat>(METRIC_FORMATS, item.format, 'number');
+    const tone = oneOf<MetricTone>(METRIC_TONES, item.tone, 'neutral');
+    const polarity = oneOf<MetricPolarity>(METRIC_POLARITIES, item.polarity, 'neutral');
+    const icon =
+      item.icon == null ? null : oneOf<MetricIconName>(METRIC_ICONS, item.icon, METRIC_ICONS[0]);
+    if (!format || !tone || !polarity || (item.icon != null && !icon)) return null;
+    const rawDetails = (item.details as unknown[] | undefined) ?? [];
+    if (rawDetails.length > MAX_METRIC_DETAILS) return null;
+    const details: MetricDetailModel[] = [];
+    for (const rawDetail of rawDetails) {
+      const detail = object(rawDetail)!;
+      const detailField = text(detail.field)!;
+      const detailFormat = oneOf<MetricFormat>(METRIC_FORMATS, detail.format, 'number');
+      if (!detailFormat) return null;
+      details.push({
+        field: detailField,
+        label: text(detail.label) ?? detailField,
+        format: detailFormat,
+        unit: text(detail.unit),
+        value: numeric(row[detailField]),
+      });
+    }
+    const comparisonField = text(item.comparison_field);
+    const headline = numeric(row[field]);
+    if (headline == null) return null;
+    cards.push({
+      field,
+      label: text(item.label) ?? field,
+      format,
+      unit: text(item.unit),
+      caption: text(item.caption),
+      icon,
+      tone,
+      value: headline,
+      comparison: comparisonField
+        ? {
+            field: comparisonField,
+            label: text(item.comparison_label),
+            value: numeric(row[comparisonField]),
+          }
+        : null,
+      polarity,
+      details,
+    });
+  }
+  return cards;
+}
+
 function points(
   value: unknown,
   numericFields: Set<string>,
@@ -215,18 +307,13 @@ export function normalizeChartArtifact(
     };
   }
   if (chartType === 'metric') {
-    const value = object(encoding.value);
-    const valueField = text(value?.field);
-    if (!valueField) return null;
-    const chartPoints = points(payload.data, new Set([valueField]));
-    if (!chartPoints || chartPoints.length !== 1) return null;
+    const metrics = parseMetricCards(encoding, payload.data);
+    if (!metrics) return null;
     return {
       id: artifact.id,
       title,
       chartType,
-      field: valueField,
-      label: text(value?.label) ?? valueField,
-      value: chartPoints[0]?.[valueField] ?? null,
+      metrics,
       dataSourceId: sourceId,
       dataSourceName: dataSourceName || 'Data source',
       provenance,

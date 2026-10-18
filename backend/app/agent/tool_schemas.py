@@ -100,6 +100,130 @@ class ChartSeriesInput(BaseModel):
     )
 
 
+MetricFormat = Literal["number", "currency", "count", "percent"]
+MetricTone = Literal["neutral", "positive", "negative", "warning", "info"]
+MetricPolarity = Literal["higher_is_better", "lower_is_better", "neutral"]
+MetricIcon = Literal[
+    "alert", "calendar", "chart", "check", "clock", "currency", "lock", "package", "truck", "users"
+]
+MAX_METRICS = 6
+MAX_METRIC_DETAILS = 4
+
+
+class MetricDetailInput(BaseModel):
+    """A secondary figure shown inside a metric card."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Exact numeric output column from the single SQL result row.",
+    )
+    label: str | None = Field(
+        default=None, max_length=160, description="Business-friendly label for this figure."
+    )
+    format: MetricFormat = Field(
+        default="number",
+        description=(
+            "number: plain figure; currency: money (set unit to the verified symbol); count: whole "
+            "number; percent: the column already holds percentage points, e.g. 52.03 for 52.03%."
+        ),
+    )
+    unit: str | None = Field(
+        default=None,
+        max_length=16,
+        description="Optional verified symbol or unit, e.g. a currency symbol. Never guess it.",
+    )
+
+
+class MetricInput(BaseModel):
+    """One metric card: a headline figure with optional comparison and supporting figures."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Exact numeric output column holding the headline figure.",
+    )
+    label: str | None = Field(
+        default=None, max_length=160, description="Business-friendly label for the headline."
+    )
+    format: MetricFormat = Field(
+        default="number",
+        description=(
+            "number: plain figure; currency: money (set unit to the verified symbol); count: whole "
+            "number; percent: the column already holds percentage points, e.g. 52.03 for 52.03%."
+        ),
+    )
+    unit: str | None = Field(
+        default=None,
+        max_length=16,
+        description="Optional verified symbol or unit, e.g. a currency symbol. Never guess it.",
+    )
+    caption: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Short context line such as scope or period. Do not put computed numbers here.",
+    )
+    icon: MetricIcon | None = Field(
+        default=None, description="Optional icon that helps identify what the metric measures."
+    )
+    tone: MetricTone | None = Field(
+        default=None,
+        description=(
+            "Colour meaning for the card. Omit for neutral. Use warning, negative, positive or "
+            "info only when colour carries meaning; never for decoration."
+        ),
+    )
+    comparison_field: str | None = Field(
+        default=None,
+        max_length=255,
+        description=(
+            "Optional numeric output column from the same row holding the value to compare "
+            "against (for example the previous period). The UI calculates the change."
+        ),
+    )
+    comparison_label: str | None = Field(
+        default=None,
+        max_length=160,
+        description="What the comparison is against, e.g. 'vs previous week'.",
+    )
+    polarity: MetricPolarity = Field(
+        default="neutral",
+        description=(
+            "Which direction of change is good. Keep neutral unless the knowledge or the question "
+            "makes the preferred direction clear."
+        ),
+    )
+    details: list[MetricDetailInput] = Field(
+        default_factory=list,
+        max_length=MAX_METRIC_DETAILS,
+        description="Up to four supporting figures from the same row shown inside the card.",
+    )
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> MetricInput:
+        used = [self.field, *([self.comparison_field] if self.comparison_field else [])]
+        used.extend(item.field for item in self.details)
+        if len(set(used)) != len(used):
+            raise ValueError(
+                "a metric card must use a different column for the headline, the comparison, "
+                "and each supporting figure"
+            )
+        if self.comparison_label and not self.comparison_field:
+            raise ValueError("comparison_label requires comparison_field")
+        if self.polarity != "neutral" and not self.comparison_field:
+            raise ValueError("polarity applies only when comparison_field is set")
+        return self
+
+    def referenced_fields(self) -> list[str]:
+        return [
+            self.field,
+            *([self.comparison_field] if self.comparison_field else []),
+            *(item.field for item in self.details),
+        ]
+
+
 class CreateChartArgs(BaseModel):
     """Frontend-only chart description grounded in a persisted SQL execution."""
 
@@ -112,7 +236,8 @@ class CreateChartArgs(BaseModel):
     )
     chart_type: Literal["bar", "line", "area", "pie", "donut", "metric", "combo"] = Field(
         description=(
-            "Presentation type: metric for one headline value, line or area for ordered trends, "
+            "Presentation type: metric for one or a few headline figures (with optional comparison "
+            "and supporting figures) from a single aggregate row, line or area for ordered trends, "
             "bar for category comparisons, combo for line and column measures sharing an X-axis, "
             "and pie or donut for a small part-to-whole breakdown."
         )
@@ -154,6 +279,14 @@ class CreateChartArgs(BaseModel):
             "omit for pie, donut and metric presentations."
         ),
     )
+    metrics: list[MetricInput] = Field(
+        default_factory=list,
+        max_length=MAX_METRICS,
+        description=(
+            "Metric presentations only: one to six cards, all built from the single SQL result "
+            "row (one numeric column per figure). The first card is the primary highlight."
+        ),
+    )
     x_label: str | None = Field(
         default=None,
         max_length=160,
@@ -179,14 +312,13 @@ class CreateChartArgs(BaseModel):
         default=None,
         max_length=255,
         description=(
-            "Exact numeric output column for pie, donut or metric; omit for bar, line, and "
-            "area charts."
+            "Exact numeric output column for pie or donut; omit for every other chart type."
         ),
     )
     value_label: str | None = Field(
         default=None,
         max_length=160,
-        description="Optional business-friendly label for value_field.",
+        description="Optional business-friendly label for value_field (pie and donut).",
     )
 
     @model_validator(mode="after")
@@ -227,10 +359,22 @@ class CreateChartArgs(BaseModel):
             if self.x_field is not None or self.series:
                 raise ValueError("pie and donut charts must not define x_field or series")
         elif self.chart_type == "metric":
-            if not self.value_field:
-                raise ValueError("metric cards require value_field")
-            if self.x_field is not None or self.series or self.category_field is not None:
-                raise ValueError("metric cards must not define x_field, series, or category_field")
+            if not self.metrics:
+                raise ValueError("metric presentations require at least one entry in metrics")
+            if (
+                self.x_field is not None
+                or self.series
+                or self.category_field is not None
+                or self.value_field is not None
+                or self.value_label is not None
+            ):
+                raise ValueError(
+                    "metric presentations must not define x_field, series, category_field, "
+                    "value_field, or value_label"
+                )
+            headlines = [item.field for item in self.metrics]
+            if len(set(headlines)) != len(headlines):
+                raise ValueError("each metric card must use a different headline column")
         else:
             if not self.x_field:
                 raise ValueError(f"{self.chart_type} charts require x_field")
@@ -238,6 +382,8 @@ class CreateChartArgs(BaseModel):
                 raise ValueError(f"{self.chart_type} charts require at least one series")
             if self.category_field is not None or self.value_field is not None:
                 raise ValueError("non-pie charts must not define category_field/value_field")
+        if self.chart_type != "metric" and self.metrics:
+            raise ValueError("metrics apply only to metric presentations")
         return self
 
 

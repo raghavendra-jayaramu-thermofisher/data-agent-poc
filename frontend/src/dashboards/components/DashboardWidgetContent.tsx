@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { AnalyticalTable } from '../../analytics/table/AnalyticalTable';
-import { formatAnalyticalValue } from '../../analytics/table/table-domain';
 import { AnalyticalChart } from '../../charts/AnalyticalChart';
+import { MetricGroup } from '../../charts/MetricCard';
+import { toFiniteNumber } from '../../charts/metric-domain';
 import type { DashboardWidget } from '../api/dashboard-api';
 import { chartModelForWidget, metricValue, tableModelForWidget } from '../lib/dashboard-artifacts';
 
@@ -9,8 +10,9 @@ export const DashboardWidgetContent = memo(function DashboardWidgetContent({ wid
   if (!widget.latest_artifact) return <div className="widget-empty" role="status"><strong>No persisted data</strong><p>Refresh this widget to create its first reusable dashboard artifact.</p></div>;
   if (widget.widget_type === 'metric') {
     const metric = metricValue(widget);
-    if (!metric) return <InvalidWidget message="The selected metric field is unavailable in the persisted result."/>;
-    return <div className="metric-widget-value"><span>{metric.field}</span><strong>{formatAnalyticalValue(metric.value)}</strong></div>;
+    const value = metric ? toFiniteNumber(metric.value) : null;
+    if (!metric || value == null) return <InvalidWidget message="The selected metric field is unavailable or not numeric in the persisted result."/>;
+    return <MetricGroup metrics={[{ field: metric.field, label: metric.field, format: 'number', unit: null, caption: null, icon: null, tone: 'neutral', value, comparison: null, polarity: 'neutral', details: [] }]}/>;
   }
   if (widget.widget_type === 'table') {
     const table = tableModelForWidget(widget);

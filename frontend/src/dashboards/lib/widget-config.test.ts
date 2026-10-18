@@ -136,6 +136,27 @@ describe('dashboard widget configuration', () => {
     expect(source?.columns).toEqual(['month', 'revenue', 'orders']);
   });
 
+  it('defaults a saved metric widget to the first metric card of a persisted metric group', () => {
+    const metricChart = {
+      ...trace.artifacts![1]!,
+      payload: {
+        schema_version: 1,
+        renderer: 'frontend',
+        chart_type: 'metric',
+        source_sql_execution_id: 's1',
+        encoding: { metrics: [{ field: 'orders' }, { field: 'revenue' }] },
+        data: [{ orders: 3, revenue: 10 }],
+      },
+    };
+    const source = findSaveSource(
+      { ...trace, artifacts: [trace.artifacts![0]!, metricChart] },
+      'chart',
+      's1',
+    );
+    expect(source?.defaultWidgetType).toBe('metric');
+    expect(source?.defaults.metricField).toBe('orders');
+  });
+
   it.each(['metric', 'table', 'bar', 'line', 'area', 'pie', 'donut'] as const)(
     'builds a valid create contract for %s widgets',
     (widgetType) => {

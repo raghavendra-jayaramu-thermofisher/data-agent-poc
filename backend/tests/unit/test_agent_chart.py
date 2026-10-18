@@ -132,13 +132,19 @@ def test_pie_chart_requires_one_row_per_category() -> None:
     assert error.value.code == "CHART_CATEGORY_NOT_UNIQUE"
 
 
+def _metric_spec(**overrides: object) -> CreateChartArgs:
+    values: dict[str, object] = {
+        "sql_execution_id": uuid.uuid4(),
+        "chart_type": "metric",
+        "title": "Backlog",
+        "metrics": [{"field": "revenue"}],
+    }
+    values.update(overrides)
+    return CreateChartArgs(**values)  # type: ignore[arg-type]
+
+
 def test_metric_chart_requires_exactly_one_row() -> None:
-    spec = CreateChartArgs(
-        sql_execution_id=uuid.uuid4(),
-        chart_type="metric",
-        title="Revenue",
-        value_field="revenue",
-    )
+    spec = _metric_spec()
     with pytest.raises(AgentToolError) as error:
         build_frontend_chart_payload(
             spec,
@@ -146,6 +152,150 @@ def test_metric_chart_requires_exactly_one_row() -> None:
             [[10], [20]],
         )
     assert error.value.code == "CHART_METRIC_ROW_COUNT_INVALID"
+
+
+def test_metric_group_payload_carries_every_card_option() -> None:
+    spec = _metric_spec(
+        metrics=[
+            {
+                "field": "backlog",
+                "label": "Backlog value",
+                "format": "currency",
+                "unit": "P$",
+                "caption": "Latest snapshot",
+                "icon": "package",
+                "tone": "warning",
+                "comparison_field": "previous_backlog",
+                "comparison_label": "vs previous week",
+                "polarity": "lower_is_better",
+                "details": [
+                    {"field": "lines", "label": "Open lines", "format": "count"},
+                    {"field": "orders", "label": "Orders", "format": "count"},
+                ],
+            },
+            {"field": "quantity", "label": "Open quantity"},
+        ]
+    )
+    columns = ["backlog", "previous_backlog", "lines", "orders", "quantity"]
+    payload, records = build_frontend_chart_payload(
+        spec, columns, [["17552267.65", 17846061.87, 17080, 9117, 1029962.2]]
+    )
+    assert payload["chart_type"] == "metric"
+    assert records == [
+        {
+            "backlog": "17552267.65",
+            "previous_backlog": 17846061.87,
+            "lines": 17080,
+            "orders": 9117,
+            "quantity": 1029962.2,
+        }
+    ]
+    metrics = payload["encoding"]["metrics"]  # type: ignore[index]
+    assert [item["field"] for item in metrics] == ["backlog", "quantity"]
+    assert metrics[0]["comparison_field"] == "previous_backlog"
+    assert metrics[0]["polarity"] == "lower_is_better"
+    assert metrics[0]["details"][1] == {"field": "orders", "label": "Orders", "format": "count"}
+    assert "value" not in payload["encoding"]  # type: ignore[operator]
+
+
+def test_metric_chart_rejects_unknown_comparison_and_detail_columns() -> None:
+    spec = _metric_spec(
+        metrics=[
+            {
+                "field": "revenue",
+                "comparison_field": "previous",
+                "details": [{"field": "orders"}],
+            }
+        ]
+    )
+    with pytest.raises(AgentToolError) as error:
+        build_frontend_chart_payload(spec, ["revenue"], [[10]])
+    assert error.value.code == "CHART_COLUMN_NOT_FOUND"
+    assert "previous" in error.value.public_message
+    assert "orders" in error.value.public_message
+
+
+def test_metric_headline_must_be_numeric_but_comparison_may_be_missing() -> None:
+    comparison = {"metrics": [{"field": "revenue", "comparison_field": "previous"}]}
+    payload, _ = build_frontend_chart_payload(
+        _metric_spec(**comparison), ["revenue", "previous"], [[10, None]]
+    )
+    assert payload["encoding"]["metrics"][0]["comparison_field"] == "previous"  # type: ignore[index]
+    with pytest.raises(AgentToolError) as headline:
+        build_frontend_chart_payload(_metric_spec(), ["revenue"], [[None]])
+    assert headline.value.code == "CHART_VALUE_EMPTY"
+    with pytest.raises(AgentToolError) as text_headline:
+        build_frontend_chart_payload(_metric_spec(), ["revenue"], [["n/a"]])
+    assert text_headline.value.code == "CHART_VALUE_NOT_NUMERIC"
+    with pytest.raises(AgentToolError) as text_comparison:
+        build_frontend_chart_payload(
+            _metric_spec(**comparison), ["revenue", "previous"], [[10, "n/a"]]
+        )
+    assert text_comparison.value.code == "CHART_VALUE_NOT_NUMERIC"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"metrics": []},
+        {"metrics": [{"field": f"m{index}"} for index in range(7)]},
+        {"metrics": [{"field": "a"}, {"field": "a"}]},
+        {"metrics": [{"field": "a", "comparison_field": "a"}]},
+        {"metrics": [{"field": "a", "details": [{"field": "b"}, {"field": "b"}]}]},
+        {"metrics": [{"field": "a", "details": [{"field": f"d{index}"} for index in range(5)]}]},
+        {"metrics": [{"field": "a", "comparison_label": "vs last week"}]},
+        {"metrics": [{"field": "a", "polarity": "higher_is_better"}]},
+        {"metrics": [{"field": "a", "tone": "purple"}]},
+        {"metrics": [{"field": "a", "icon": "rocket"}]},
+        {"metrics": [{"field": "a", "format": "money"}]},
+        {"metrics": [{"field": "a", "unit": "x" * 17}]},
+        {"value_field": "a"},
+    ],
+)
+def test_metric_schema_rejects_invalid_shapes(overrides: dict) -> None:
+    with pytest.raises(ValidationError):
+        _metric_spec(**overrides)
+
+
+def test_metrics_apply_only_to_metric_presentations() -> None:
+    with pytest.raises(ValidationError):
+        CreateChartArgs(
+            sql_execution_id=uuid.uuid4(),
+            chart_type="bar",
+            title="Revenue",
+            x_field="month",
+            series=[{"field": "revenue"}],
+            metrics=[{"field": "revenue"}],
+        )
+    with pytest.raises(ValidationError):
+        CreateChartArgs(
+            sql_execution_id=uuid.uuid4(),
+            chart_type="metric",
+            title="Revenue",
+        )
+
+
+def test_metric_group_is_accepted_as_final_answer_evidence() -> None:
+    from app.agent.evidence import _valid_chart_artifact
+    from app.agent.models import SQLExecution
+
+    spec = _metric_spec(
+        metrics=[
+            {"field": "backlog", "comparison_field": "previous", "details": [{"field": "lines"}]}
+        ]
+    )
+    columns = ["backlog", "previous", "lines"]
+    payload, _ = build_frontend_chart_payload(spec, columns, [[10, 8, 3]])
+    source = SQLExecution(id=spec.sql_execution_id, columns=columns)
+    assert _valid_chart_artifact(payload, source)
+    assert not _valid_chart_artifact(
+        payload, SQLExecution(id=spec.sql_execution_id, columns=["backlog", "previous"])
+    )
+    assert not _valid_chart_artifact({**payload, "encoding": {"metrics": []}}, source)
+    assert not _valid_chart_artifact(
+        {**payload, "encoding": {"metrics": [{"field": "backlog", "tone": "purple"}]}}, source
+    )
+    assert not _valid_chart_artifact({**payload, "data": payload["data"] * 2}, source)  # type: ignore[operator]
 
 
 def test_chart_rejects_nonfinite_numeric_values() -> None:
@@ -220,7 +370,7 @@ def test_bar_options_are_rejected_for_other_chart_types(chart_type: str, options
     mapping = (
         {"category_field": "category", "value_field": "value"}
         if chart_type in {"pie", "donut"}
-        else {"value_field": "value"}
+        else {"metrics": [{"field": "value"}]}
         if chart_type == "metric"
         else {"x_field": "category", "series": [{"field": "value"}]}
     )

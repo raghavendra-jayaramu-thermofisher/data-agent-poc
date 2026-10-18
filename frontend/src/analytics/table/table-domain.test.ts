@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { formatColumnHeader } from './table-domain';
+import { formatAnalyticalValue, formatColumnHeader, isNumericColumn } from './table-domain';
+
+describe('formatAnalyticalValue', () => {
+  it('groups digits of numbers and of decimal text from the database', () => {
+    expect(formatAnalyticalValue(17080)).toBe('17,080');
+    expect(formatAnalyticalValue('17552267.65356')).toBe('17,552,267.65356');
+    expect(formatAnalyticalValue('-1029962.20000')).toBe('-1,029,962.2');
+  });
+
+  it('leaves identifiers and other text untouched', () => {
+    expect(formatAnalyticalValue('00702')).toBe('00702');
+    expect(formatAnalyticalValue('75831563')).toBe('75831563');
+    expect(formatAnalyticalValue('2026-10-12')).toBe('2026-10-12');
+    expect(formatAnalyticalValue('v1.2.3')).toBe('v1.2.3');
+  });
+
+  it('formats missing, boolean and structured values', () => {
+    expect(formatAnalyticalValue(null)).toBe('—');
+    expect(formatAnalyticalValue(true)).toBe('True');
+    expect(formatAnalyticalValue({ a: 1 })).toBe('{"a":1}');
+  });
+});
+
+describe('isNumericColumn', () => {
+  const rows = (...values: Array<string | number | null>) =>
+    values.map((value, index) => ({ id: String(index), values: { v: value } }));
+
+  it('treats numbers and decimal text as numeric but not identifiers', () => {
+    expect(isNumericColumn(rows(1, 2.5, null), 'v')).toBe(true);
+    expect(isNumericColumn(rows('10.5', '20.25'), 'v')).toBe(true);
+    expect(isNumericColumn(rows('00702', '75831563'), 'v')).toBe(false);
+    expect(isNumericColumn(rows(null, null), 'v')).toBe(false);
+  });
+});
 
 describe('formatColumnHeader', () => {
   it('prefers custom column labels when supplied', () => {
