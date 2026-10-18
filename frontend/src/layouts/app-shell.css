@@ -151,7 +151,6 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  scrollbar-width: thin;
   padding: 2px;
 }
 .sidebar-navigation {

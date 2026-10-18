@@ -41,6 +41,59 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Share light, thin scrollbars across the app while preserving native scrolling. */
+@media (forced-colors: none) {
+  :root {
+    --db-scrollbar-thumb: color-mix(in srgb, var(--db-primary) 15%, var(--db-border-default));
+    --db-scrollbar-thumb-hover: color-mix(in srgb, var(--db-primary) 25%, var(--db-border-default));
+    --db-scrollbar-track: color-mix(in srgb, var(--db-surface-muted) 25%, var(--db-surface));
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--db-scrollbar-thumb) var(--db-scrollbar-track);
+  }
+
+  *:hover {
+    scrollbar-color: var(--db-scrollbar-thumb-hover) var(--db-scrollbar-track);
+  }
+
+  @supports selector(::-webkit-scrollbar) {
+    /* Native color/width overrides would prevent Chromium from hiding the arrow buttons. */
+    *,
+    *:hover {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: var(--db-scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: var(--db-scrollbar-thumb);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--db-scrollbar-thumb-hover);
+    }
+  }
+}
+
 html,
 body {
   height: 100%;
@@ -2530,7 +2583,6 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
   max-height: 480px;
   overflow-y: auto;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .markdown-table-wrapper table {
