@@ -31,8 +31,8 @@ export function appendJobEvent(events: JobEvent[], next: JobEvent): JobEvent[] {
   return [...events, next].sort((a, b) => a.sequence - b.sequence);
 }
 const exactLabels: Record<string, string> = {
-  'job.queued': 'Queued',
-  'job.started': 'Started',
+  'job.queued': 'Waiting to start',
+  'job.started': 'Ready to begin',
   'job.completed': 'Completed',
   'job.failed': 'Failed',
   'job.cancelled': 'Cancelled',
@@ -46,19 +46,19 @@ const exactLabels: Record<string, string> = {
   'knowledge.index.generated': 'Knowledge index generated',
   'knowledge.documents.generated': 'Knowledge documents generated',
   'knowledge.generation.completed': 'Knowledge ready',
-  'knowledge.index.loaded': 'Reading data knowledge…',
-  'knowledge.schema.loaded': 'Loading table schema…',
-  'agent.started': 'Starting analysis…',
-  'analysis.completed': 'Analysis completed',
+  'knowledge.index.loaded': 'Reviewing your data guide…',
+  'knowledge.schema.loaded': 'Checking your table structure…',
+  'agent.started': 'Starting your analysis…',
+  'analysis.completed': 'Analysis complete',
   'model.request.started': 'Analyzing…',
   'model.request.completed': 'Analysis step completed',
-  'tool.started': 'Running analysis tool…',
-  'tool.completed': 'Analysis tool completed',
-  'sql.started': 'Executing SQL…',
-  'sql.completed': 'SQL completed',
-  'chart.generated': 'Chart created',
+  'tool.started': 'Working on your request…',
+  'tool.completed': 'Step complete',
+  'sql.started': 'Retrieving the data…',
+  'sql.completed': 'Data retrieved',
+  'chart.generated': 'Chart ready',
   'answer.generated': 'Answer generated',
-  'finalization.started': 'Preparing final answer…',
+  'finalization.started': 'Putting your answer together…',
   'finalization.repair_started': 'Refining final answer…',
   'finalization.quality_warning': 'Answer ready with formatting warnings',
   'finalization.completed': 'Final answer ready',
@@ -88,11 +88,11 @@ export function getSafeJobEventLabel(event?: JobEvent): string | null {
   if (event.event_type.startsWith('datasource.')) return 'Processing data source…';
   if (event.event_type.startsWith('job.')) return 'Updating job…';
   if (event.event_type.startsWith('model.request.')) return 'Analyzing…';
-  if (event.event_type.startsWith('tool.')) return 'Running analysis tool…';
-  if (event.event_type.startsWith('sql.')) return 'Executing SQL…';
+  if (event.event_type.startsWith('tool.')) return 'Working on your request…';
+  if (event.event_type.startsWith('sql.')) return 'Retrieving the data…';
   if (event.event_type.startsWith('agent.')) return 'Running analysis…';
   if (event.event_type.startsWith('analysis.')) return 'Validating analysis…';
-  if (event.event_type.startsWith('finalization.')) return 'Preparing final answer…';
+  if (event.event_type.startsWith('finalization.')) return 'Putting your answer together…';
   if (event.event_type.startsWith('dashboard.')) return 'Refreshing dashboard…';
   return null;
 }

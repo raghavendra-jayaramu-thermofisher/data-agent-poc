@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.models import Job, JobEvent
@@ -15,6 +15,17 @@ class JobRepository:
 
     def add(self, job: Job) -> None:
         self.session.add(job)
+
+    async def has_earlier_chat(self, job: Job) -> bool:
+        return bool(await self.session.scalar(
+            select(Job.id).where(
+                Job.conversation_id == job.conversation_id,
+                Job.job_type == "chat_query",
+                Job.status.in_(("queued", "running")),
+                or_(Job.created_at < job.created_at,
+                    and_(Job.created_at == job.created_at, Job.id < job.id)),
+            ).limit(1)
+        ))
 
     async def get(self, job_id: uuid.UUID) -> Job | None:
         return await self.session.get(Job, job_id)
@@ -89,7 +100,10 @@ class JobRepository:
         return {str(status): int(count) for status, count in result.all()}
 
     async def lock(self, job_id: uuid.UUID) -> Job | None:
-        result = await self.session.execute(select(Job).where(Job.id == job_id).with_for_update())
+        result = await self.session.execute(
+            select(Job).where(Job.id == job_id).with_for_update()
+            .execution_options(populate_existing=True)
+        )
         return result.scalar_one_or_none()
 
     async def lock_for_organization(

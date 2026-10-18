@@ -128,6 +128,9 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
                         ...current,
                         [jobId]: {
                             ...item,
+                            job: event.event_type === 'job.started' && item.job.status === 'queued'
+                                ? { ...item.job, status: 'running', started_at: item.job.started_at ?? event.created_at }
+                                : item.job,
                             events: appendJobEvent(item.events, event),
                             lastSeenSequence: event.sequence,
                             connectionState: 'connected',

@@ -11,17 +11,35 @@ type FollowUpChatComposerProps = Omit<
 // Keep each keystroke local so long answers and artifacts do not rerender with the draft.
 export function FollowUpChatComposer({ onSubmit, ...props }: FollowUpChatComposerProps) {
   const [question, setQuestion] = useState('');
+  const [error, setError] = useState('');
 
   const submitDraft = async () => {
     const submittedQuestion = question;
-    await onSubmit(submittedQuestion);
-    // A user can keep typing while this request is pending.
-    setQuestion((current) => current === submittedQuestion ? '' : current);
+    setError('');
+    try {
+      await onSubmit(submittedQuestion);
+      // A user can keep typing while this request is pending.
+      setQuestion((current) => (current === submittedQuestion ? '' : current));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Unable to send question. Try again.');
+    }
   };
 
   return (
     <ChatComposer
       {...props}
+      status={
+        props.status || error ? (
+          <>
+            {props.status}
+            {error && (
+              <p className="chat-composer-error" role="alert">
+                {error}
+              </p>
+            )}
+          </>
+        ) : undefined
+      }
       question={question}
       onQuestionChange={setQuestion}
       onSubmit={submitDraft}

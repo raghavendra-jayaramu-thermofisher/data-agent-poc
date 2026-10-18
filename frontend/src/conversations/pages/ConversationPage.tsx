@@ -1,13 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { queryKeys } from '../../api/queryKeys';
 import { PageError, PageLoading, PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
 import { listProfiles } from '../../models/api/models-api';
 import { useJobManager } from '../../jobs/JobManagerProvider';
-import { isActiveJobStatus, isTerminalJobStatus } from '../../jobs/types';
+import { isTerminalJobStatus } from '../../jobs/types';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import type { ConversationMessage as Message } from '../api/conversation-api';
@@ -17,6 +16,7 @@ import { AnalysisProgress } from '../components/AnalysisProgress';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { FollowUpChatComposer } from '../components/FollowUpChatComposer';
 import { ConversationActions } from '../components/ConversationActions';
+import { orderConversationTurns } from '../components/conversation-turns';
 import { useConversation, useConversationMessages } from '../hooks/useConversations';
 
 type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
@@ -54,7 +54,6 @@ export function ConversationPage() {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(null);
-  const [composerHeight, setComposerHeight] = useState(136);
   const [initialSubmitError, setInitialSubmitError] = useState<string | null>(null);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -68,7 +67,9 @@ export function ConversationPage() {
     [conversationId, jobManager.jobs],
   );
 
-  const activeRunningJob = conversationJobs.find((entry) => isActiveJobStatus(entry.job.status));
+  const activeRunningJob =
+    conversationJobs.find((entry) => entry.job.status === 'running') ??
+    conversationJobs.find((entry) => entry.job.status === 'queued');
 
   const appendOptimisticMessage = useCallback(
     (accepted: api.MessageAccepted, content: string) => {
@@ -138,29 +139,23 @@ export function ConversationPage() {
 
   useEffect(() => {
     if (!composerElement) return;
-    const composerCard = composerElement.querySelector<HTMLElement>('.chat-composer-card');
-    const stream = workspaceRef.current?.querySelector<HTMLElement>('.chat-message-stream');
-    // Reserve enough scroll space to reach the final message above the fixed composer.
-    const updateComposerHeight = () => {
-      if (stream) {
-        const bounds = stream.getBoundingClientRect();
-        composerElement.style.setProperty('--conversation-composer-left', `${bounds.left}px`);
-        composerElement.style.setProperty('--conversation-composer-width', `${bounds.width}px`);
-      }
-      const top =
-        composerCard?.getBoundingClientRect().top ?? composerElement.getBoundingClientRect().top;
-      setComposerHeight(Math.max(0, Math.ceil(window.innerHeight - top)));
+    const scroll = workspaceRef.current?.querySelector<HTMLElement>('.chat-main-scroll');
+    if (!scroll) return;
+    // The composer stays in layout; only match the message viewport's scrollbar gutter.
+    const updateGutter = () => {
+      composerElement.style.setProperty(
+        '--conversation-scrollbar-width',
+        `${scroll.offsetWidth - scroll.clientWidth}px`,
+      );
     };
-    updateComposerHeight();
+    updateGutter();
     const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateComposerHeight);
-    observer?.observe(composerElement);
-    if (composerCard) observer?.observe(composerCard);
-    if (stream) observer?.observe(stream);
-    window.addEventListener('resize', updateComposerHeight);
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateGutter);
+    observer?.observe(scroll);
+    window.addEventListener('resize', updateGutter);
     return () => {
       observer?.disconnect();
-      window.removeEventListener('resize', updateComposerHeight);
+      window.removeEventListener('resize', updateGutter);
     };
   }, [composerElement]);
 
@@ -193,7 +188,7 @@ export function ConversationPage() {
 
   const sourceMap = new Map((dataSources.data ?? []).map((source) => [source.id, source]));
 
-  const durableMessages = messages.data ?? [];
+  const durableMessages = orderConversationTurns(messages.data ?? []);
   const latestAssistantId = durableMessages.findLast((message) => message.role === 'assistant')?.id;
   const assistantJobIds = new Set(
     durableMessages
@@ -201,24 +196,40 @@ export function ConversationPage() {
       .map((message) => message.job_id),
   );
   const jobsById = new Map(conversationJobs.map((entry) => [entry.job.id, entry]));
+  const progressJob =
+    conversationJobs.find(
+      (entry) => entry.job.status === 'running' && !assistantJobIds.has(entry.job.id),
+    ) ??
+    conversationJobs.find(
+      (entry) => entry.job.status === 'queued' && !assistantJobIds.has(entry.job.id),
+    );
   const insertedJobs = new Set<string>();
 
   const messageTimeline = durableMessages.flatMap((message, index) => {
-    const question = message.role === 'assistant'
-      ? durableMessages.slice(0, index).findLast((item) => item.role === 'user' &&
-          (!message.job_id || item.job_id === message.job_id))?.content
-        ?? durableMessages.slice(0, index).findLast((item) => item.role === 'user')?.content
-        ?? conversation.data?.title
-      : undefined;
+    const question =
+      message.role === 'assistant'
+        ? (durableMessages
+            .slice(0, index)
+            .findLast(
+              (item) => item.role === 'user' && (!message.job_id || item.job_id === message.job_id),
+            )?.content ??
+          durableMessages.slice(0, index).findLast((item) => item.role === 'user')?.content ??
+          conversation.data?.title)
+        : undefined;
     const items = [
       <ConversationMessage
         key={message.id}
         message={message}
         question={question ?? undefined}
+        queued={Boolean(
+          message.job_id &&
+          message.job_id !== progressJob?.job.id &&
+          jobsById.get(message.job_id)?.job.status === 'queued',
+        )}
         senderName={user?.display_name?.trim() || user?.email || 'You'}
         onFollowUp={submitFollowUp}
         showSuggestions={message.id === latestAssistantId}
-        followUpDisabled={isSubmitting || Boolean(activeRunningJob)}
+        followUpDisabled={isSubmitting}
       />,
     ];
     if (message.role !== 'user' || !message.job_id || assistantJobIds.has(message.job_id))
@@ -226,7 +237,7 @@ export function ConversationPage() {
     const entry = jobsById.get(message.job_id);
     if (!entry) return items;
     insertedJobs.add(entry.job.id);
-    if (isActiveJobStatus(entry.job.status)) {
+    if (entry.job.id === progressJob?.job.id) {
       items.push(
         <AnalysisProgress
           key={`progress-${entry.job.id}`}
@@ -245,11 +256,7 @@ export function ConversationPage() {
   );
 
   return (
-    <div
-      ref={workspaceRef}
-      className="chat-workspace"
-      style={{ '--conversation-composer-height': `${composerHeight}px` } as CSSProperties}
-    >
+    <div ref={workspaceRef} className="chat-workspace">
       <header className="conversation-heading">
         <h1>{conversation.data?.title?.trim() || 'Analysis'}</h1>
         <ConversationActions
@@ -286,15 +293,13 @@ export function ConversationPage() {
             />
           )}
 
-          {unmatchedJobs
-            .filter((entry) => isActiveJobStatus(entry.job.status))
-            .map((entry) => (
-              <AnalysisProgress
-                key={`orphan-progress-${entry.job.id}`}
-                managedJob={entry}
-                onCancel={() => jobManager.cancel(entry.job.id)}
-              />
-            ))}
+          {progressJob && !insertedJobs.has(progressJob.job.id) && (
+            <AnalysisProgress
+              key={`progress-${progressJob.job.id}`}
+              managedJob={progressJob}
+              onCancel={() => jobManager.cancel(progressJob.job.id)}
+            />
+          )}
 
           {unmatchedJobs
             .filter(
@@ -309,7 +314,7 @@ export function ConversationPage() {
         </div>
       </div>
 
-      {/* Fixed Bottom ChatGPT Follow-up Composer Deck */}
+      {/* The composer stays in layout outside the scrolling messages. */}
       <FollowUpChatComposer
         key={conversationId}
         containerRef={setComposerElement}
@@ -321,7 +326,7 @@ export function ConversationPage() {
         profiles={(profiles.data ?? []).filter((p) => p.enabled)}
         selectedProfileId={selectedProfileId}
         onProfileIdChange={setSelectedProfileId}
-        isSubmitting={isSubmitting || Boolean(activeRunningJob)}
+        isSubmitting={isSubmitting}
         placeholder="Ask a follow-up about this analysis…"
         inputLabel="Ask a follow-up"
         dataSourceSelection="hidden"

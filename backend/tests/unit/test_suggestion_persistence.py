@@ -13,7 +13,9 @@ from app.core.config import Settings
 
 @pytest.mark.parametrize("retry", [False, True])
 async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch, retry):
-    job_id, conversation_id, profile_id, org_id, source_id = [uuid.uuid4() for _ in range(5)]
+    job_id, conversation_id, profile_id, org_id, source_id, question_id = [
+        uuid.uuid4() for _ in range(6)
+    ]
     session = AsyncMock()
 
     @asynccontextmanager
@@ -30,12 +32,15 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         }
     ]
     job = SimpleNamespace(
+        id=job_id,
+        created_at=jobs.utc_now(),
         job_type="chat_query",
         organization_id=org_id,
         input={
             "conversation_id": str(conversation_id),
             "model_profile_id": str(profile_id),
             "table_scope": scope,
+            "user_message_id": str(question_id),
         },
     )
     monkeypatch.setattr(jobs.JobRepository, "get", AsyncMock(return_value=job))
@@ -52,7 +57,15 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         "recent_messages",
         AsyncMock(
             return_value=[
-                SimpleNamespace(role="user", content="Count orders", metadata_json={}, job_id=None),
+                    SimpleNamespace(
+                        id=question_id, role="user", content="Count orders",
+                        metadata_json={}, job_id=job_id,
+                    ),
+                # Even a stale/broad history provider cannot redirect this job to a newer question.
+                    SimpleNamespace(
+                        id=uuid.uuid4(), role="user", content="Unrelated later question",
+                        metadata_json={}, job_id=uuid.uuid4(),
+                    ),
             ]
         ),
     )
@@ -71,7 +84,7 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
     async def finalize(**kwargs):
         context = json.loads(kwargs["follow_up_context"])
         assert context["table_scope"] == [dict(scope[0], knowledge_version_id=None)]
-        assert context["recent_questions"] == ["Count orders"]
+        assert "Count orders" in context["recent_questions"]
         kwargs["follow_up_suggestions"][:] = ["Compare orders by region?"]
         return "There are 12 orders."
 
@@ -125,6 +138,10 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
     assert artifact.payload["markdown"] == message.content
     assert len(saved_messages) == (0 if retry else 1)
     analysis.assert_awaited_once()
+    assert analysis.call_args.kwargs["history"][-1] == {
+        "role": "user", "content": "Count orders"
+    }
+    assert jobs._load_evidence.call_args.kwargs["question"] == "Count orders"
     finalizer.assert_awaited_once()
     session.commit.assert_awaited_once()
 

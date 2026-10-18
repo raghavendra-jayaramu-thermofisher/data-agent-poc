@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.schemas import AnswerReviewCounts
+from app.jobs.models import Job
 
 
 class ConversationRepository:
@@ -105,13 +106,24 @@ class ConversationRepository:
         )
         return list(result.scalars().all())
 
-    async def recent_messages(self, conversation_id: uuid.UUID, limit: int) -> list[Message]:
-        result = await self.session.execute(
-            select(Message)
-            .where(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at.desc())
-            .limit(limit)
-        )
+    async def recent_messages(
+        self, conversation_id: uuid.UUID, limit: int, *,
+        through_job: Job | None = None, user_message_id: uuid.UUID | None = None,
+    ) -> list[Message]:
+        statement = select(Message).where(Message.conversation_id == conversation_id)
+        if through_job is not None:
+            # A queued question may predate the previous answer. Order by turn, and
+            # include earlier answers while excluding all subsequently queued questions.
+            statement = statement.outerjoin(Job, Message.job_id == Job.id).where(or_(
+                Message.id == user_message_id,
+                Message.job_id == through_job.id,
+                Job.created_at < through_job.created_at,
+                and_(Job.created_at == through_job.created_at, Job.id < through_job.id),
+            )).order_by(func.coalesce(Job.created_at, Message.created_at).desc(),
+                       func.coalesce(Job.id, Message.id).desc(), Message.created_at.desc())
+        else:
+            statement = statement.order_by(Message.created_at.desc())
+        result = await self.session.execute(statement.limit(limit))
         rows = list(result.scalars().all())
         rows.reverse()
         return rows

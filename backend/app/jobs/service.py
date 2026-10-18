@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversations.models import Conversation
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.time import utc_now
@@ -19,6 +20,10 @@ from app.jobs.state import TERMINAL_STATUSES, assert_transition
 from app.organizations.models import Organization
 
 logger = logging.getLogger(__name__)
+
+
+class JobDeferredError(Exception):
+    """An accepted question is waiting for an earlier turn in its conversation."""
 
 
 class JobService:
@@ -122,6 +127,15 @@ class JobService:
         return job
 
     async def claim(self, job_id: uuid.UUID, worker_id: str) -> Job | None:
+        snapshot = await self.repo.get(job_id)
+        if snapshot and snapshot.job_type == "chat_query" and snapshot.conversation_id:
+            # All workers take the conversation lock before the job lock. No lock is
+            # held while analysis runs; the persisted running status gates later turns.
+            await self.session.execute(
+                select(Conversation.id).where(
+                    Conversation.id == snapshot.conversation_id
+                ).with_for_update()
+            )
         job = await self.repo.lock(job_id)
         if job is None:
             await self.session.rollback()
@@ -142,6 +156,13 @@ class JobService:
         if job.status == "running" and job.lease_expires_at and job.lease_expires_at > now:
             await self.session.rollback()
             return None
+        if (
+            job.job_type == "chat_query"
+            and job.conversation_id
+            and await self.repo.has_earlier_chat(job)
+        ):
+            await self.session.rollback()
+            raise JobDeferredError()
         if job.status == "running":
             assert_transition("running", "queued")
             job.status = "queued"

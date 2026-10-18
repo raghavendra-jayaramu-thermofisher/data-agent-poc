@@ -67,8 +67,8 @@ describe('AnalysisProgress', () => {
   it('shows only the current step by default and updates elapsed time without expanding logs', () => {
     render(<AnalysisProgress managedJob={managedJob} onCancel={() => undefined} />);
 
-    expect(screen.getByText('Executing SQL…')).toBeInTheDocument();
-    expect(screen.queryByText('Queued')).not.toBeInTheDocument();
+    expect(screen.getByText('Retrieving the data…')).toBeInTheDocument();
+    expect(screen.queryByText('Waiting to start')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Analysis activity' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show analysis activity' })).toHaveAttribute(
       'aria-expanded',
@@ -129,16 +129,16 @@ describe('AnalysisProgress', () => {
 
     render(<AnalysisProgress managedJob={completedSqlJob} onCancel={() => undefined} />);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Preparing final answer…');
+    expect(screen.getByRole('status')).toHaveTextContent('Putting your answer together…');
     fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
     const history = screen.getByRole('region', { name: 'Analysis activity' });
     expect(within(history).getAllByRole('listitem')).toHaveLength(8);
-    expect(within(history).getAllByText('Executing SQL…')).toHaveLength(2);
-    expect(within(history).getByText('Queued')).toBeInTheDocument();
-    expect(within(history).getByText('SQL completed').closest('li')).toHaveTextContent('5s');
+    expect(within(history).getAllByText('Retrieving the data…')).toHaveLength(2);
+    expect(within(history).getByText('Waiting to start')).toBeInTheDocument();
+    expect(within(history).getByText('Data retrieved').closest('li')).toHaveTextContent('5s');
 
     act(() => vi.advanceTimersByTime(5000));
-    expect(within(history).getByText('SQL completed').closest('li')).toHaveTextContent('5s');
+    expect(within(history).getByText('Data retrieved').closest('li')).toHaveTextContent('5s');
     fireEvent.click(screen.getByRole('button', { name: 'Hide analysis activity' }));
     expect(screen.queryByRole('region', { name: 'Analysis activity' })).not.toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe('AnalysisProgress', () => {
         onCancel={() => undefined}
       />,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('SQL completed');
+    expect(screen.getByRole('status')).toHaveTextContent('Data retrieved');
     expect(screen.queryByText('Preparing answer…')).not.toBeInTheDocument();
   });
 
@@ -176,7 +176,7 @@ describe('AnalysisProgress', () => {
         onCancel={() => undefined}
       />,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Waiting to start…');
+    expect(screen.getByRole('status')).toHaveTextContent('Waiting to start');
     fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
     expect(screen.getByText('Waiting for activity…')).toBeInTheDocument();
   });
@@ -213,7 +213,7 @@ describe('AnalysisProgress', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Show analysis activity' }));
-    expect(screen.getByText('Analysis update')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Analysis activity' })).getByText('Working on your request…')).toBeInTheDocument();
     expect(screen.queryByText('private-value')).not.toBeInTheDocument();
   });
 });

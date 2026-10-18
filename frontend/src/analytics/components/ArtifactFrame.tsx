@@ -250,10 +250,40 @@ export function ArtifactFrame({
   const content = typeof children === 'function' ? children(fullscreen) : children;
   function header(expanded: boolean) {
     return (
-      <header ref={expanded ? attachViewer : undefined} className="artifact-viewer-header">
+      <header
+        ref={expanded ? attachViewer : undefined}
+        className="artifact-viewer-header"
+        data-collapsible={!expanded && collapsible}
+        onClick={(event) => {
+          if (expanded || !collapsible) return;
+          const target = event.target as Element;
+          if (
+            target.closest(
+              'button, a, input, select, textarea, [role="button"], [role="menu"], [role="menuitem"]',
+            )
+          )
+            return;
+          setIsOpen((open) => !open);
+        }}
+      >
         <div className="artifact-heading">
           {Icon && <Icon size={15} aria-hidden="true" />}
-          <h4>{title}</h4>
+          <h4>
+            {!expanded && collapsible ? (
+              <button
+                type="button"
+                className="artifact-header-toggle"
+                aria-label={`${isOpen ? 'Hide' : 'View'} ${title}`}
+                aria-expanded={isOpen}
+                aria-controls={contentId}
+                onClick={() => setIsOpen((open) => !open)}
+              >
+                {title}
+              </button>
+            ) : (
+              title
+            )}
+          </h4>
           {warning && (
             <span className="artifact-warning" role="status">
               {warning}
@@ -313,21 +343,18 @@ export function ArtifactFrame({
             />
           ) : (
             collapsible && (
-              <Tooltip delay={350}>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  className="artifact-icon-button"
-                  aria-label={`${isOpen ? 'Hide' : 'View'} ${kind}`}
-                  aria-expanded={isOpen}
-                  aria-controls={contentId}
-                  onPress={() => setIsOpen((open) => !open)}
-                >
-                  {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </Button>
-                <Tooltip.Content className="artifact-tooltip">{`${isOpen ? 'Hide' : 'View'} ${kind}`}</Tooltip.Content>
-              </Tooltip>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                className="artifact-icon-button"
+                aria-label={`${isOpen ? 'Hide' : 'View'} ${kind}`}
+                aria-expanded={isOpen}
+                aria-controls={contentId}
+                onPress={() => setIsOpen((open) => !open)}
+              >
+                {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </Button>
             )
           )}
         </div>

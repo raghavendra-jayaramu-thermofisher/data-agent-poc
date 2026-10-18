@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { checkArtifactHeader } from './helpers/artifact-header';
 
 for (const { width, touch } of [
   { width: 1440, touch: false },
@@ -122,6 +123,7 @@ for (const { width, touch } of [
       const artifactView = page.locator('.table-artifact');
       const table = artifactView.getByRole('table', { name: title });
       await expect(table).toBeVisible();
+      await checkArtifactHeader(artifactView, 'table');
       await expect(page.locator('body')).toHaveCSS('font-family', /IBM Plex Sans/);
       await expect(page.locator('.topbar')).toHaveCount(0);
       await expect(page.locator('.app-shell')).toHaveCSS('background-image', /gradient/);
@@ -134,7 +136,7 @@ for (const { width, touch } of [
       if (touch) {
         await expect(secondary).toBeHidden();
         const more = artifactView.getByRole('button', { name: 'Table actions' });
-        expect((await more.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        await expect(more).toHaveCSS('height', '44px');
       } else {
         await page.mouse.move(0, 0);
         await expect(secondary).toHaveCSS('opacity', '0');

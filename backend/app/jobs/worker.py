@@ -11,7 +11,7 @@ from app.core.database import get_session_factory
 from app.core.redis import get_redis
 from app.jobs.handlers import JobHandlerRegistry, registry
 from app.jobs.queue import QueueMessage, RedisJobQueue
-from app.jobs.service import JobService
+from app.jobs.service import JobDeferredError, JobService
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,20 @@ class Worker:
             async with session_factory() as session:
                 service = JobService(session, self.redis, self.settings)
                 job = await service.claim(message.job_id, self.worker_id)
+        except JobDeferredError:
+            # Requeue before acknowledging so a crash cannot lose the waiting turn.
+            # This wait does not consume an analysis attempt or emit repeated progress events.
+            await asyncio.sleep(1)
+            try:
+                await self.queue.enqueue(message.job_id)
+            except Exception:
+                # Leave the original delivery pending for recovery if Redis is unavailable.
+                logger.exception(
+                    "waiting_job_requeue_failed", extra={"job_id": str(message.job_id)}
+                )
+                return
+            await self.queue.ack(message.message_id)
+            return
         except asyncio.CancelledError:
             raise
         except Exception:

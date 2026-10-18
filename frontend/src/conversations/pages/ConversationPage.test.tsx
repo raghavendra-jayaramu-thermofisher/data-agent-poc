@@ -484,7 +484,7 @@ describe('durable conversation workspace', () => {
       },
     ];
     renderPage();
-    expect(await screen.findByText('Executing SQL…')).toBeInTheDocument();
+    expect(await screen.findByText('Retrieving the data…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Stop/i })).toBeEnabled();
     expect(screen.queryByText(/analysis failed/i)).not.toBeInTheDocument();
   });

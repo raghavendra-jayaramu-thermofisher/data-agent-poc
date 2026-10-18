@@ -82,6 +82,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         try:
             conversation_id = uuid.UUID(str(raw_conversation_id))
             profile_id = uuid.UUID(str(raw_profile_id))
+            user_message_id = uuid.UUID(str(job.input.get("user_message_id")))
         except (TypeError, ValueError, AttributeError) as exc:
             raise JobFailureError(
                 "JOB_INPUT_INVALID", "The analytical job input is invalid."
@@ -99,9 +100,18 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                 "CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource."
             )
         messages = await convo_repo.recent_messages(
-            conversation.id, settings.agent_max_history_messages
+            conversation.id, settings.agent_max_history_messages,
+            through_job=job, user_message_id=user_message_id,
         )
-        user_message = next((item for item in reversed(messages) if item.role == "user"), None)
+        messages = [
+            item for item in messages
+            if not (item.role == "assistant" and item.job_id == job_id)
+        ]
+        user_message = next(
+            (item for item in messages if item.id == user_message_id and item.role == "user"), None
+        )
+        if user_message is not None:
+            messages = messages[:messages.index(user_message) + 1]
         question = (
             str(user_message.metadata_json.get("expanded_prompt") or user_message.content)
             if user_message

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { checkArtifactHeader } from './helpers/artifact-header';
 import baseFixture from '../../test-fixtures/combo-chart.json' with { type: 'json' };
 
 for (const { width, large } of [
@@ -182,6 +183,7 @@ for (const { width, large } of [
       chartView.getByRole('img', { name: /Interactive Line \+ stacked columns/ }),
     ).toBeVisible();
     await expect(chartView.locator('canvas')).toHaveCount(1);
+    await checkArtifactHeader(chartView, 'chart');
     await chartView.getByRole('button', { name: 'Chart actions' }).click();
     await page.getByRole('menuitem', { name: 'Chart information' }).click();
     const information = page.getByRole('dialog', { name: fixture.title + ' information' });

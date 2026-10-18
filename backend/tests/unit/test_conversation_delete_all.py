@@ -19,3 +19,4 @@ async def test_delete_all_deletes_all_conversations_for_organization():
     service.repo.delete_all_for_org.assert_awaited_once_with(organization_id)
     session.commit.assert_awaited_once()
     assert count == 5
+

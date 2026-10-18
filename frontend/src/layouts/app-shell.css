@@ -563,12 +563,6 @@
   border-radius: 6px;
   background: var(--db-surface);
 }
-.chat-workspace .assistant-card .artifact-frame[data-collapsed='true'] {
-  border: 1px solid var(--db-border-default);
-  border-radius: 6px;
-  background: var(--db-surface-muted);
-  padding: 2px 8px;
-}
 .chat-workspace .assistant-card .artifact-viewer-header {
   min-height: 32px;
   padding: 2px 8px;
@@ -599,18 +593,55 @@
   margin-block: 6px;
 }
 .chat-workspace .artifact-frame .artifact-viewer-header {
-  background: transparent;
+  background: var(--db-surface-muted);
 }
 .chat-workspace .artifact-frame .analytical-table-scroll {
   border-color: var(--db-border-subtle);
 }
 .chat-workspace .chat-composer-deck:not(.chat-composer-deck--inline) {
-  left: var(--conversation-composer-left, var(--main-offset));
-  width: var(--conversation-composer-width, auto);
-  right: var(--shell-inset);
-  bottom: var(--shell-inset);
-  padding: 12px 0 16px;
+  position: static;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px calc(24px + var(--conversation-scrollbar-width, 0px)) 16px 24px;
+  transition: none;
   background: linear-gradient(to top, var(--db-surface) 80%, transparent);
+}
+.main-content:has(> .chat-workspace:not(.chat-workspace--empty)) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.chat-workspace:not(.chat-workspace--empty) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.chat-workspace:not(.chat-workspace--empty) .conversation-heading {
+  flex-shrink: 0;
+}
+.chat-workspace:not(.chat-workspace--empty) .chat-main-scroll {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: 16px 24px 12px;
+}
+.chat-composer-status {
+  width: 100%;
+  margin-bottom: 8px;
+  pointer-events: auto;
+}
+.queued-question-label {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--db-text-muted);
+}
+.chat-composer-error {
+  color: var(--db-danger);
+  font-size: 12px;
 }
 .chat-workspace .chat-composer-deck:not(.chat-composer-deck--inline) .chat-composer-card {
   max-width: none;
@@ -701,7 +732,10 @@
     padding: 4px 6px 8px;
   }
   .chat-workspace .chat-composer-deck:not(.chat-composer-deck--inline) {
-    padding: 8px 0 12px;
+    padding: 8px calc(8px + var(--conversation-scrollbar-width, 0px)) 12px 8px;
+  }
+  .chat-workspace:not(.chat-workspace--empty) .chat-main-scroll {
+    padding: 20px 8px 12px;
   }
   .chat-empty-state {
     padding: 64px 20px 36px;

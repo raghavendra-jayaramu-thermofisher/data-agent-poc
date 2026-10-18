@@ -35,7 +35,7 @@ export function AnalysisProgress({
   const currentLabel = cancelRequested
     ? 'Stopping analysis…'
     : (getSafeJobEventLabel(events.at(-1)) ??
-      (job.status === 'queued' ? 'Waiting to start…' : 'Analyzing your data…'));
+      (job.status === 'queued' ? 'Waiting to start' : 'Working on your request…'));
   const elapsed = secondsBetween(job.created_at, now);
 
   useEffect(() => {
@@ -98,8 +98,8 @@ export function AnalysisProgress({
             tabIndex={0}
           >
             <div className="analysis-progress-log-heading">
-              <span>Activity</span>
-              <span>From start</span>
+              <span>Analysis activity</span>
+              <span>Time since start</span>
             </div>
             {events.length ? (
               <ol aria-label="Analysis events">
@@ -109,7 +109,7 @@ export function AnalysisProgress({
                     data-current={index === events.length - 1}
                     data-level={event.level}
                   >
-                    <span>{getSafeJobEventLabel(event) ?? 'Analysis update'}</span>
+                    <span>{getSafeJobEventLabel(event) ?? 'Working on your request…'}</span>
                     <time dateTime={event.created_at}>
                       {formatDuration(secondsBetween(job.created_at, Date.parse(event.created_at)))}
                     </time>

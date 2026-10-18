@@ -85,3 +85,4 @@ describe('DeleteAllChatsModal', () => {
     expect(handleClose).not.toHaveBeenCalled();
   });
 });
+

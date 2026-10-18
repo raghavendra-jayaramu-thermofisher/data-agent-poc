@@ -25,7 +25,7 @@ import { JobManagerProvider, useJobManager } from './JobManagerProvider';
 const baseJob: Job = { id: 'j1', organization_id: 'org-1', job_type: 'knowledge_generation', status: 'running', requested_by: 'u1', conversation_id: null, input: { data_source_id: 'ds1' }, result: null, attempt_count: 1, max_attempts: 3, cancel_requested_at: null, error_code: null, error_message: null, created_at: '2026-08-24T12:00:00Z', started_at: '2026-08-24T12:00:01Z', finished_at: null };
 function Probe() {
     const manager = useJobManager();
-    return <div><span data-testid="count">{manager.activeJobs.length}</span><span data-testid="event">{manager.latestEvent('j1')?.sequence ?? 0}</span><span data-testid="event-count">{manager.jobs.find((entry) => entry.job.id === 'j1')?.events.length ?? 0}</span><button onClick={() => void manager.cancel('j1')}>Cancel</button></div>;
+    return <div><span data-testid="status">{manager.jobs.find((entry) => entry.job.id === 'j1')?.job.status}</span><span data-testid="count">{manager.activeJobs.length}</span><span data-testid="event">{manager.latestEvent('j1')?.sequence ?? 0}</span><span data-testid="event-count">{manager.jobs.find((entry) => entry.job.id === 'j1')?.events.length ?? 0}</span><button onClick={() => void manager.cancel('j1')}>Cancel</button></div>;
 }
 function renderManager(ui: ReactNode) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -48,6 +48,14 @@ describe('global job manager', () => {
         await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('1'));
         await waitFor(() => expect(stream.fn).toHaveBeenCalledTimes(1));
         expect(stream.fn.mock.calls[0][0].afterSequence).toBe(0);
+    });
+    it('promotes queued questions when the worker starts them', async () => {
+        api.listJobs.mockImplementation(async (status?: string) => status === 'queued' ? [{ ...baseJob, status: 'queued', started_at: null }] : []);
+        renderManager(<Probe />);
+        await waitFor(() => expect(stream.callbacks.has('j1')).toBe(true));
+        expect(screen.getByTestId('status')).toHaveTextContent('queued');
+        act(() => stream.callbacks.get('j1')!.onEvent({ sequence: 2, event_type: 'job.started', level: 'info', payload: {}, created_at: baseJob.created_at }));
+        expect(screen.getByTestId('status')).toHaveTextContent('running');
     });
     it('deduplicates replayed events by sequence and treats disconnect as reconnecting, not failure', async () => {
         renderManager(<Probe />);

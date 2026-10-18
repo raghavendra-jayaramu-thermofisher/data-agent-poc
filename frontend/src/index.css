@@ -2612,8 +2612,15 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
 .chat-skill-content { flex: 1; min-width: 0; }
 .chat-skill-name { font-size: 13px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
 /* Matrix artifacts display SQL-owned values; hierarchy expansion only changes visibility. */
-.analytical-matrix { --matrix-header-surface: color-mix(in srgb, var(--db-surface-muted) 50%, var(--db-surface)); --matrix-total-surface: color-mix(in srgb, var(--db-surface-muted) 35%, var(--db-surface)); min-width: 0; max-width: 100%; border: 1px solid var(--db-border-default); border-radius: 6px; background: var(--db-surface); overflow: hidden; }
-.matrix-scroll { max-height: 480px; overflow: auto; width: 100%; }
+.analytical-matrix { min-width: 0; max-width: 100%; border: 1px solid var(--db-border-default); border-radius: 6px; background: var(--db-surface); overflow: hidden; }
+/* Keep opaque sticky-cell surfaces with the viewport, including portaled full-screen views. */
+.matrix-scroll {
+  --matrix-header-surface: color-mix(in srgb, var(--db-surface-muted) 50%, var(--db-surface));
+  --matrix-total-surface: color-mix(in srgb, var(--db-surface-muted) 35%, var(--db-surface));
+  max-height: 480px;
+  overflow: auto;
+  width: 100%;
+}
 .matrix-scroll table { border-collapse: separate; border-spacing: 0; min-width: 100%; width: max-content; font-size: 12px; font-variant-numeric: tabular-nums; }
 .matrix-scroll thead { position: sticky; top: 0; z-index: 3; }
 .matrix-scroll th, .matrix-scroll td { min-width: 112px; height: 32px; padding: 6px 10px; border-bottom: 1px solid var(--db-border-default); border-right: 1px solid var(--db-border-default); }

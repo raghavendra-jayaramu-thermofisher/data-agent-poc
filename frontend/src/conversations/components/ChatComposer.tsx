@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, LayoutTemplate } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
@@ -25,6 +25,7 @@ type ChatComposerProps = {
   dataSourceSelection?: 'editable' | 'hidden';
   inputLabel?: string;
   containerRef?: Ref<HTMLDivElement>;
+  status?: ReactNode;
   tableScope?: SourceTableScope[];
   onTableScopeChange?(scope: SourceTableScope[]): void;
 };
@@ -46,6 +47,7 @@ export function ChatComposer({
   dataSourceSelection = 'editable',
   inputLabel = 'Ask a question',
   containerRef,
+  status,
   tableScope,
   onTableScopeChange,
 }: ChatComposerProps) {
@@ -206,6 +208,7 @@ export function ChatComposer({
 
   return (
     <div ref={containerRef} className={`chat-composer-deck chat-composer-deck--${placement}`} role="region" aria-label="Query composer">
+      {status && <div className="chat-composer-status">{status}</div>}
       <div className="chat-composer-card">
         {/* Slash Command Autocomplete Popover */}
         {(skillsOpen || (isTypingCommand && !autocompleteDismissed && !activeInstruction)) && (

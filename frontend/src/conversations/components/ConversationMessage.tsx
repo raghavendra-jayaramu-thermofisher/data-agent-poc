@@ -16,6 +16,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   message,
   senderName = 'You',
   question,
+  queued = false,
   onFollowUp,
   showSuggestions = false,
   followUpDisabled = false,
@@ -23,6 +24,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   message: Message;
   senderName?: string;
   question?: string;
+  queued?: boolean;
   onFollowUp?(question: string): Promise<void> | void;
   showSuggestions?: boolean;
   followUpDisabled?: boolean;
@@ -136,6 +138,7 @@ export const ConversationMessage = memo(function ConversationMessage({
       <div className="chat-message-row user" data-message-id={message.id}>
         <span className="message-avatar"><UserAvatar name={senderName} /></span>
         <div className="user-bubble">{message.content}</div>
+        {queued && <span className="queued-question-label">Queued</span>}
       </div>
     );
   }

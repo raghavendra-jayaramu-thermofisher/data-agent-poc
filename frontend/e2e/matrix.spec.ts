@@ -1,15 +1,78 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+import { checkArtifactHeader } from './helpers/artifact-header';
 import baseFixture from '../../test-fixtures/matrix.json' with { type: 'json' };
 
-for (const { width, large } of [
-  { width: 1280, large: false },
-  { width: 390, large: false },
-  { width: 1280, large: true },
+async function checkFrozenHeaders(view: Locator) {
+  const scroll = view.locator('.matrix-scroll');
+  const corner = scroll.locator('.matrix-corner');
+  // Full-screen content is portaled outside the inline artifact's style scope.
+  for (const cell of await scroll.locator('thead th').all()) {
+    await expect(cell).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  }
+  await scroll.evaluate((element) => {
+    element.scrollLeft = 90;
+  });
+  await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBe(90);
+  const bounds = (await corner.boundingBox())!;
+  const viewport = (await scroll.boundingBox())!;
+  expect(bounds.x).toBeCloseTo(viewport.x, 0);
+  expect((await scroll.locator('tbody th').first().boundingBox())!.x).toBeCloseTo(viewport.x, 0);
+  const covered = await corner.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return Array.from(element.closest('thead')!.rows).every((row) => {
+      const rowBounds = row.getBoundingClientRect();
+      return (
+        document
+          .elementFromPoint(bounds.right - 4, rowBounds.y + rowBounds.height / 2)
+          ?.closest('th') === element
+      );
+    });
+  });
+  expect(covered).toBe(true);
+}
+
+for (const { width, large, wide } of [
+  { width: 1280, large: false, wide: false },
+  { width: 390, large: false, wide: false },
+  { width: 1280, large: true, wide: false },
+  { width: 1280, large: false, wide: true },
+  { width: 390, large: false, wide: true },
 ]) {
-  test(`matrix renders, scrolls, expands, reloads and exports at ${width}px${large ? ' with 500 rows' : ''}`, async ({
+  test(`matrix renders, scrolls, expands, reloads and exports at ${width}px${large ? ' with 500 rows' : ''}${wide ? ' with grouped columns' : ''}`, async ({
     page,
   }) => {
     const fixture = structuredClone(baseFixture);
+    if (wide) {
+      const parentId = 'c000000000000000000000000';
+      fixture.spec.columns = [
+        { ...fixture.spec.columns[0]!, field: 'status', sort_field: null },
+        fixture.spec.columns[0]!,
+      ];
+      fixture.column_nodes = [
+        {
+          id: parentId,
+          parent_id: null,
+          depth: 1,
+          path: ['Carried-forward'],
+          label: 'Carried-forward',
+        },
+        ...Array.from({ length: 8 }, (_, index) => ({
+          id: `c${(index + 1).toString(16).padStart(24, '0')}`,
+          parent_id: parentId,
+          depth: 2,
+          path: ['Carried-forward', `Week ${index + 1}`],
+          label: `Week ${index + 1}`,
+        })),
+      ];
+      fixture.cells = fixture.row_nodes.flatMap((row) =>
+        fixture.column_nodes.map((column) => ({
+          row_id: row.id,
+          column_id: column.id,
+          values: ['250000', '241'],
+        })),
+      );
+      fixture.source_row_count = fixture.cells.length;
+    }
     if (large) {
       fixture.spec.rows = [fixture.spec.rows[0]!];
       fixture.spec.show_row_subtotals = false;
@@ -155,10 +218,28 @@ for (const { width, large } of [
     await page.goto('/conversations/c1');
     const matrix = page.getByRole('region', { name: 'Orders by period', exact: true });
     await expect(matrix).toBeVisible();
+    await checkArtifactHeader(matrix, 'matrix');
     const table = matrix.getByRole('table');
     await expect(matrix).toHaveCSS('border-top-width', '1px');
-    if (!large) await expect(matrix.locator('.matrix-subtotal td').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    if (!large)
+      await expect(matrix.locator('.matrix-subtotal td').first()).toHaveCSS(
+        'background-color',
+        'rgb(255, 255, 255)',
+      );
     await matrix.hover();
+    if (wide) {
+      await checkFrozenHeaders(matrix);
+      await matrix.getByRole('button', { name: 'Expand matrix to full screen' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Orders by period' });
+      await expect(dialog).toBeVisible();
+      await checkFrozenHeaders(dialog);
+      await dialog.screenshot({
+        path: test.info().outputPath(`matrix-pinned-headers-${width}.png`),
+      });
+      await dialog.getByRole('button', { name: 'Exit matrix full screen' }).click();
+      await checkFrozenHeaders(matrix);
+      return;
+    }
     if (large) {
       expect(await table.locator('tbody tr').count()).toBeLessThan(50);
       await expect(table.getByRole('rowheader', { name: 'Record 499', exact: true })).toHaveCount(

@@ -143,7 +143,7 @@ for (const width of [1280, 390]) {
     try {
       await page.goto('/conversations/c1');
       const progress = page.getByRole('region', { name: 'Analysis in progress', exact: true });
-      await expect(progress.getByRole('status')).toHaveText('Preparing final answer…');
+      await expect(progress.getByRole('status')).toHaveText('Putting your answer together…');
       await expect(
         progress.getByRole('region', { name: 'Analysis activity', exact: true }),
       ).toHaveCount(0);
@@ -159,7 +159,7 @@ for (const width of [1280, 390]) {
       await progress.getByRole('button', { name: 'Show analysis activity' }).click();
       const history = progress.getByRole('region', { name: 'Analysis activity', exact: true });
       await expect(history.getByRole('listitem')).toHaveCount(12);
-      await expect(history.getByText('Running analysis tool…', { exact: true })).toHaveCount(2);
+      await expect(history.getByText('Working on your request…', { exact: true })).toHaveCount(2);
       expect((await history.boundingBox())!.height).toBeLessThanOrEqual(180);
       expect(await history.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
         true,
