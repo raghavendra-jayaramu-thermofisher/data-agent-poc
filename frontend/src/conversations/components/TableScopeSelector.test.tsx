@@ -34,7 +34,7 @@ describe('table selection dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Warehouse, 1 table selected' }));
     expect(await screen.findByRole('checkbox', { name: /orders/ })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(change.mock.calls[0][0].map((scope: SourceTableScope) => [scope.data_source_id, scope.tables?.length])).toEqual([['ds1', 1], ['ds2', 1]]);
+    expect(change.mock.calls[0]![0].map((scope: SourceTableScope) => [scope.data_source_id, scope.tables?.length])).toEqual([['ds1', 1], ['ds2', 1]]);
   });
 
   it('removes a table from the visible selection summary without widening scope', async () => {
@@ -79,7 +79,7 @@ describe('table selection dialog', () => {
     await user.type(screen.getByRole('searchbox'), 'missing');
     expect(await screen.findByText('No tables match your search.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(change.mock.calls[0][0][0].tables).toEqual([{ schema: 'dbo', name: 'orders' }]);
+    expect(change.mock.calls[0]![0][0].tables).toEqual([{ schema: 'dbo', name: 'orders' }]);
   });
 
   it('loads the next page with its schema version and preserves earlier selections', async () => {
@@ -93,7 +93,7 @@ describe('table selection dialog', () => {
     await user.click(await screen.findByRole('checkbox', { name: /customers/ }));
     expect(listTables).toHaveBeenLastCalledWith('ds1', '', 'dbo.orders', 'v1', expect.any(AbortSignal));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(change.mock.calls[0][0][0].tables).toHaveLength(2);
+    expect(change.mock.calls[0]![0][0].tables).toHaveLength(2);
   });
 
   it('shows saved scope without querying the catalog and closes with Escape', async () => {

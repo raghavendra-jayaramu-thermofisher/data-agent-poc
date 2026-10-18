@@ -216,18 +216,17 @@ export function ChatComposer({
             aria-label={skillsOpen ? "Select a template" : "Slash command suggestions"}
           >
             <div className="chat-composer-popover__header">
-              <div>
-                  <strong>Templates</strong>
-                <span>{skillsOpen ? 'Choose a template for this question' : 'Tab or Enter to select'}</span>
-              </div>
-              <button
-                type="button"
-                className="chat-composer-popover__close"
-                onClick={() => { setAutocompleteDismissed(true); setSkillsOpen(false); }}
-                aria-label="Close command suggestions"
-              >
-                <X size={14} />
-              </button>
+              <strong>Templates</strong>
+              {!skillsOpen && (
+                <button
+                  type="button"
+                  className="chat-composer-popover__close"
+                  onClick={() => { setAutocompleteDismissed(true); setSkillsOpen(false); }}
+                  aria-label="Close command suggestions"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
             {skillsOpen && <label className="db-icon-search chat-composer-search">
               <Search size={13} />
@@ -309,159 +308,191 @@ export function ChatComposer({
 
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
-            {tableScope && dataSourceSelection === 'hidden' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} readOnly />}
-            {dataSourceSelection === 'editable' ? (
-              <div className="chat-composer-picker" ref={sourcesPickerRef}>
+            <div className="chat-composer-group chat-composer-group--context">
+              {tableScope && dataSourceSelection === 'hidden' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} readOnly />}
+              {dataSourceSelection === 'editable' ? (
+                <div className="chat-composer-picker" ref={sourcesPickerRef}>
+                  <button
+                    type="button"
+                    className={`chat-composer-chip ${sourcesOpen || selectedDataSourceIds.length > 0 ? 'active' : ''}`}
+                    onClick={() => {
+                      setSourcesOpen(!sourcesOpen);
+                      setModelsOpen(false);
+                      setSkillsOpen(false);
+                    }}
+                    aria-haspopup="dialog"
+                    aria-expanded={sourcesOpen}
+                  >
+                    <Database size={12} />
+                    <span>
+                      {selectedDataSourceIds.length === 0
+                        ? 'Select data source'
+                        : selectedDataSourceIds.length === 1
+                          ? dataSources.find((source) => source.id === selectedDataSourceIds[0])?.name ?? '1 source'
+                          : `${selectedDataSourceIds.length} sources`}
+                    </span>
+                    <ChevronDown size={11} />
+                  </button>
+
+                  {sourcesOpen && (
+                    <div
+                      className="chat-composer-popover chat-composer-popover--sources"
+                      role="dialog"
+                      aria-label="Select data sources"
+                    >
+                      <div className="chat-composer-popover__header">
+                        <strong>Data Sources</strong>
+                      </div>
+
+                      <label className="db-icon-search chat-composer-search">
+                        <Search size={13} />
+                        <input
+                          type="text"
+                          className="db-icon-search__input"
+                          placeholder="Search sources…"
+                          value={sourceSearch}
+                          onChange={(e) => setSourceSearch(e.target.value)}
+                          aria-label="Search data sources"
+                        />
+                      </label>
+
+                      <div className="chat-composer-popover__list">
+                        {filteredSources.map((source) => {
+                          const isSelected = selectedDataSourceIds.includes(source.id);
+                          return (
+                            <button
+                              type="button"
+                              key={source.id}
+                              onClick={() => toggleSource(source.id)}
+                              aria-pressed={isSelected}
+                              className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
+                            >
+                              <div className="chat-composer-option__label">
+                                <span className="chat-composer-option__title">{source.name}</span>
+                                {source.display_type && (
+                                  <small className="chat-composer-option__type">{source.display_type}</small>
+                                )}
+                              </div>
+                              {isSelected ? <Check size={14} className="shrink-0 text-[var(--db-primary)]" /> : null}
+                            </button>
+                          );
+                        })}
+                        {filteredSources.length === 0 && (
+                          <p className="chat-composer-popover__empty">No matching sources</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {tableScope && dataSourceSelection === 'editable' && (
+                <TableScopeSelector
+                  dataSources={dataSources}
+                  sourceIds={selectedDataSourceIds}
+                  value={tableScope}
+                  onChange={onTableScopeChange}
+                  disabled={disabled || isSubmitting}
+                />
+              )}
+            </div>
+
+            <span className="chat-composer-separator" aria-hidden="true" />
+
+            <div className="chat-composer-group chat-composer-group--tools">
+              {/* Model Profile Picker */}
+              <div className="chat-composer-picker" ref={modelsPickerRef}>
                 <button
-                type="button"
-                className={`chat-composer-chip ${selectedDataSourceIds.length > 0 ? 'active' : ''}`}
-                onClick={() => {
-                  setSourcesOpen(!sourcesOpen);
-                  setModelsOpen(false);
-                  setSkillsOpen(false);
-                }}
-                aria-haspopup="dialog"
-                aria-expanded={sourcesOpen}
-              >
-                <Database size={12} />
-                <span>
-                  {selectedDataSourceIds.length === 0
-                    ? 'Select data source'
-                    : selectedDataSourceIds.length === 1
-                      ? dataSources.find((source) => source.id === selectedDataSourceIds[0])?.name ?? '1 source'
-                      : `${selectedDataSourceIds.length} sources`}
-                </span>
-                <ChevronDown size={11} />
+                  type="button"
+                  className={`chat-composer-chip ${modelsOpen || Boolean(selectedProfile || selectedProfileId === null) ? 'active' : ''}`}
+                  onClick={() => {
+                    setModelsOpen(!modelsOpen);
+                    setSourcesOpen(false);
+                    setSkillsOpen(false);
+                  }}
+                  aria-haspopup="listbox"
+                  aria-expanded={modelsOpen}
+                >
+                  <Sparkles size={12} />
+                  <span>{selectedProfile?.display_name || 'Default model'}</span>
+                  <ChevronDown size={11} />
                 </button>
 
-                {sourcesOpen && (
+                {modelsOpen && (
                   <div
-                  className="chat-composer-popover chat-composer-popover--sources"
-                  role="dialog"
-                  aria-label="Select data sources"
-                >
-                  <div className="chat-composer-popover__header">
-                    <div>
-                      <strong>Choose data sources</strong>
-                      <span>Fixed after your first question</span>
+                    className="chat-composer-popover chat-composer-popover--models"
+                    role="listbox"
+                    aria-label="Select model profile"
+                  >
+                    <div className="chat-composer-popover__header">
+                      <strong>Model Profile</strong>
                     </div>
+
                     <button
                       type="button"
-                      className="chat-composer-popover__close"
-                      onClick={() => setSourcesOpen(false)}
-                      aria-label="Close data source picker"
+                      role="option"
+                      aria-selected={selectedProfileId === null}
+                      onClick={() => {
+                        onProfileIdChange(null);
+                        setModelsOpen(false);
+                      }}
+                      className={`chat-composer-option ${selectedProfileId === null ? 'is-selected' : ''}`}
                     >
-                      <X size={14} />
+                      <div className="chat-composer-option__label">
+                        <span className="chat-composer-option__title">Workspace default</span>
+                      </div>
+                      {selectedProfileId === null ? <Check size={14} className="shrink-0 text-[var(--db-primary)]" /> : null}
                     </button>
-                  </div>
 
-                  <label className="db-icon-search chat-composer-search">
-                    <Search size={13} />
-                    <input
-                      type="text"
-                      className="db-icon-search__input"
-                      placeholder="Search sources…"
-                      value={sourceSearch}
-                      onChange={(e) => setSourceSearch(e.target.value)}
-                      aria-label="Search data sources"
-                    />
-                  </label>
-
-                  <div className="chat-composer-popover__list">
-                    {filteredSources.map((source) => {
-                      const isSelected = selectedDataSourceIds.includes(source.id);
+                    {profiles.filter((p) => p.enabled).map((profile) => {
+                      const isSelected = selectedProfileId === profile.id;
+                      const isSameName = profile.model_name?.toLowerCase() === profile.display_name?.toLowerCase();
                       return (
                         <button
                           type="button"
-                          key={source.id}
-                          onClick={() => toggleSource(source.id)}
-                          aria-pressed={isSelected}
+                          role="option"
+                          aria-selected={isSelected}
+                          key={profile.id}
+                          onClick={() => {
+                            onProfileIdChange(profile.id);
+                            setModelsOpen(false);
+                          }}
                           className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
                         >
                           <div className="chat-composer-option__label">
-                            <span>{source.name}</span>
-                            <small>{source.display_type}</small>
+                            <span className="chat-composer-option__title">{profile.display_name}</span>
+                            {profile.model_name && !isSameName ? (
+                              <small className="chat-composer-option__meta--mono">{profile.model_name}</small>
+                            ) : null}
                           </div>
-                          {isSelected ? <Check size={14} /> : null}
+                          {isSelected ? <Check size={14} className="shrink-0 text-[var(--db-primary)]" /> : null}
                         </button>
                       );
                     })}
-                    {filteredSources.length === 0 && (
-                      <p className="chat-composer-popover__empty">No matching sources</p>
-                    )}
-                  </div>
                   </div>
                 )}
               </div>
-            ) : null}
 
-            {/* Model Profile Picker */}
-            {tableScope && dataSourceSelection === 'editable' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} onChange={onTableScopeChange} disabled={disabled || isSubmitting} />}
-            <div className="chat-composer-picker" ref={modelsPickerRef}>
               <button
+                ref={skillsButtonRef}
                 type="button"
-                className={`chat-composer-chip ${selectedProfileId ? 'active' : ''}`}
-                onClick={() => {
-                  setModelsOpen(!modelsOpen);
-                  setSourcesOpen(false);
-                  setSkillsOpen(false);
-                }}
+                className={`chat-composer-chip ${skillsOpen || Boolean(activeInstruction) ? 'active' : ''}`}
+                disabled={disabled}
                 aria-haspopup="listbox"
-                aria-expanded={modelsOpen}
+                aria-expanded={skillsOpen}
+                onClick={() => {
+                  setSkillsOpen(!skillsOpen);
+                  setSkillSearch('');
+                  setSourcesOpen(false);
+                  setModelsOpen(false);
+                  setAutocompleteDismissed(true);
+                }}
               >
-                <Sparkles size={12} />
-                <span>{selectedProfile?.display_name || 'Default model'}</span>
+                <LayoutTemplate size={12} />
+                <span>Templates</span>
                 <ChevronDown size={11} />
               </button>
-
-              {modelsOpen && (
-                <div
-                  className="chat-composer-popover chat-composer-popover--models"
-                  role="listbox"
-                  aria-label="Select model profile"
-                >
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selectedProfileId === null}
-                    onClick={() => {
-                      onProfileIdChange(null);
-                      setModelsOpen(false);
-                    }}
-                    className={`chat-composer-option ${selectedProfileId === null ? 'is-selected' : ''}`}
-                  >
-                    <span className="chat-composer-option__label">Workspace default</span>
-                    {selectedProfileId === null ? <Check size={14} /> : null}
-                  </button>
-
-                  {profiles.filter((p) => p.enabled).map((profile) => {
-                    const isSelected = selectedProfileId === profile.id;
-                    return (
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        key={profile.id}
-                        onClick={() => {
-                          onProfileIdChange(profile.id);
-                          setModelsOpen(false);
-                        }}
-                        className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
-                      >
-                        <div className="chat-composer-option__label">
-                          <span>{profile.display_name}</span>
-                          <small className="chat-composer-option__meta--mono">{profile.model_name}</small>
-                        </div>
-                        {isSelected ? <Check size={14} /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-            <button ref={skillsButtonRef} type="button" className={`chat-composer-chip ${skillsOpen ? 'active' : ''}`} disabled={disabled} aria-haspopup="listbox" aria-expanded={skillsOpen} onClick={() => { setSkillsOpen(!skillsOpen); setSkillSearch(''); setSourcesOpen(false); setModelsOpen(false); setAutocompleteDismissed(true); }}>
-              <LayoutTemplate size={12} /><span>Templates</span><ChevronDown size={11} />
-            </button>
           </div>
 
           {/* Send Action */}

@@ -588,7 +588,7 @@
   padding: 12px 0 16px;
   background: linear-gradient(to top, var(--db-surface) 80%, transparent);
 }
-.chat-workspace .chat-composer-card {
+.chat-workspace .chat-composer-deck:not(.chat-composer-deck--inline) .chat-composer-card {
   max-width: none;
 }
 .chat-composer-card {

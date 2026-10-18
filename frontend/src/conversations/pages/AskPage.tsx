@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { queryKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthProvider';
+import { BrandLogo } from '../../components/BrandLogo';
 import { PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
 import { preferences } from '../../lib/preferences';
@@ -127,10 +128,13 @@ export function AskPage() {
     <div className="chat-workspace chat-workspace--empty">
       <main className="chat-empty-state">
         <div className="chat-empty-state__welcome">
+          <div className="chat-empty-state__logo-badge" aria-hidden="true">
+            <BrandLogo decorative className="chat-empty-state__logo" />
+          </div>
           <p className="chat-empty-state__greeting">Hi {firstName}</p>
           <h1>What would you like to know about your data?</h1>
         </div>
-        <div className="w-full max-w-3xl mx-auto">
+        <div className="w-full">
           {submitError && (
             <div className="p-3 mb-4 bg-[var(--db-danger-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-danger)]" role="alert">
               {submitError}

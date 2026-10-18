@@ -79,7 +79,7 @@ function SourceTables({ source, scope, onChange, readOnly }: {
             <Search size={16} aria-hidden="true" />
             <input type="search" value={search} placeholder="Search tables or schemas…" onChange={(event) => setSearch(event.target.value)} />
           </label>
-          <span className="table-scope-loaded-count">{visibleTables.length} {readOnly ? 'selected' : 'loaded'}</span>
+          <span className="table-scope-loaded-count">{readOnly ? `${visibleTables.length} selected` : query ? `${visibleTables.length} found` : `${visibleTables.length} tables`}</span>
         </div>
         <div className="table-scope-catalog" aria-label="Table catalog" tabIndex={0}>
           {!readOnly && catalog.isPending && <div className="table-scope-empty" role="status"><Table2 size={24} /><p>Loading tables…</p></div>}
@@ -100,8 +100,8 @@ function SourceTables({ source, scope, onChange, readOnly }: {
                   <input type="checkbox" checked={checked} disabled={!selectedIds.has(tableIdentity(table)) && selected.length >= 500} onChange={() => toggle(table)} />
                   <Table2 size={16} aria-hidden="true" />
                   <span className="table-scope-name" title={table.schema ? `${table.schema}.${table.name}` : table.name}>{table.name}</span>
-                  <span className={`table-scope-object-type ${table.object_type === 'view' ? 'is-view' : ''}`}>{table.object_type}</span>
-                  <span className="table-scope-columns">{table.column_count} columns</span>
+                  {table.object_type === 'view' ? <span className="table-scope-object-type is-view">View</span> : null}
+                  {table.column_count > 0 ? <span className="table-scope-columns">{table.column_count} cols</span> : null}
                 </label>;
               })}
             </fieldset>)}
@@ -116,9 +116,9 @@ function SourceTables({ source, scope, onChange, readOnly }: {
         <div className="table-scope-selection-header"><h4>Selection <span>{scope.mode === 'all' ? 'All' : selected.length}</span></h4>
           {selected.length > 0 && <button type="button" onClick={() => onChange({ ...scope, mode: 'selected', tables: [] })}>Clear</button>}
         </div>
-        {scope.mode === 'all' || !selected.length ? <div className="table-scope-selection-empty"><Layers3 size={24} aria-hidden="true" />
-          <strong>{scope.mode === 'all' ? 'All tables included' : 'Choose your tables'}</strong>
-          <p>{scope.mode === 'all' ? 'Select individual tables to focus your answer.' : 'Your selected tables will appear here.'}</p>
+        {scope.mode === 'all' || !selected.length ? <div className="table-scope-selection-empty"><Layers3 size={20} aria-hidden="true" />
+          <strong>{scope.mode === 'all' ? 'All tables included' : 'No tables selected'}</strong>
+          <p>{scope.mode === 'all' ? 'Queries have access to all tables in this source.' : 'Select tables on the left to narrow scope.'}</p>
         </div> : <ul className="table-scope-selected-list">
           {selected.map((table) => <li key={tableIdentity(table)}>
             <div><span title={table.name}>{table.name}</span><small>{table.schema || 'No schema'}</small></div>
@@ -144,7 +144,7 @@ export function TableScopeSelector({ dataSources, sourceIds, value, onChange, re
   const allCount = displayedScope.filter((item) => item.mode === 'all').length;
   const summary = selectedCount ? `${selectedCount} table${selectedCount === 1 ? '' : 's'} selected${allCount ? ` · all tables in ${allCount} other source${allCount === 1 ? '' : 's'}` : ''}` : `All tables in ${allCount} source${allCount === 1 ? '' : 's'}`;
   return <>
-    <button type="button" className={`chat-composer-chip table-scope-trigger ${scope.some((item) => item.mode === 'selected' && (item.tables?.length ?? 0) > 0) ? 'active' : ''}`} disabled={disabled || sourceIds.length === 0}
+    <button type="button" className={`chat-composer-chip table-scope-trigger ${open || sourceIds.length > 0 ? 'active' : ''}`} disabled={disabled || sourceIds.length === 0}
       aria-haspopup="dialog" aria-expanded={open} onClick={openDialog}
       title={sourceIds.length ? `${tableScopeLabel(scope)} · ${readOnly ? 'Fixed for this conversation' : 'Choose tables for this conversation'}` : 'Select a data source first'}>
       <Table2 size={12} aria-hidden="true" /><span>{tableScopeLabel(scope)}</span>
@@ -155,8 +155,7 @@ export function TableScopeSelector({ dataSources, sourceIds, value, onChange, re
         <Modal.Dialog className="table-scope-dialog">
           <Modal.CloseTrigger />
           <Modal.Header className="table-scope-header"><span className="table-scope-heading-icon"><Table2 size={20} /></span>
-            <div><Modal.Heading>{readOnly ? 'Selected tables' : 'Select tables'}</Modal.Heading>
-              <p>{readOnly ? 'The data available to this conversation.' : 'Choose the data you want to ask about.'}</p></div>
+            <Modal.Heading>{readOnly ? 'Selected tables' : 'Select tables'}</Modal.Heading>
           </Modal.Header>
           <Modal.Body className="table-scope-body">
             {sources.length > 1 && <nav className="table-scope-source-nav" aria-label="Data sources">
