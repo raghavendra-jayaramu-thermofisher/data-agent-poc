@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@heroui/react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import type { components } from '../../api/generated/schema';
 import { MarkdownDocument } from './MarkdownDocument';
@@ -84,6 +84,15 @@ export function AnnotationRow({
     ? annotation.content.replace(/^[#*`\s-]+/, '').replace(/\n+/g, ' ').trim()
     : '';
 
+  const scopeClass =
+    annotation.scope_type === 'table'
+      ? 'annotation-badge--table'
+      : annotation.scope_type === 'column'
+      ? 'annotation-badge--column'
+      : annotation.scope_type === 'metric'
+      ? 'annotation-badge--metric'
+      : 'annotation-badge--datasource';
+
   return (
     <article
       className={`annotation-row transition-all duration-150 ${
@@ -110,9 +119,13 @@ export function AnnotationRow({
               isExpanded || editing ? 'rotate-180 text-[var(--db-primary)]' : ''
             }`}
           />
-          <span className="annotation-scope-badge shrink-0">{annotation.scope_type}</span>
+          <span className={`annotation-badge shrink-0 ${scopeClass}`}>
+            {annotation.scope_type}
+          </span>
           {annotation.scope_key ? (
-            <span className="annotation-scope-key font-mono text-xs shrink-0">{annotation.scope_key}</span>
+            <span className="annotation-scope-key font-mono text-xs shrink-0">
+              {annotation.scope_key}
+            </span>
           ) : null}
           {!isExpanded && !editing ? (
             <span className="text-xs text-[var(--db-text-muted)] truncate min-w-0 pr-2 italic">
@@ -126,18 +139,26 @@ export function AnnotationRow({
             onClick={(e) => e.stopPropagation()}
           >
             {editing ? (
-              <Button size="sm" variant="ghost" onPress={handleCancelEdit}>
+              <Button size="sm" variant="ghost" className="annotation-btn-ghost" onPress={handleCancelEdit}>
                 Cancel
               </Button>
             ) : (
-              <Button size="sm" variant="ghost" onPress={handleStartEdit}>
-                Edit
+              <Button size="sm" variant="ghost" className="annotation-btn-ghost" onPress={handleStartEdit}>
+                <Pencil size={12} />
+                <span>Edit</span>
               </Button>
             )}
             <ConfirmationDialog
-              triggerLabel="Delete"
+              triggerLabel={
+                <span className="inline-flex items-center gap-1">
+                  <Trash2 size={12} />
+                  <span>Delete</span>
+                </span>
+              }
+              triggerVariant="ghost"
+              triggerSize="sm"
+              triggerClassName="annotation-btn-ghost is-danger"
               title="Delete business knowledge?"
-              description="This removes the annotation from future knowledge use."
               confirmLabel="Delete"
               onConfirm={() => void onDelete()}
             />
@@ -173,7 +194,7 @@ export function AnnotationRow({
             </div>
           </form>
         ) : (
-          <div className="annotation-content p-4">
+          <div className="annotation-content p-4 knowledge-document-view">
             <MarkdownDocument>{annotation.content}</MarkdownDocument>
           </div>
         )

@@ -48,11 +48,20 @@ export function BusinessKnowledgePanel({
   };
 
   return (
-    <div className="detail-panel my-6 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-xl p-5 shadow-xs">
+    <div className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg p-5 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--db-border-subtle)]">
         <div className="flex items-center gap-2">
-          <BookOpen size={18} className="text-[var(--db-primary)]" />
-          <h2 className="text-base font-semibold text-[var(--db-text-primary)] m-0">Business Knowledge Annotations</h2>
+          <div className="p-1.5 rounded bg-[var(--db-primary-soft)] text-[var(--db-primary)]">
+            <BookOpen size={16} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-[var(--db-text-primary)] m-0 leading-tight">
+              Business Knowledge Annotations
+            </h2>
+            <p className="text-xs text-[var(--db-text-muted)] mt-0.5">
+              Domain business context, metrics, and definitions provided to guide AI queries.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {annotations.length > 0 && (
@@ -72,20 +81,29 @@ export function BusinessKnowledgePanel({
             <button
               type="button"
               onClick={() => setIsAdding((prev) => !prev)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] text-xs font-semibold rounded transition-colors cursor-pointer ml-1"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] text-xs font-semibold rounded-md transition-colors cursor-pointer ml-1 shadow-2xs"
             >
-              {isAdding ? <X size={12} /> : <Plus size={12} />}
-              <span>{isAdding ? 'Close form' : 'Add Knowledge'}</span>
+              {isAdding ? <X size={13} /> : <Plus size={13} />}
+              <span>{isAdding ? 'Close Form' : 'Add Knowledge'}</span>
             </button>
           )}
         </div>
       </div>
 
       {canManage && isAdding && (
-        <div className="mb-6 pb-6 border-b border-[var(--db-border-subtle)] bg-[var(--db-surface)] p-4 rounded-lg border">
-          <h3 className="text-xs font-semibold text-[var(--db-text-secondary)] uppercase tracking-wider mb-3">
-            Add New Business Knowledge
-          </h3>
+        <div className="mb-5 pb-5 border-b border-[var(--db-border-subtle)] bg-[var(--db-surface)] p-4 rounded-lg border border-[var(--db-border-default)]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-[var(--db-text-primary)] uppercase tracking-wider">
+              Add New Business Knowledge
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsAdding(false)}
+              className="text-[var(--db-text-muted)] hover:text-[var(--db-text-primary)]"
+            >
+              <X size={14} />
+            </button>
+          </div>
           <AnnotationForm
             onSubmit={async (values) => {
               await onCreate(values);
@@ -95,7 +113,7 @@ export function BusinessKnowledgePanel({
         </div>
       )}
 
-      <div className="annotation-list space-y-3">
+      <div className="annotation-list space-y-2.5">
         {annotations.map((annotation) => (
           <AnnotationRow
             key={annotation.id}
@@ -107,17 +125,21 @@ export function BusinessKnowledgePanel({
             onDelete={() => onDelete(annotation.id)}
           />
         ))}
-        {annotations.length === 0 ? (
-          <div className="text-center py-10 text-[var(--db-text-muted)]">
-            <BookOpen size={28} className="mx-auto text-[var(--db-border-default)] mb-2" />
-            <p className="text-xs">No business annotations added yet.</p>
+        {annotations.length === 0 && !isAdding ? (
+          <div className="text-center py-12 text-[var(--db-text-muted)]">
+            <BookOpen size={32} className="mx-auto text-[var(--db-border-default)] mb-2.5" />
+            <p className="text-xs font-medium text-[var(--db-text-primary)]">No business annotations added yet</p>
+            <p className="text-[11px] text-[var(--db-text-muted)] mt-0.5">
+              Annotations help the LLM understand company terminology, fiscal year calculations, and table nuances.
+            </p>
             {canManage && (
               <button
                 type="button"
                 onClick={() => setIsAdding(true)}
-                className="mt-2 text-xs text-[var(--db-primary)] font-semibold hover:underline"
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
               >
-                + Add the first business knowledge item
+                <Plus size={13} />
+                <span>Add Knowledge Annotation</span>
               </button>
             )}
           </div>

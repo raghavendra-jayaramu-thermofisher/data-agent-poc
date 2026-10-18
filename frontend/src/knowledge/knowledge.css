@@ -1,0 +1,415 @@
+/* Knowledge Base Page Styling */
+
+.knowledge-stat-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .knowledge-stat-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.knowledge-stat-card {
+  background: var(--db-surface-raised);
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  box-shadow: var(--db-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  transition: border-color 0.15s ease;
+}
+
+.knowledge-stat-card:hover {
+  border-color: var(--db-border-strong);
+}
+
+.knowledge-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--db-text-muted);
+}
+
+.knowledge-stat-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--db-text-primary);
+  line-height: 1.2;
+}
+
+.knowledge-stat-subvalue {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--db-text-secondary);
+}
+
+/* Tabs Navigation */
+.knowledge-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--db-border-default);
+  margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.knowledge-tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.knowledge-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--db-text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.knowledge-tab-item:hover {
+  color: var(--db-text-primary);
+  background: var(--db-surface-hover);
+}
+
+.knowledge-tab-item.is-active {
+  color: var(--db-primary);
+  font-weight: 600;
+  background: var(--db-primary-soft);
+  border-bottom-color: var(--db-primary);
+}
+
+.knowledge-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--db-surface-muted);
+  color: var(--db-text-muted);
+  border: 1px solid var(--db-border-subtle);
+  transition: all 0.15s ease;
+}
+
+.knowledge-tab-item.is-active .knowledge-tab-badge {
+  background: color-mix(in srgb, var(--db-primary) 15%, transparent);
+  color: var(--db-primary);
+  border-color: color-mix(in srgb, var(--db-primary) 25%, transparent);
+}
+
+/* Schema Explorer Two-Column Layout */
+.schema-explorer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .schema-explorer-grid {
+    grid-template-columns: 310px 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .schema-explorer-grid {
+    grid-template-columns: 330px 1fr;
+  }
+}
+
+.schema-sidebar {
+  background: var(--db-surface-raised);
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  box-shadow: var(--db-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+
+.schema-search-box {
+  position: relative;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.schema-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 30px;
+  font-size: 12px;
+  color: var(--db-text-primary);
+  background: var(--db-surface);
+  border: 1px solid var(--db-border-default);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.schema-search-input:focus {
+  border-color: var(--db-focus-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-primary) 15%, transparent);
+}
+
+.schema-search-clear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  padding: 2px;
+  color: var(--db-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schema-search-clear:hover {
+  color: var(--db-text-primary);
+  background: var(--db-surface-hover);
+}
+
+.schema-items-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schema-item-btn {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  color: var(--db-text-primary);
+}
+
+.schema-item-btn:hover {
+  background: var(--db-surface-hover);
+  border-color: var(--db-border-subtle);
+}
+
+.schema-item-btn.is-active {
+  background: var(--db-primary-soft);
+  border-color: color-mix(in srgb, var(--db-primary) 35%, transparent);
+  color: var(--db-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.schema-item-pill {
+  font-family: var(--db-font-mono, monospace);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--db-surface);
+  color: var(--db-text-secondary);
+  border: 1px solid var(--db-border-subtle);
+  flex-shrink: 0;
+}
+
+.schema-item-btn.is-active .schema-item-pill {
+  background: color-mix(in srgb, var(--db-primary) 12%, transparent);
+  color: var(--db-primary);
+  border-color: color-mix(in srgb, var(--db-primary) 20%, transparent);
+}
+
+.schema-reader {
+  background: var(--db-surface-raised);
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  padding: 20px;
+  height: 600px;
+  overflow-y: auto;
+  box-shadow: var(--db-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+
+/* Polished markdown document inside Knowledge */
+.knowledge-document-view {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.knowledge-document-view table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  border: 1px solid var(--db-border-default);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.knowledge-document-view th {
+  background: var(--db-surface-muted);
+  color: var(--db-text-secondary);
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--db-border-default);
+  text-align: left;
+}
+
+.knowledge-document-view td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--db-border-subtle);
+  color: var(--db-text-primary);
+  vertical-align: middle;
+}
+
+.knowledge-document-view tr:last-child td {
+  border-bottom: none;
+}
+
+.knowledge-document-view tr:hover td {
+  background: var(--db-surface-hover);
+}
+
+/* Subtle code tags in schema document (avoid bulky badges) */
+.knowledge-document-view code {
+  font-family: var(--db-font-mono, monospace);
+  font-size: 11px;
+  background: var(--db-surface-muted);
+  color: var(--db-text-primary);
+  border: 1px solid var(--db-border-subtle);
+  padding: 1.5px 5px;
+  border-radius: 4px;
+}
+
+.knowledge-document-view pre {
+  background: var(--db-surface-muted);
+  border: 1px solid var(--db-border-subtle);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+/* Business Knowledge Annotations Styling */
+.annotation-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.annotation-badge--datasource {
+  background: var(--db-primary-soft);
+  color: var(--db-primary);
+  border: 1px solid color-mix(in srgb, var(--db-primary) 18%, transparent);
+}
+
+.annotation-badge--table {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+.annotation-badge--column {
+  background: rgba(168, 85, 247, 0.1);
+  color: #9333ea;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.annotation-badge--metric {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.annotation-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--db-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.annotation-btn-ghost:hover {
+  background: var(--db-surface-hover);
+  color: var(--db-text-primary);
+  border-color: var(--db-border-subtle);
+}
+
+.annotation-btn-ghost.is-danger:hover {
+  background: var(--db-danger-soft);
+  color: var(--db-danger);
+  border-color: color-mix(in srgb, var(--db-danger) 20%, transparent);
+}
+
+/* Raw Index Card Max Height & Clean Pills */
+.compact-index-card {
+  background: var(--db-surface-raised);
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: var(--db-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  margin-bottom: 20px;
+}
+
+.compact-index-body {
+  max-height: 480px;
+  overflow-y: auto;
+  border: 1px solid var(--db-border-subtle);
+  border-radius: 6px;
+  padding: 14px;
+  background: var(--db-surface);
+}
+
+.compact-index-body .markdown-document code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--db-surface-muted);
+  color: var(--db-text-secondary);
+  border: 1px solid var(--db-border-subtle);
+}
