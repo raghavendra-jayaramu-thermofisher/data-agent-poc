@@ -190,11 +190,35 @@
 .sidebar-history {
   margin-top: 20px;
 }
-.sidebar-history h2 {
-  margin: 0 10px 8px;
+.sidebar-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 6px 8px 10px;
+}
+.sidebar-history-header h2 {
+  margin: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--db-text-secondary);
+}
+.sidebar-history-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--db-text-muted);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.sidebar-history-clear-btn:hover {
+  color: var(--db-danger);
+  background: var(--db-danger-soft);
 }
 .sidebar-search-field {
   display: flex;

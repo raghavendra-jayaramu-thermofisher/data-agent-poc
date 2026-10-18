@@ -16,12 +16,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   MoreHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { useOrganization } from '../organizations/OrganizationProvider';
 import { useConversationList } from '../conversations/hooks/useConversations';
 import { ConversationActions } from '../conversations/components/ConversationActions';
 import { ConversationListItemContent } from '../conversations/components/ConversationListItemContent';
+import { DeleteAllChatsModal } from '../conversations/components/DeleteAllChatsModal';
 import { BRANDING } from '../lib/branding';
 import { useSidebarDisplay } from './useSidebarDisplay';
 import { DisplaySettingsModal } from './DisplaySettingsModal';
@@ -46,6 +48,7 @@ export function AppShell() {
   const { visibility, isTabVisible, toggleTab, resetDefaults } = useSidebarDisplay();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsed, setCollapsed] = useState(() => preferences.get('navigationCollapsed') ?? false);
   const navigate = useNavigate();
@@ -166,7 +169,24 @@ export function AppShell() {
           </nav>
           {!compact && (
             <section className="sidebar-history" aria-label="Recent chats">
-              <h2>Recent chats</h2>
+              <div className="sidebar-history-header">
+                <h2>Recent chats</h2>
+                {Boolean(conversations.data?.length) && (
+                  <button
+                    type="button"
+                    className="sidebar-history-clear-btn"
+                    onClick={() => {
+                      if (mobile) setMobileOpen(false);
+                      setDeleteAllOpen(true);
+                    }}
+                    title="Delete all chats"
+                    aria-label="Delete all chats"
+                  >
+                    <Trash2 size={12} aria-hidden="true" />
+                    <span>Delete all</span>
+                  </button>
+                )}
+              </div>
               <div className="sidebar-search-field db-icon-search">
                 <Search size={14} aria-hidden="true" />
                 <input
@@ -336,6 +356,10 @@ export function AppShell() {
         visibility={visibility}
         onToggleTab={toggleTab}
         onResetDefaults={resetDefaults}
+      />
+      <DeleteAllChatsModal
+        isOpen={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
       />
     </div>
   );

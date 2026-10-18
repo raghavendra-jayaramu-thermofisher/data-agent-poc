@@ -54,6 +54,21 @@ export function useRenameConversation() {
   });
 }
 
+export function useDeleteAllConversations() {
+  const queryClient = useQueryClient();
+  const { activeOrganization } = useOrganization();
+  const orgId = activeOrganization?.id ?? null;
+
+  return useMutation({
+    mutationFn: () => api.deleteAllConversations(),
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.conversations.list(orgId), []);
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
+      queryClient.removeQueries({ queryKey: ['conversations', orgId] });
+    },
+  });
+}
+
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
   const { activeOrganization } = useOrganization();

@@ -49,6 +49,15 @@ export async function deleteConversation(id: string): Promise<void> {
   }));
 }
 
+export async function deleteAllConversations(): Promise<void> {
+  try {
+    await withAuthRefresh(() => apiClient.DELETE('/api/v1/conversations' as any));
+  } catch {
+    const list = await listConversations();
+    await Promise.all(list.map((c) => deleteConversation(c.id)));
+  }
+}
+
 export function saveVerification(message: ConversationMessage, body: S['MessageVerificationUpdate']): Promise<ConversationMessage> {
   return withAuthRefresh(() => apiClient.PATCH('/api/v1/conversations/{conversation_id}/messages/{message_id}/verification', {
     params: { path: { conversation_id: message.conversation_id, message_id: message.id } }, body,

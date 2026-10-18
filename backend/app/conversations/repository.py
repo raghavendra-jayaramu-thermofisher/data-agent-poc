@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
@@ -21,6 +21,12 @@ class ConversationRepository:
 
     def add_message(self, item: Message) -> None:
         self.session.add(item)
+
+    async def delete_all_for_org(self, organization_id: uuid.UUID) -> int:
+        result = await self.session.execute(
+            delete(Conversation).where(Conversation.organization_id == organization_id)
+        )
+        return result.rowcount
 
     async def get_for_org(
         self, conversation_id: uuid.UUID, organization_id: uuid.UUID

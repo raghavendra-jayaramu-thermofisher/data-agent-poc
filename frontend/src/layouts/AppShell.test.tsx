@@ -13,9 +13,18 @@ vi.mock('../organizations/OrganizationProvider', () => ({
     setActiveOrganization: vi.fn(),
   }),
 }));
+const mockConversations = vi.hoisted(() => ({
+  list: [{ id: 'c1', title: 'Revenue analysis' }],
+  deleteAll: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../conversations/hooks/useConversations', () => ({
-  useConversationList: () => ({ data: [] }),
+  useConversationList: () => ({ data: mockConversations.list }),
   useDeleteConversation: () => ({ mutate: vi.fn() }),
+  useDeleteAllConversations: () => ({
+    mutate: mockConversations.deleteAll,
+    mutateAsync: mockConversations.deleteAll,
+    isPending: false,
+  }),
 }));
 describe('AppShell', () => {
   beforeEach(() => localStorage.clear());
@@ -81,5 +90,33 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Expand sidebar' }));
     expect(screen.getByText('Recent chats')).toBeInTheDocument();
     expect(screen.getByLabelText('Search conversation history')).toBeInTheDocument();
+  });
+
+  it('opens delete all chats confirmation dialog and triggers deletion', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/conversations/c1']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/conversations/:id" element={<div>Conversation view</div>} />
+            <Route path="/ask" element={<div>Ask view</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const deleteAllBtn = screen.getByRole('button', { name: 'Delete all chats' });
+    expect(deleteAllBtn).toBeInTheDocument();
+    await user.click(deleteAllBtn);
+
+    expect(screen.getByRole('dialog', { name: 'Delete all chats' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/All chats and their message history in this workspace will be permanently deleted/),
+    ).toBeInTheDocument();
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Delete all chats' });
+    const modalConfirmBtn = confirmBtns[confirmBtns.length - 1];
+    await user.click(modalConfirmBtn);
+    expect(mockConversations.deleteAll).toHaveBeenCalled();
   });
 });

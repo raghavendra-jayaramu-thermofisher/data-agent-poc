@@ -139,6 +139,11 @@ class ConversationService:
         await self.session.delete(item)
         await self.session.commit()
 
+    async def delete_all(self, organization_id: uuid.UUID) -> int:
+        count = await self.repo.delete_all_for_org(organization_id)
+        await self.session.commit()
+        return count
+
     async def rename(
         self,
         conversation_id: uuid.UUID,
