@@ -78,6 +78,8 @@ class Settings(BaseSettings):
 
     # Final-answer orchestration reuses the model profile selected for the conversation.
     final_answer_timeout_seconds: int = Field(default=60, ge=5, le=600)
+    final_answer_streaming_enabled: bool = True
+    final_answer_stream_flush_ms: int = Field(default=200, ge=50, le=1000)
     analysis_evidence_retries: int = Field(default=2, ge=0, le=5)
 
     # Task 6 retention/maintenance controls. Durable audit/history is never auto-deleted.

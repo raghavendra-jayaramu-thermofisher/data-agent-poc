@@ -16,7 +16,9 @@ vi.mock('../../api/client', () => ({
   },
   getAuthenticatedHeaderRecord: (extra?: Record<string, string>) => {
     const record: Record<string, string> = { ...extra };
-    clientMocks.headers.forEach((value, key) => { record[key] = value; });
+    clientMocks.headers.forEach((value, key) => {
+      record[key] = value;
+    });
     return record;
   },
   refreshAuthTokens: clientMocks.refresh,
@@ -28,35 +30,79 @@ describe('job SSE transport', () => {
   beforeEach(() => {
     fetchEventSourceMock.mockReset();
     clientMocks.refresh.mockReset();
-    clientMocks.headers = new Headers({ Authorization: 'Bearer access', 'X-Organization-ID': 'org-1' });
+    clientMocks.headers = new Headers({
+      Authorization: 'Bearer access',
+      'X-Organization-ID': 'org-1',
+    });
+  });
+
+  it('reconnects from the last accepted event when a live delta was missed', async () => {
+    const received: number[] = [];
+    fetchEventSourceMock.mockImplementation(
+      async (_url: string, options: Record<string, unknown>) => {
+        const callbacks = options as {
+          headers: Record<string, string>;
+          onmessage(message: { data: string }): void;
+        };
+        const message = (sequence: number) => ({
+          data: JSON.stringify({
+            sequence,
+            event_type: 'answer.delta',
+            level: 'info',
+            payload: {},
+            created_at: '2026-10-18T00:00:00Z',
+          }),
+        });
+        callbacks.headers['last-event-id'] = '11'; // The underlying SSE library already observed the gap's ID.
+        expect(() => callbacks.onmessage(message(11))).toThrow('missed');
+        expect(callbacks.headers['last-event-id']).toBe('8');
+        callbacks.onmessage(message(9));
+        callbacks.onmessage(message(9));
+        callbacks.onmessage(message(10));
+        callbacks.onmessage(message(11));
+        expect(callbacks.headers['last-event-id']).toBe('11');
+      },
+    );
+    await streamJobEvents({
+      jobId: 'j1',
+      afterSequence: 8,
+      signal: new AbortController().signal,
+      onOpen: vi.fn(),
+      onEvent: (event) => received.push(event.sequence),
+      onError: vi.fn(),
+      onClosed: vi.fn(),
+    });
+    expect(received).toEqual([9, 10, 11]);
   });
 
   it('resumes from the durable sequence using query and Last-Event-ID and parses events', async () => {
     const received: number[] = [];
-    fetchEventSourceMock.mockImplementation(async (url: string, options: Record<string, unknown>) => {
-      const callbacks = options as {
-        headers: Record<string, string>;
-        onopen(response: Response): Promise<void>;
-        onmessage(message: { data: string }): void;
-        onclose(): void;
-      };
-      expect(url).toContain('after_sequence=8');
-      expect(callbacks.headers['Last-Event-ID']).toBe('8');
-      expect(callbacks.headers['Authorization']).toBe('Bearer access');
-      expect(callbacks.headers['X-Organization-ID']).toBe('org-1');
-      await callbacks.onopen(new Response(null, { status: 200 }));
-      callbacks.onmessage({
-        data: JSON.stringify({
-          sequence: 9,
-          event_type: 'sql.completed',
-          level: 'info',
-          payload: {},
-          created_at: '2026-08-24T12:00:00Z',
-        }),
-      });
-      expect(callbacks.headers.get('Last-Event-ID')).toBe('9');
-      callbacks.onclose();
-    });
+    fetchEventSourceMock.mockImplementation(
+      async (url: string, options: Record<string, unknown>) => {
+        const callbacks = options as {
+          headers: Record<string, string>;
+          onopen(response: Response): Promise<void>;
+          onmessage(message: { data: string }): void;
+          onclose(): void;
+        };
+        expect(url).toContain('after_sequence=8');
+        expect(callbacks.headers['last-event-id']).toBe('8');
+        expect(new Headers(callbacks.headers).get('Authorization')).toBe('Bearer access');
+        expect(new Headers(callbacks.headers).get('X-Organization-ID')).toBe('org-1');
+        await callbacks.onopen(new Response(null, { status: 200 }));
+        callbacks.onmessage({
+          data: JSON.stringify({
+            sequence: 9,
+            event_type: 'sql.completed',
+            level: 'info',
+            payload: {},
+            created_at: '2026-08-24T12:00:00Z',
+          }),
+        });
+        expect(callbacks.headers['last-event-id']).toBe('9');
+        callbacks.onclose();
+      },
+    );
 
     await streamJobEvents({
       jobId: 'job-1',
@@ -73,11 +119,18 @@ describe('job SSE transport', () => {
 
   it('refreshes an expired access token before reconnecting', async () => {
     clientMocks.refresh.mockResolvedValue(true);
-    clientMocks.headers = new Headers({ Authorization: 'Bearer refreshed', 'X-Organization-ID': 'org-1' });
-    fetchEventSourceMock.mockImplementation(async (_url: string, options: Record<string, unknown>) => {
-      const callbacks = options as { onopen(response: Response): Promise<void> };
-      await expect(callbacks.onopen(new Response(null, { status: 401 }))).rejects.toThrow('reconnecting');
+    clientMocks.headers = new Headers({
+      Authorization: 'Bearer refreshed',
+      'X-Organization-ID': 'org-1',
     });
+    fetchEventSourceMock.mockImplementation(
+      async (_url: string, options: Record<string, unknown>) => {
+        const callbacks = options as { onopen(response: Response): Promise<void> };
+        await expect(callbacks.onopen(new Response(null, { status: 401 }))).rejects.toThrow(
+          'reconnecting',
+        );
+      },
+    );
 
     await streamJobEvents({
       jobId: 'job-1',

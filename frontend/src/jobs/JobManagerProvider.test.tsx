@@ -25,7 +25,7 @@ import { JobManagerProvider, useJobManager } from './JobManagerProvider';
 const baseJob: Job = { id: 'j1', organization_id: 'org-1', job_type: 'knowledge_generation', status: 'running', requested_by: 'u1', conversation_id: null, input: { data_source_id: 'ds1' }, result: null, attempt_count: 1, max_attempts: 3, cancel_requested_at: null, error_code: null, error_message: null, created_at: '2026-08-24T12:00:00Z', started_at: '2026-08-24T12:00:01Z', finished_at: null };
 function Probe() {
     const manager = useJobManager();
-    return <div><span data-testid="status">{manager.jobs.find((entry) => entry.job.id === 'j1')?.job.status}</span><span data-testid="count">{manager.activeJobs.length}</span><span data-testid="event">{manager.latestEvent('j1')?.sequence ?? 0}</span><span data-testid="event-count">{manager.jobs.find((entry) => entry.job.id === 'j1')?.events.length ?? 0}</span><button onClick={() => void manager.cancel('j1')}>Cancel</button></div>;
+    return <div><span data-testid="answer">{manager.jobs.find((entry) => entry.job.id === 'j1')?.answer?.text}</span><span data-testid="status">{manager.jobs.find((entry) => entry.job.id === 'j1')?.job.status}</span><span data-testid="count">{manager.activeJobs.length}</span><span data-testid="event">{manager.latestEvent('j1')?.sequence ?? 0}</span><span data-testid="event-count">{manager.jobs.find((entry) => entry.job.id === 'j1')?.events.length ?? 0}</span><button onClick={() => void manager.cancel('j1')}>Cancel</button></div>;
 }
 function renderManager(ui: ReactNode) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -48,6 +48,23 @@ describe('global job manager', () => {
         await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('1'));
         await waitFor(() => expect(stream.fn).toHaveBeenCalledTimes(1));
         expect(stream.fn.mock.calls[0][0].afterSequence).toBe(0);
+    });
+    it('keeps answer text out of the activity log and preserves it across reconciliation', async () => {
+        renderManager(<Probe />);
+        await waitFor(() => expect(stream.callbacks.has('j1')).toBe(true));
+        const cb = stream.callbacks.get('j1')!;
+        act(() => {
+            cb.onEvent({ sequence: 1, event_type: 'finalization.started', level: 'info', payload: {}, created_at: baseJob.created_at });
+            cb.onEvent({ sequence: 2, event_type: 'answer.started', level: 'info', payload: { stream_id: 'a1' }, created_at: baseJob.created_at });
+            cb.onEvent({ sequence: 3, event_type: 'answer.delta', level: 'info', payload: { stream_id: 'a1', offset: 0, text: 'First finding.' }, created_at: baseJob.created_at });
+            cb.onEvent({ sequence: 3, event_type: 'answer.delta', level: 'info', payload: { stream_id: 'a1', offset: 0, text: 'First finding.' }, created_at: baseJob.created_at });
+        });
+        expect(screen.getByTestId('answer')).toHaveTextContent('First finding.');
+        expect(screen.getByTestId('event-count')).toHaveTextContent('1');
+        expect(screen.getByTestId('event')).toHaveTextContent('1');
+        act(() => cb.onEvent({ sequence: 4, event_type: 'job.completed', level: 'info', payload: {}, created_at: baseJob.created_at }));
+        await waitFor(() => expect(api.getJob).toHaveBeenCalledWith('j1'));
+        expect(screen.getByTestId('answer')).toHaveTextContent('First finding.');
     });
     it('promotes queued questions when the worker starts them', async () => {
         api.listJobs.mockImplementation(async (status?: string) => status === 'queued' ? [{ ...baseJob, status: 'queued', started_at: null }] : []);

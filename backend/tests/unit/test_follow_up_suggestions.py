@@ -49,3 +49,9 @@ def test_invalid_optional_metadata_does_not_damage_answer(block):
 
 def test_existing_answers_without_suggestions_are_unchanged():
     assert extract_follow_up_suggestions("# Answer\n\nText.") == ("# Answer\n\nText.", [])
+
+
+def test_metadata_is_not_exposed_when_the_model_omits_its_newline():
+    assert extract_follow_up_suggestions(
+        "Answer. <follow_up_suggestions><suggestion>Next?</suggestion></follow_up_suggestions>"
+    ) == ("Answer.", ["Next?"])

@@ -12,7 +12,9 @@ export type ManagedJob = {
     events: JobEvent[];
     lastSeenSequence: number;
     connectionState: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
+    answer?: StreamingAnswer;
 };
+export type StreamingAnswer = { streamId: string; text: string };
 export function isActiveJobStatus(status: string): status is 'queued' | 'running' {
     return status === 'queued' || status === 'running';
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 from urllib.parse import urlsplit
@@ -31,6 +33,17 @@ class ModelCompletion:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelStreamChunk:
+    text: str = ""
+    model: str | None = None
+    usage: ModelUsage | None = None
+
+
+class ModelStreamingUnsupportedError(ModelProviderError):
+    """The provider explicitly rejected streaming before generating a response."""
+
+
+@dataclass(frozen=True, slots=True)
 class ModelRuntimeConfiguration:
     profile_id: str
     model_name: str
@@ -49,6 +62,14 @@ class ModelClient(Protocol):
         messages: list[ModelMessage],
         settings: dict[str, object] | None = None,
     ) -> ModelCompletion: ...
+
+    def stream_chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[ModelMessage],
+        settings: dict[str, object] | None = None,
+    ) -> AsyncIterator[ModelStreamChunk]: ...
 
 
 class OpenAICompatibleClient:
@@ -134,13 +155,25 @@ class OpenAICompatibleClient:
         messages: list[ModelMessage],
         settings: dict[str, object] | None = None,
     ) -> ModelCompletion:
+        payload = self._completion_payload(model, messages, settings)
+        response = await self._request("POST", "chat/completions", json=payload)
+        try:
+            return self._parse_completion(response.json())
+        except ValueError as exc:
+            raise ModelProviderError(
+                "MODEL_PROVIDER_INVALID_RESPONSE", "The model provider returned an invalid response.",
+            ) from exc
+
+    def _completion_payload(
+        self, model: str, messages: list[ModelMessage], settings: dict[str, object] | None,
+    ) -> dict[str, object]:
         payload: dict[str, object] = {
             "model": model,
             "messages": [{"role": item.role, "content": item.content} for item in messages],
         }
         if settings:
             for key, value in settings.items():
-                if key not in {"model", "messages"}:
+                if key not in {"model", "messages", "stream", "stream_options"}:
                     payload[key] = value
 
         # Saved profiles currently use max_tokens. OpenAI's newer models require
@@ -150,9 +183,13 @@ class OpenAICompatibleClient:
             if payload.get("max_completion_tokens") is None:
                 payload["max_completion_tokens"] = token_limit
 
-        response = await self._request("POST", "chat/completions", json=payload)
+        return payload
+
+    @classmethod
+    def _parse_completion(cls, body: object) -> ModelCompletion:
         try:
-            body = response.json()
+            if not isinstance(body, dict):
+                raise TypeError
             choices = body["choices"]
             if not isinstance(choices, list) or not choices:
                 raise TypeError
@@ -164,7 +201,7 @@ class OpenAICompatibleClient:
                 raise TypeError
             text = message["content"]
             returned_model = body.get("model") if isinstance(body.get("model"), str) else None
-            usage = self._parse_usage(body.get("usage"))
+            usage = cls._parse_usage(body.get("usage"))
         except (ValueError, KeyError, TypeError) as exc:
             raise ModelProviderError(
                 "MODEL_PROVIDER_INVALID_RESPONSE",
@@ -172,6 +209,120 @@ class OpenAICompatibleClient:
             ) from exc
 
         return ModelCompletion(text=text, model=returned_model, usage=usage)
+
+    async def stream_chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[ModelMessage],
+        settings: dict[str, object] | None = None,
+    ) -> AsyncIterator[ModelStreamChunk]:
+        payload = self._completion_payload(model, messages, settings)
+        payload.update(stream=True, stream_options={"include_usage": True})
+        # A few compatible gateways support streaming but not its optional usage flag.
+        for include_usage in (True, False):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_seconds, transport=self.transport, follow_redirects=False,
+                ) as client:
+                    headers = {**self._headers(), "Accept": "text/event-stream"}
+                    async with client.stream(
+                        "POST", f"{self.base_url}/chat/completions", headers=headers, json=payload,
+                    ) as response:
+                        if response.status_code >= 400:
+                            await response.aread()
+                            diagnostics = provider_diagnostics(
+                                response, api_key=self.api_key, request_payload=payload,
+                            )
+                            detail = str(diagnostics.get("provider_message", "")).lower()
+                            parameter = str(diagnostics.get("parameter", "")).lower()
+                            rejected_option = response.status_code in {400, 404, 422} and any(
+                                word in detail for word in ("unsupported", "not support", "unknown", "unrecognized", "not allowed", "unexpected")
+                            )
+                            if rejected_option and include_usage and (
+                                "stream_options" in detail + parameter or "include_usage" in detail + parameter
+                            ):
+                                payload.pop("stream_options", None)
+                                continue
+                            error = ModelStreamingUnsupportedError if rejected_option and (
+                                parameter == "stream" or "stream" in detail
+                            ) else ModelProviderError
+                            raise error(
+                                "MODEL_PROVIDER_REJECTED_REQUEST",
+                                "The model provider rejected the request.", diagnostics=diagnostics,
+                            )
+                        if "application/json" in response.headers.get("content-type", ""):
+                            # Some gateways ignore stream=true and return a normal completion.
+                            await response.aread()
+                            completion = self._parse_completion(response.json())
+                            yield ModelStreamChunk(completion.text, completion.model, completion.usage)
+                            return
+                        frame: list[str] = []
+                        finished = False
+                        async for line in response.aiter_lines():
+                            if line.startswith("data:"):
+                                frame.append(line[5:].lstrip(" "))
+                            elif line == "" and frame:
+                                data = "\n".join(frame)
+                                frame.clear()
+                                if data.strip() == "[DONE]":
+                                    return
+                                chunk, terminal = self._parse_stream_frame(data)
+                                finished = finished or terminal
+                                yield chunk
+                        if frame:
+                            data = "\n".join(frame)
+                            if data.strip() == "[DONE]":
+                                return
+                            chunk, terminal = self._parse_stream_frame(data)
+                            finished = finished or terminal
+                            yield chunk
+                        if not finished:
+                            raise ModelProviderError(
+                                "MODEL_PROVIDER_STREAM_INTERRUPTED",
+                                "The model provider stopped sending the answer before it finished.",
+                            )
+                        return
+            except httpx.TimeoutException as exc:
+                raise ModelProviderError(
+                    "MODEL_PROVIDER_TIMEOUT", "The model provider did not respond in time.",
+                ) from exc
+            except httpx.RequestError as exc:
+                raise ModelProviderError(
+                    "MODEL_PROVIDER_UNAVAILABLE", "The connection to the model provider was interrupted.",
+                ) from exc
+            except (ValueError, KeyError, TypeError) as exc:
+                raise ModelProviderError(
+                    "MODEL_PROVIDER_INVALID_RESPONSE", "The model provider returned an invalid stream.",
+                ) from exc
+
+    @classmethod
+    def _parse_stream_frame(cls, data: str) -> tuple[ModelStreamChunk, bool]:
+        body = json.loads(data)
+        if not isinstance(body, dict) or body.get("error"):
+            raise ModelProviderError(
+                "MODEL_PROVIDER_STREAM_FAILED", "The model provider could not finish the answer.",
+            )
+        choices = body.get("choices")
+        if not isinstance(choices, list):
+            raise TypeError("Missing completion choices")
+        first = next((item for item in choices if isinstance(item, dict) and item.get("index", 0) == 0), {})
+        delta = first.get("delta") or {}
+        if not isinstance(delta, dict):
+            raise TypeError("Invalid completion delta")
+        text = delta.get("content")
+        if text is not None and not isinstance(text, str):
+            raise TypeError("Invalid completion text")
+        finish_reason = first.get("finish_reason")
+        if finish_reason in {"length", "content_filter", "tool_calls", "function_call"}:
+            raise ModelProviderError(
+                "MODEL_PROVIDER_STREAM_INCOMPLETE", "The model provider could not finish the full answer.",
+            )
+        return ModelStreamChunk(
+            text=text or "",
+            model=body.get("model") if isinstance(body.get("model"), str) else None,
+            usage=cls._parse_usage(body.get("usage")),
+        ), finish_reason == "stop"
 
     @staticmethod
     def _parse_usage(value: object) -> ModelUsage | None:

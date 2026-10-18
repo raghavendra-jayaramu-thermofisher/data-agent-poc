@@ -45,6 +45,23 @@ GET  /api/v1/jobs/{job_id}/execution
 
 Submitting a conversation message returns immediately with the durable message/job IDs. The worker performs the analysis independently of the HTTP/SSE connection.
 
+Final answers stream over the same authenticated job-event connection after analysis and evidence
+checks finish. `answer.started` identifies the model execution; batched `answer.delta` events carry
+only public Markdown, a stream ID, and a UTF-16 text offset. Private analyst/tool content and the
+follow-up suggestions block are excluded. Each batch is durable, so reconnects replay from the
+last accepted sequence. These text batches are not displayed in the activity log.
+
+`FINAL_ANSWER_STREAMING_ENABLED=true` enables this behavior (the default).
+`FINAL_ANSWER_STREAM_FLUSH_MS=200` controls batching (50–1000 ms). Set streaming to `false` and
+restart the worker to use the original whole-response path. Compatible providers that explicitly
+reject streaming before producing text fall back to that path; interrupted generations do not
+start another model request. Missing provider token usage remains unknown.
+
+The growing answer is a preview. The normal cleanup, quality checks, assistant-message persistence,
+and answer artifact remain authoritative on completion. Failed or cancelled previews stay marked
+as incomplete in the live view and are not added to model conversation history. The question queue
+continues to process one turn at a time.
+
 ### Agent execution model
 
 ```text

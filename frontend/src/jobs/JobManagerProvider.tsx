@@ -7,6 +7,7 @@ import { useOrganization } from '../organizations/OrganizationProvider';
 import * as jobsApi from './api/jobs-api';
 import { appendJobEvent, getSafeJobEventLabel } from './sse/job-events';
 import { streamJobEvents } from './sse/job-stream';
+import { applyAnswerStreamEvent, isAnswerStreamEvent } from './sse/answer-stream';
 import type { JobEvent, ManagedJob } from './types';
 import { isActiveJobStatus, isTerminalJobStatus } from './types';
 type JobManagerValue = {
@@ -25,6 +26,7 @@ function toManaged(job: Job, existing?: ManagedJob): ManagedJob {
         events: existing?.events ?? [],
         lastSeenSequence: existing?.lastSeenSequence ?? 0,
         connectionState: existing?.connectionState ?? 'idle',
+        answer: existing?.answer,
     };
 }
 function destinationDataSourceId(job: Job): string | null {
@@ -131,7 +133,8 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
                             job: event.event_type === 'job.started' && item.job.status === 'queued'
                                 ? { ...item.job, status: 'running', started_at: item.job.started_at ?? event.created_at }
                                 : item.job,
-                            events: appendJobEvent(item.events, event),
+                            answer: applyAnswerStreamEvent(item.answer, event),
+                            events: isAnswerStreamEvent(event) ? item.events : appendJobEvent(item.events, event),
                             lastSeenSequence: event.sequence,
                             connectionState: 'connected',
                         },

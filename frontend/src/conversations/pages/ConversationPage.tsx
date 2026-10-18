@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { queryKeys } from '../../api/queryKeys';
 import { PageError, PageLoading, PageState } from '../../components/PageState';
@@ -13,6 +13,7 @@ import type { ConversationMessage as Message } from '../api/conversation-api';
 import * as api from '../api/conversation-api';
 import { AnalysisFailure } from '../components/AnalysisFailure';
 import { AnalysisProgress } from '../components/AnalysisProgress';
+import { StreamingAnswer } from '../components/StreamingAnswer';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { FollowUpChatComposer } from '../components/FollowUpChatComposer';
 import { ConversationActions } from '../components/ConversationActions';
@@ -52,12 +53,17 @@ export function ConversationPage() {
   const jobManager = useJobManager();
   const pendingStarted = useRef(false);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const followScrollRef = useRef(true);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(null);
   const [initialSubmitError, setInitialSubmitError] = useState<string | null>(null);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const sourceNames = useMemo(
+    () => Object.fromEntries((dataSources.data ?? []).map((source) => [source.id, source.name])),
+    [dataSources.data],
+  );
 
   const conversationJobs = useMemo(
     () =>
@@ -132,15 +138,19 @@ export function ConversationPage() {
     );
   }, [conversationId, location.pathname, location.state, navigate, submit]);
 
-  // Auto-scroll when new messages or active job arrives
-  useEffect(() => {
-    scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.data?.length, activeRunningJob?.job.id]);
+  // Follow incoming text only while the reader has stayed near the bottom.
+  useLayoutEffect(() => {
+    if (followScrollRef.current) scrollAnchorRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, [messages.data?.length, activeRunningJob?.job.id, activeRunningJob?.answer?.text.length]);
 
   useEffect(() => {
     if (!composerElement) return;
     const scroll = workspaceRef.current?.querySelector<HTMLElement>('.chat-main-scroll');
     if (!scroll) return;
+    const trackScroll = () => {
+      followScrollRef.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80;
+    };
+    scroll.addEventListener('scroll', trackScroll, { passive: true });
     // The composer stays in layout; only match the message viewport's scrollbar gutter.
     const updateGutter = () => {
       composerElement.style.setProperty(
@@ -150,11 +160,18 @@ export function ConversationPage() {
     };
     updateGutter();
     const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateGutter);
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+        updateGutter();
+        // Charts can gain height after their trace loads, between text batches.
+        if (followScrollRef.current) scroll.scrollTop = scroll.scrollHeight;
+      });
     observer?.observe(scroll);
+    const stream = workspaceRef.current?.querySelector<HTMLElement>('.chat-message-stream');
+    if (stream) observer?.observe(stream);
     window.addEventListener('resize', updateGutter);
     return () => {
       observer?.disconnect();
+      scroll.removeEventListener('scroll', trackScroll);
       window.removeEventListener('resize', updateGutter);
     };
   }, [composerElement]);
@@ -245,7 +262,17 @@ export function ConversationPage() {
           onCancel={() => jobManager.cancel(entry.job.id)}
         />,
       );
-    } else if (isTerminalJobStatus(entry.job.status) && entry.job.status !== 'succeeded') {
+    }
+    if (entry.answer?.text) {
+      items.push(
+        <StreamingAnswer
+          key={`draft-${entry.job.id}`}
+          managedJob={entry}
+          dataSourceNames={sourceNames}
+        />,
+      );
+    }
+    if (isTerminalJobStatus(entry.job.status) && entry.job.status !== 'succeeded') {
       items.push(<AnalysisFailure key={`failure-${entry.job.id}`} job={entry.job} />);
     }
     return items;
@@ -300,6 +327,16 @@ export function ConversationPage() {
               onCancel={() => jobManager.cancel(progressJob.job.id)}
             />
           )}
+
+          {unmatchedJobs
+            .filter((entry) => entry.answer?.text)
+            .map((entry) => (
+              <StreamingAnswer
+                key={`draft-${entry.job.id}`}
+                managedJob={entry}
+                dataSourceNames={sourceNames}
+              />
+            ))}
 
           {unmatchedJobs
             .filter(

@@ -137,6 +137,69 @@ describe('durable conversation workspace', () => {
     });
   });
 
+  it('replaces a read-only streamed preview with the authoritative saved answer', async () => {
+    const question = {
+      id: 'q1',
+      conversation_id: 'c1',
+      role: 'user' as const,
+      content: 'Summarize orders',
+      job_id: 'j1',
+      metadata: {},
+      created_at: conversation.created_at,
+    };
+    baseHandlers(() => [question]);
+    manager.jobs = [
+      {
+        job: {
+          id: 'j1',
+          organization_id: 'org-1',
+          conversation_id: 'c1',
+          job_type: 'chat_query',
+          status: 'running',
+          input: {},
+          result: null,
+          requested_by: 'u1',
+          attempt_count: 1,
+          max_attempts: 3,
+          cancel_requested_at: null,
+          error_code: null,
+          error_message: null,
+          created_at: conversation.created_at,
+          started_at: conversation.created_at,
+          finished_at: null,
+        },
+        answer: { streamId: 's1', text: 'An early finding.' },
+        events: [],
+        lastSeenSequence: 2,
+        connectionState: 'connected',
+      },
+    ];
+    const client = renderPage();
+    expect(await screen.findByRole('article', { name: 'Answer being written' })).toHaveTextContent(
+      'An early finding.',
+    );
+    expect(screen.queryByRole('button', { name: 'Present answer' })).not.toBeInTheDocument();
+    await act(async () => {
+      manager.jobs = [
+        { ...manager.jobs[0]!, job: { ...manager.jobs[0]!.job, status: 'succeeded' } },
+      ];
+      client.setQueryData(queryKeys.conversations.messages('org-1', 'c1'), [
+        question,
+        {
+          ...question,
+          id: 'a1',
+          role: 'assistant',
+          content: 'The final saved answer.',
+          metadata: {},
+        },
+      ]);
+    });
+    expect(await screen.findByText('The final saved answer.')).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Answer being written' })).not.toBeInTheDocument();
+    expect(screen.queryByText('An early finding.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Present answer' })).toBeEnabled();
+  });
+
   it('updates a follow-up draft without rerendering the report, and still renders new answer data', async () => {
     const answer = {
       id: 'm-answer',

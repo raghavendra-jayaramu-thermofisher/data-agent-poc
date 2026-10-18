@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
+from contextlib import aclosing
 from typing import Protocol, cast
 
 from app.agent.evidence import EvidenceBundle, render_evidence_context
+from app.agent.answer_stream import AnswerStreamPublisher
 from app.agent.final_answer_validation import normalize_final_answer, validate_final_answer
 from app.agent.follow_up_suggestions import extract_follow_up_suggestions
 from app.agent.models import ModelExecution
@@ -17,6 +21,7 @@ from app.models.client import (
     ModelCompletion,
     ModelMessage,
     ModelRuntimeConfiguration,
+    ModelStreamingUnsupportedError,
     OpenAICompatibleClient,
 )
 from app.models.errors import ModelProviderError
@@ -190,6 +195,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
                 ModelMessage(role="system", content=finalizer_system_prompt),
                 ModelMessage(role="user", content=context),
             ],
+            artifact_ids=frozenset(str(item.artifact_id) for item in evidence.visible_artifacts),
         )
         markdown, suggestions = extract_follow_up_suggestions(markdown)
         if follow_up_suggestions is not None:
@@ -225,16 +231,16 @@ Generate the answer and suggestions together; do not call tools to generate sugg
         job_id: uuid.UUID,
         model: ModelRuntimeConfiguration,
         messages: list[ModelMessage],
+        artifact_ids: frozenset[str] = frozenset(),
     ) -> str:
         execution_id = await self._start_execution(job_id, model)
         client = self.client_factory(model, float(self.settings.final_answer_timeout_seconds))
         try:
             raw = await run_cancellable(
                 job_id,
-                client.chat_completion(
-                    model=model.model_name,
-                    messages=messages,
-                    settings=model.settings,
+                self._generate_completion(
+                    client=client, job_id=job_id, execution_id=execution_id,
+                    model=model, messages=messages, artifact_ids=artifact_ids,
                 ),
                 timeout_seconds=float(self.settings.final_answer_timeout_seconds),
             )
@@ -302,6 +308,55 @@ Generate the answer and suggestions together; do not call tools to generate sugg
             total_tokens=usage.total_tokens if usage else None,
         )
         return completion.text
+
+    async def _generate_completion(
+        self, *, client: ModelClient, job_id: uuid.UUID, execution_id: uuid.UUID,
+        model: ModelRuntimeConfiguration, messages: list[ModelMessage],
+        artifact_ids: frozenset[str],
+    ) -> ModelCompletion:
+        stream = getattr(client, "stream_chat_completion", None)
+        if self.settings.final_answer_streaming_enabled and callable(stream):
+            publisher = AnswerStreamPublisher(
+                job_id=job_id, stream_id=execution_id, artifact_ids=artifact_ids,
+                write=append_agent_event,
+            )
+            await publisher.start()
+            interval = self.settings.final_answer_stream_flush_ms / 1000
+
+            async def receive() -> ModelCompletion:
+                usage = None
+                returned_model = None
+                async with aclosing(stream(
+                    model=model.model_name, messages=messages, settings=model.settings,
+                )) as chunks:
+                    async for chunk in chunks:
+                        usage = chunk.usage or usage
+                        returned_model = chunk.model or returned_model
+                        if chunk.text:
+                            publisher.raw += chunk.text
+                            if not publisher.published or time.monotonic() - publisher.last_flush >= interval:
+                                await publisher.flush()
+                return ModelCompletion(publisher.raw, returned_model, usage)
+
+            reader = asyncio.create_task(receive())
+            try:
+                while not reader.done():
+                    await asyncio.wait({reader}, timeout=interval)
+                    await publisher.flush()
+                completion = await reader
+                await publisher.flush()
+                return completion
+            except ModelStreamingUnsupportedError:
+                # Only an explicit rejection before any content permits a second request.
+                if publisher.raw:
+                    raise
+            finally:
+                reader.cancel()
+                await asyncio.gather(reader, return_exceptions=True)
+
+        return await client.chat_completion(
+            model=model.model_name, messages=messages, settings=model.settings,
+        )
 
     @staticmethod
     async def _start_execution(job_id: uuid.UUID, model: ModelRuntimeConfiguration) -> uuid.UUID:

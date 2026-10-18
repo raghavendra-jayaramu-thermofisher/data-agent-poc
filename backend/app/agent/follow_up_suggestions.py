@@ -5,7 +5,8 @@ from xml.etree import ElementTree
 
 
 def extract_follow_up_suggestions(response: str) -> tuple[str, list[str]]:
-    match = re.search(r"(?m)^\s*<follow_up_suggestions\b", response)
+    # A missing newline must not turn private response metadata into answer prose.
+    match = re.search(r"<follow_up_suggestions\b", response, re.IGNORECASE)
     if not match:
         return response, []
     answer = response[: match.start()].rstrip()

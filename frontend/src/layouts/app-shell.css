@@ -421,6 +421,11 @@
 .chat-message-stream {
   gap: 16px;
 }
+.streaming-answer-state {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--db-text-muted);
+}
 .chat-message-row {
   position: relative;
 }
