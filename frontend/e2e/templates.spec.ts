@@ -25,7 +25,7 @@ for (const viewport of [
         is_default,
         enabled,
         content:
-          'Lead with the direct answer. Include the reporting period, show the supporting data, and explain any limitations.\n\nUse the workspace definitions for backlog and stock availability.',
+          'Lead with the direct answer. Include the reporting period, show the supporting data, and explain any limitations.\n\nUse these sections:\n\n## Summary\nOne sentence with the total and the change vs the previous period.\n\n## Drivers\nA table of the largest contributors by region, customer and product.\n\n## Actions\n2 to 3 bullets on what to do first.',
         prompt_template: command ? 'Analyze the backlog for: {prompt}' : null,
         organization_id: 'org1',
         created_by: 'u1',
@@ -146,7 +146,9 @@ for (const viewport of [
         name: 'Template instructions: Backlog drivers and concentration',
         exact: true,
       });
-      await expect(viewer.locator('pre')).toBeVisible();
+      await expect(viewer.getByRole('region', { name: 'How to use' })).toContainText('your request');
+      await expect(viewer.locator('.template-viewer-section')).toHaveCount(3);
+      await expect(viewer.getByRole('heading', { level: 4, name: 'Drivers', exact: true })).toBeVisible();
       await expect
         .poll(() =>
           page

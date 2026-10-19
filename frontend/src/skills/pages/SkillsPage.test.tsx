@@ -200,5 +200,34 @@ describe('Templates', () => {
     const viewer = await screen.findByRole('dialog', { name: 'Template instructions: Retention' });
     expect(within(viewer).getByText(template.content)).toBeInTheDocument();
     expect(within(viewer).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(viewer).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('shows instructions as numbered sections with how to use the template', async () => {
+    state.items = [
+      {
+        ...template,
+        content: 'Build a **weekly** report.\n\n## Summary\nOne sentence.\n\n## Detail\n- A table',
+      },
+    ];
+    render(<SkillsPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More actions for Retention' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'View instructions' }));
+    const viewer = await screen.findByRole('dialog', { name: 'Template instructions: Retention' });
+
+    const usage = within(viewer).getByRole('region', { name: 'How to use' });
+    expect(usage).toHaveTextContent('/retention your request');
+    expect(usage).toHaveTextContent('Review: your request');
+    expect(within(viewer).getByText('weekly').tagName).toBe('STRONG');
+    const sections = within(viewer).getByRole('region', { name: /Report sections/ });
+    expect(within(sections).getAllByRole('heading', { level: 4 }).map((item) => item.textContent)).toEqual([
+      'Summary',
+      'Detail',
+    ]);
+    expect(within(sections).getByText('A table')).toBeInTheDocument();
+
+    await user.click(within(viewer).getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByRole('dialog', { name: /Edit template/ })).toBeInTheDocument();
   });
 });

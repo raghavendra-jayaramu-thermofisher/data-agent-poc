@@ -1,7 +1,9 @@
 import { Button, Dropdown, Label, Modal } from '@heroui/react';
-import { Edit2, Eye, LayoutTemplate, MoreHorizontal, Star, Trash2, X } from 'lucide-react';
-import { useId, useState } from 'react';
+import { Check, Copy, Edit2, Eye, LayoutTemplate, MoreHorizontal, Star, Trash2, X } from 'lucide-react';
+import { Fragment, useId, useMemo, useState } from 'react';
+import { MarkdownDocument } from '../../knowledge/components/MarkdownDocument';
 import type { AgentInstruction } from '../../settings/api/instructions-api';
+import { promptTemplateParts, templateOutline } from '../template-outline';
 
 type Props = {
   item: AgentInstruction;
@@ -14,7 +16,20 @@ type Props = {
 
 export function TemplateCard({ item, canManage, busy, onEdit, onMakeDefault, onDelete }: Props) {
   const headingId = useId();
+  const sectionsHeadingId = useId();
   const [viewing, setViewing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const outline = useMemo(() => templateOutline(item.content), [item.content]);
+
+  async function copyInstructions() {
+    try {
+      await navigator.clipboard.writeText(item.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
   return (
     <>
       <article
@@ -120,18 +135,74 @@ export function TemplateCard({ item, canManage, busy, onEdit, onMakeDefault, onD
                 {item.description && (
                   <p className="template-viewer-description">{item.description}</p>
                 )}
-                <section className="template-viewer-instructions">
-                  <h3>Instructions</h3>
-                  <pre>{item.content}</pre>
-                </section>
-                {item.prompt_template && (
-                  <section className="template-prompt-preview">
-                    <h3>Prompt template</h3>
-                    <p>{item.prompt_template}</p>
+                {(item.command || item.prompt_template) && (
+                  <section className="template-viewer-usage" aria-label="How to use">
+                    {item.command && (
+                      <div className="template-viewer-usage-row">
+                        <span className="template-viewer-label">Use</span>
+                        <code>
+                          /{item.command} <span className="template-viewer-placeholder">your request</span>
+                        </code>
+                      </div>
+                    )}
+                    {item.prompt_template && (
+                      <div className="template-viewer-usage-row">
+                        <span className="template-viewer-label">Sends</span>
+                        <p>
+                          {promptTemplateParts(item.prompt_template).map((part, index) => (
+                            <Fragment key={index}>
+                              {index > 0 && <span className="template-viewer-placeholder">your request</span>}
+                              {part}
+                            </Fragment>
+                          ))}
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                )}
+                {outline.intro && (
+                  <section className="template-viewer-intro" aria-label="Instructions">
+                    <MarkdownDocument>{outline.intro}</MarkdownDocument>
+                  </section>
+                )}
+                {outline.sections.length > 0 && (
+                  <section aria-labelledby={sectionsHeadingId}>
+                    <h3 id={sectionsHeadingId} className="template-viewer-sections-title">
+                      Report sections <span>{outline.sections.length}</span>
+                    </h3>
+                    <ol className="template-viewer-sections">
+                      {outline.sections.map((section, index) => (
+                        <li key={`${section.title}-${index}`} className="template-viewer-section">
+                          <span className="template-viewer-section-number" aria-hidden="true">
+                            {index + 1}
+                          </span>
+                          <div>
+                            <h4>{section.title}</h4>
+                            {section.body && <MarkdownDocument>{section.body}</MarkdownDocument>}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
                   </section>
                 )}
               </Modal.Body>
               <Modal.Footer className="template-editor-footer">
+                <Button variant="ghost" onPress={() => void copyInstructions()}>
+                  {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                  {copied ? 'Copied' : 'Copy instructions'}
+                </Button>
+                {canManage && (
+                  <Button
+                    variant="secondary"
+                    onPress={() => {
+                      setViewing(false);
+                      onEdit();
+                    }}
+                  >
+                    <Edit2 size={15} aria-hidden="true" />
+                    Edit
+                  </Button>
+                )}
                 <Button variant="secondary" onPress={() => setViewing(false)}>
                   Close
                 </Button>
