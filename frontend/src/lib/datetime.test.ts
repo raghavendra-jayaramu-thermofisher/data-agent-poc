@@ -10,6 +10,6 @@ describe('datetime', () => {
     it('does not timezone-shift a date-only business value', () => expect(formatDateOnly('2026-08-24')).toBe('2026-08-24'));
     it('formats local date independently', () => expect(formatLocalDate(instant, 'Asia/Kolkata', 'en-GB')).toContain('24 Aug 2026'));
     it('returns safe invalid date text', () => expect(formatLocalDateTime('bad-date', 'UTC')).toBe('Invalid date'));
-    it('creates UTC ISO strings', () => expect(toUtcIsoString('2026-08-24T18:05:00+05:30')).toBe(instant));
+    it('creates UTC ISO strings', () => expect(toUtcIsoString('2026-08-24T18:05:00+05:30')).toBe('2026-08-24T12:35:00.000Z'));
     it('formats relative time', () => expect(formatRelativeTime('2026-08-24T12:34:00Z', new Date(instant))).toContain('minute'));
 });

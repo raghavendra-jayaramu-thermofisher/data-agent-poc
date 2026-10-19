@@ -27,6 +27,6 @@ describe('conversation review indicators', () => {
   });
   it('keeps unreviewed or empty conversations neutral', () => {
     render(<ConversationListItemContent conversation={conversation} />);
-    expect(screen.getByRole('img', { name: 'No answers yet' })).toHaveClass('text-[#8B848C]');
+    expect(screen.getByRole('img', { name: 'No answers yet' })).toHaveClass('text-[var(--db-text-muted)]');
   });
 });
