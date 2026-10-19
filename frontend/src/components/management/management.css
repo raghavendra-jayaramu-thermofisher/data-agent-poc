@@ -1,0 +1,606 @@
+.management-page {
+  width: 100%;
+  max-width: 1184px;
+  margin: 0 auto;
+  padding: 32px 36px 40px;
+  color: var(--db-text-primary);
+}
+.management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.management-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.management-heading h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
+}
+.management-detail .management-heading h1,
+.management-form-page .management-heading h1 {
+  font-size: 20px;
+}
+.management-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 32px;
+  border-radius: 5px;
+  color: var(--db-text-secondary);
+}
+.management-back:hover {
+  background: var(--db-surface-muted);
+  color: var(--db-primary);
+}
+.management-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.management-search {
+  width: 300px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 11px;
+  gap: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--db-text-muted);
+}
+.management-search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--db-text-secondary);
+  cursor: pointer;
+}
+.management-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.management-page .button,
+.management-delete-dialog .button {
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+.management-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+.management-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 10px 14px 10px 16px;
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  background: var(--db-surface);
+}
+.management-row:hover {
+  border-color: var(--db-border-strong);
+}
+.management-row-link {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex: 1;
+  min-width: 0;
+  color: var(--db-text-primary);
+  text-decoration: none;
+}
+.management-row-link:hover .management-row-title {
+  color: var(--db-primary);
+}
+.management-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: var(--db-surface-muted);
+  color: var(--db-text-secondary);
+}
+.management-row-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.management-row-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.management-row-meta {
+  font-size: 12px;
+  color: var(--db-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+.management-row-tags {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.management-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--db-surface-muted);
+  color: var(--db-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.management-badge[data-tone='success'] {
+  background: color-mix(in srgb, var(--db-success) 9%, var(--db-surface));
+  color: var(--db-success);
+}
+.management-badge[data-tone='accent'] {
+  background: var(--db-primary-soft);
+  color: var(--db-primary);
+}
+.management-badge[data-tone='danger'] {
+  background: var(--db-danger-soft);
+  color: var(--db-danger);
+}
+.management-more {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  color: var(--db-text-secondary);
+}
+.management-tabs {
+  gap: 18px;
+  min-width: 0;
+}
+.management-tabs .tabs__list-container {
+  border-bottom: 1px solid var(--db-border-default);
+}
+.management-tabs [role='tablist'] {
+  justify-content: flex-start;
+  gap: 22px;
+  padding: 0;
+  background: transparent;
+}
+.management-tabs [role='tab'] {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
+  padding: 10px 0 12px;
+  min-height: 38px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.management-tabs [role='tabpanel'] {
+  min-width: 0;
+  padding: 0;
+}
+.management-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--db-text-muted);
+}
+.management-empty h2 {
+  margin: 0;
+  color: var(--db-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.management-empty p {
+  max-width: 380px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.management-error {
+  margin: 12px 0;
+  color: var(--db-danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.management-panel {
+  padding: 20px;
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  background: var(--db-surface);
+  min-width: 0;
+  margin-bottom: 18px;
+}
+.management-panel h2 {
+  margin: 0 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--db-text-primary);
+}
+.management-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.management-panel-heading h2 {
+  margin: 0;
+}
+.management-definition {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.4fr) minmax(0, 1fr);
+  gap: 12px 20px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.management-definition dt {
+  color: var(--db-text-secondary);
+  font-weight: 400;
+}
+.management-definition dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.management-definition pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+}
+.management-definition a {
+  color: var(--db-primary);
+}
+.management-connection-summary {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--db-border-subtle);
+}
+.management-details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+}
+.management-details-grid .management-panel {
+  margin-bottom: 0;
+}
+.management-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--db-text-secondary);
+  margin: 10px 0 0;
+}
+.management-note a {
+  color: var(--db-primary);
+}
+.management-panel > .management-search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.management-page [aria-label='Connection diagnostics'] {
+  padding: 16px;
+  margin-bottom: 18px;
+  box-shadow: none;
+}
+.management-form-page {
+  max-width: 860px;
+}
+.management-form-page .form-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.management-page .form-card {
+  padding: 20px;
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  background: var(--db-surface);
+  box-shadow: none;
+}
+.management-page .form-card-header {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  gap: 16px;
+  min-width: 0;
+}
+.management-page .form-card-header h1 {
+  font-size: 18px;
+}
+.management-page .form-stack {
+  gap: 18px;
+}
+.management-page .form-stack > p,
+.management-page form p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.management-page .form-section-divider {
+  margin: 4px 0;
+  gap: 12px;
+}
+.management-page .form-section-divider span {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--db-text-secondary);
+}
+.management-page .form-panel {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--db-border-default);
+  border-radius: 8px;
+  background: var(--db-surface);
+  box-shadow: none;
+}
+.management-page form {
+  min-width: 0;
+}
+.management-page form > [data-slot='text-field'],
+.management-page form .text-field {
+  min-width: 0;
+}
+.management-page form [data-slot='label'] {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.management-page form :is(input, select, textarea) {
+  font-size: 13px;
+}
+.management-page form .form-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 16px;
+  border-top: 1px solid var(--db-border-subtle);
+}
+.management-page .switch {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+.management-page .switch__content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 20px;
+  margin: 0;
+}
+.management-page .switch__control {
+  flex-shrink: 0;
+}
+.management-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+}
+.management-switches .switch {
+  padding: 12px 0;
+  border-top: 1px solid var(--db-border-subtle);
+}
+.management-switch-label {
+  font-size: 13px;
+  color: var(--db-text-primary);
+}
+.management-schema-list {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.management-schema-list details {
+  border: 1px solid var(--db-border-default);
+  border-radius: 6px;
+  background: var(--db-surface);
+  margin-bottom: 8px;
+}
+.management-schema-list summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  list-style: none;
+  padding: 11px 12px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.management-schema-list summary::-webkit-details-marker {
+  display: none;
+}
+.management-schema-list summary > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.management-schema-list summary > svg {
+  flex-shrink: 0;
+  color: var(--db-text-muted);
+}
+.management-schema-list details[open] summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.management-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.management-schema-list table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+  text-align: left;
+}
+.management-schema-list :is(th, td) {
+  padding: 8px 12px;
+  border-top: 1px solid var(--db-border-subtle);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+.management-schema-list th {
+  font-weight: 500;
+  color: var(--db-text-secondary);
+  background: var(--db-surface-muted);
+}
+.management-delete-dialog {
+  border: 1px solid var(--db-border-default);
+  border-radius: 10px;
+}
+.management-page :is(a, button):focus-visible {
+  outline: 2px solid var(--db-focus-ring);
+  outline-offset: 2px;
+}
+.management-page .dropzone {
+  padding: 24px 16px;
+}
+@media (max-width: 900px) {
+  .management-page {
+    padding: 24px 20px 32px;
+  }
+  .management-row-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .management-row-meta {
+    max-width: 100%;
+  }
+  .management-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .management-details-grid .management-panel {
+    margin-bottom: 0;
+  }
+}
+@media (max-width: 640px) {
+  .management-page {
+    padding: 20px 16px 28px;
+  }
+  .management-header {
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .management-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .management-heading h1 {
+    font-size: 22px;
+  }
+  .management-detail .management-heading h1,
+  .management-form-page .management-heading h1 {
+    font-size: 18px;
+  }
+  .management-header-actions {
+    display: contents;
+  }
+  .management-header-actions > .management-search {
+    order: 2;
+    width: 100%;
+  }
+  .management-header-actions > .button {
+    margin-left: auto;
+  }
+  .management-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    position: relative;
+  }
+  .management-row-link {
+    flex-basis: calc(100% - 42px);
+    padding-right: 36px;
+  }
+  .management-row-icon {
+    display: none;
+  }
+  .management-row-tags {
+    margin-right: auto;
+    justify-content: flex-start;
+  }
+  .management-row .management-more {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+  }
+  .management-row-copy {
+    gap: 6px;
+  }
+  .management-row-title {
+    font-size: 13px;
+  }
+  .management-row-meta {
+    font-size: 11px;
+  }
+  .management-panel,
+  .management-page .form-panel,
+  .management-page .form-card {
+    padding: 16px;
+  }
+  .management-definition {
+    grid-template-columns: minmax(85px, 0.4fr) minmax(0, 1fr);
+    gap: 10px 14px;
+    font-size: 12px;
+  }
+  .management-page .form-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .management-page form .form-actions {
+    justify-content: flex-end;
+  }
+  .management-form-page .form-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .management-schema-list {
+    max-height: 380px;
+  }
+}

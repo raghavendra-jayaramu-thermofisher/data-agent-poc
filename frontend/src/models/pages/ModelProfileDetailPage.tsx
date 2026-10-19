@@ -1,15 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Label, Switch } from '@heroui/react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Switch } from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Star, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { useNavigate, useParams, Link } from 'react-router';
-import { ArrowLeft, Cpu, Save, Star, AlertTriangle } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
 import type { AppError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
 import { FormField } from '../../auth/components/FormField';
-import { ConfirmationDialog } from '../../components/ConfirmationDialog';
-import { PageState } from '../../components/PageState';
+import { PageError, PageLoading } from '../../components/PageState';
 import { SingleSelect } from '../../components/SingleSelect';
+import {
+  ManagementDeleteDialog,
+  ManagementHeader,
+  ManagementMenu,
+  ManagementStatus,
+} from '../../components/management/ManagementUI';
 import { notifications } from '../../components/notifications';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/models-api';
@@ -21,12 +27,12 @@ import {
 
 export function ModelProfileDetailPage() {
   const { profileId = '' } = useParams();
-  const nav = useNavigate();
-  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const client = useQueryClient();
   const { activeOrganization } = useOrganization();
   const orgId = activeOrganization?.id ?? null;
   const canManage = activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin';
-
+  const [deleting, setDeleting] = useState(false);
   const profile = useQuery({
     queryKey: queryKeys.models.profile(orgId, profileId),
     queryFn: () => api.getProfile(profileId),
@@ -37,106 +43,121 @@ export function ModelProfileDetailPage() {
     queryFn: api.listConnections,
     enabled: Boolean(orgId),
   });
-
+  const invalidate = () => client.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
+  const makeDefault = useMutation({
+    mutationFn: () => api.setDefaultProfile(profileId),
+    onSuccess: async () => {
+      await invalidate();
+      notifications.success('Default model updated.');
+    },
+  });
   if (profile.isLoading || connections.isLoading)
-    return <PageState title="Loading model profile…" loading />;
+    return <PageLoading label="Loading model profile…" />;
   if (profile.isError || !profile.data)
-    return <PageState title="Model profile not found" />;
-
-  const invalidate = async () => {
-    await qc.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
-    await profile.refetch();
-  };
-
+    return <PageError title="Unable to load this profile" retry={() => void profile.refetch()} />;
+  if (connections.isError)
+    return (
+      <PageError
+        title="Unable to load model connections"
+        retry={() => void connections.refetch()}
+      />
+    );
   const item = profile.data;
-
   return (
-    <section className="page max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="page-header mb-6">
-        <div>
-          <Link
-            to="/models"
-            className="inline-flex items-center gap-1 text-xs text-[var(--db-text-muted)] hover:text-[var(--db-primary)] mb-1 font-medium"
-          >
-            <ArrowLeft size={12} />
-            <span>Back to Models</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Cpu size={22} className="text-[var(--db-primary)]" />
-            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">{item.display_name}</h1>
-          </div>
-          <p className="text-xs text-[var(--db-text-secondary)] font-mono mt-0.5">{item.model_name}</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {item.is_default ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--db-signal-soft)] text-[var(--db-warning)] font-semibold text-xs border border-[var(--db-signal)]/40">
-              <Star size={12} className="fill-[var(--db-warning)]" /> Default profile
+    <section className="management-page management-form-page management-detail">
+      <ManagementHeader
+        title={item.display_name}
+        backTo="/models"
+        backLabel="Back to models"
+        badge={
+          item.is_default ? (
+            <span className="management-badge" data-tone="accent">
+              Workspace default
             </span>
-          ) : canManage ? (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded text-xs font-semibold transition-colors"
-              onClick={() =>
-                void api.setDefaultProfile(profileId).then(async () => {
-                  await invalidate();
-                  notifications.success('Default model updated');
-                })
-              }
-            >
-              <Star size={13} />
-              <span>Make default</span>
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Edit Form Card */}
-      {canManage && connections.data ? (
-        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg p-6 shadow-xs mb-6">
-          <h2 className="text-sm font-semibold text-[var(--db-text-primary)] pb-2 mb-4 border-b border-[var(--db-border-subtle)]">
-            Profile parameters
-          </h2>
+          ) : (
+            <ManagementStatus status={item.enabled ? 'enabled' : 'disabled'} />
+          )
+        }
+      >
+        {canManage && (
+          <ManagementMenu
+            name={item.display_name}
+            disabled={makeDefault.isPending}
+            actions={[
+              ...(!item.is_default && item.enabled
+                ? [{ id: 'default', label: 'Make workspace default', icon: <Star size={15} /> }]
+                : []),
+              {
+                id: 'delete',
+                label: 'Delete profile',
+                icon: <Trash2 size={15} />,
+                danger: true,
+                disabled: item.is_default,
+              },
+            ]}
+            onAction={(key) => {
+              if (key === 'default') makeDefault.mutate();
+              if (key === 'delete') setDeleting(true);
+            }}
+          />
+        )}
+      </ManagementHeader>
+      {makeDefault.isError && (
+        <p className="management-error" role="alert">
+          {(makeDefault.error as unknown as AppError)?.message ||
+            'Unable to change the default model.'}
+        </p>
+      )}
+      <section className="management-panel">
+        <h2>Profile settings</h2>
+        {canManage && connections.data ? (
           <ProfileEdit
             key={item.id}
             profile={item}
             connections={connections.data}
             onSaved={async () => {
               await invalidate();
-              notifications.success('Model profile updated');
+              notifications.success('Profile updated.');
             }}
           />
-        </div>
-      ) : (
-        <div className="p-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded-lg text-xs text-[var(--db-text-muted)] mb-6">
-          This profile is read-only for your workspace role.
-        </div>
-      )}
-
-      {/* Danger zone */}
-      {canManage && (
-        <div className="bg-[var(--db-surface-raised)] border border-[var(--db-danger)]/30 rounded-lg p-5 shadow-xs">
-          <div className="flex items-center gap-2 mb-1 text-[var(--db-danger)]">
-            <AlertTriangle size={16} />
-            <h2 className="text-sm font-semibold">Danger zone</h2>
-          </div>
-          <p className="text-xs text-[var(--db-text-secondary)] mb-3">
-            Delete this reusable AI reasoning profile. The backend will reject deletion if it is currently set as the organization default.
-          </p>
-          <ConfirmationDialog
-            triggerLabel="Delete profile"
-            title="Delete model profile?"
-            description="Delete this reusable model profile. The backend will reject deletion when it violates default-profile rules."
-            confirmLabel="Delete"
-            onConfirm={() => {
-              void api.deleteProfile(profileId).then(async () => {
-                await qc.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
-                nav('/models');
-              });
-            }}
-          />
-        </div>
+        ) : (
+          <dl className="management-definition">
+            <dt>Connection</dt>
+            <dd>
+              {connections.data?.find((connection) => connection.id === item.connection_id)?.name ??
+                'Unavailable'}
+            </dd>
+            <dt>Model identifier</dt>
+            <dd>{item.model_name}</dd>
+            {typeof item.settings.temperature === 'number' && (
+              <>
+                <dt>Temperature</dt>
+                <dd>{item.settings.temperature}</dd>
+              </>
+            )}
+            {typeof item.settings.max_tokens === 'number' && (
+              <>
+                <dt>Max tokens</dt>
+                <dd>{item.settings.max_tokens}</dd>
+              </>
+            )}
+          </dl>
+        )}
+      </section>
+      {deleting && (
+        <ManagementDeleteDialog
+          title="Delete model profile?"
+          description={
+            'Remove “' + item.display_name + '” from this workspace? This can’t be undone.'
+          }
+          confirmLabel="Delete profile"
+          onClose={() => setDeleting(false)}
+          onConfirm={async () => {
+            await api.deleteProfile(profileId);
+            await invalidate();
+            void navigate('/models');
+          }}
+        />
       )}
     </section>
   );
@@ -198,13 +219,13 @@ function ProfileEdit({
   });
 
   return (
-    <form className="space-y-4 max-w-xl" onSubmit={submit}>
+    <form className="form-stack" onSubmit={submit}>
       <Controller
         control={control}
         name="connectionId"
         render={({ field }) => (
           <SingleSelect
-            label="Backend provider connection"
+            label="Connection"
             value={field.value}
             onChange={field.onChange}
             options={connections.map((connection) => ({
@@ -217,38 +238,61 @@ function ProfileEdit({
       <Controller
         control={control}
         name="displayName"
-        render={({ field }) => <FormField label="Display name" {...field} error={errors.displayName?.message} />}
+        render={({ field }) => (
+          <FormField label="Display name" {...field} error={errors.displayName?.message} />
+        )}
       />
       <Controller
         control={control}
         name="modelName"
-        render={({ field }) => <FormField label="Model identifier" {...field} error={errors.modelName?.message} />}
+        render={({ field }) => (
+          <FormField label="Model identifier" {...field} error={errors.modelName?.message} />
+        )}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="form-grid-2">
         <Controller
           control={control}
           name="temperature"
-          render={({ field }) => <FormField label="Temperature" type="number" step="0.1" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.temperature?.message} />}
+          render={({ field }) => (
+            <FormField
+              label="Temperature"
+              type="number"
+              step="0.1"
+              {...field}
+              value={field.value ?? ''}
+              onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))}
+              error={errors.temperature?.message}
+            />
+          )}
         />
         <Controller
           control={control}
           name="maxTokens"
-          render={({ field }) => <FormField label="Max tokens" type="number" {...field} value={field.value ?? ''} onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))} error={errors.maxTokens?.message} />}
+          render={({ field }) => (
+            <FormField
+              label="Max tokens"
+              type="number"
+              {...field}
+              value={field.value ?? ''}
+              onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))}
+              error={errors.maxTokens?.message}
+            />
+          )}
         />
       </div>
 
-      <div className="space-y-3 pt-2">
+      <div className="management-switches">
         <Controller
           control={control}
           name="enabled"
           render={({ field }) => (
-            <Switch isSelected={field.value} onChange={field.onChange}>
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
+            <Switch isSelected={field.value} onChange={field.onChange} aria-label="Profile enabled">
               <Switch.Content>
-                <Label>Enable profile for analysis</Label>
+                <span className="management-switch-label">Profile enabled</span>
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
               </Switch.Content>
             </Switch>
           )}
@@ -257,12 +301,16 @@ function ProfileEdit({
           control={control}
           name="isDefault"
           render={({ field }) => (
-            <Switch isSelected={field.value} onChange={field.onChange}>
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
+            <Switch
+              isSelected={field.value}
+              onChange={field.onChange}
+              aria-label="Workspace default"
+            >
               <Switch.Content>
-                <Label>Set as default workspace profile</Label>
+                <span className="management-switch-label">Workspace default</span>
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
               </Switch.Content>
             </Switch>
           )}
@@ -275,15 +323,10 @@ function ProfileEdit({
         </div>
       )}
 
-      <div className="pt-3">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold transition-colors disabled:opacity-50"
-        >
-          <Save size={13} />
-          <span>{isSubmitting ? 'Saving…' : 'Save profile changes'}</span>
-        </button>
+      <div className="form-actions">
+        <Button type="submit" isPending={isSubmitting} variant="primary">
+          <span>{isSubmitting ? 'Saving…' : 'Save changes'}</span>
+        </Button>
       </div>
     </form>
   );

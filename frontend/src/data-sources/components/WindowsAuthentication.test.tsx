@@ -129,7 +129,7 @@ describe('MSSQL Windows authentication', () => {
     await user.type(screen.getByLabelText('New password'), 'old-secret');
     await user.selectOptions(screen.getByLabelText('Authentication method'), 'windows');
     expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save & Test Connection' }));
+    await user.click(screen.getByRole('button', { name: 'Save and test connection' }));
     await waitFor(() =>
       expect(submit).toHaveBeenCalledWith(
         expect.objectContaining({ credentials: undefined, config: { ...source.config } }),

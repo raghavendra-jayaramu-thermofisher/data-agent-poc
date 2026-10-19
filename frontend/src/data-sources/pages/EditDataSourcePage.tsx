@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
+import { ManagementHeader } from '../../components/management/ManagementUI';
 import { queryKeys } from '../../api/queryKeys';
 import { PageState } from '../../components/PageState';
 import { notifications } from '../../components/notifications';
@@ -34,28 +34,15 @@ export function EditDataSourcePage() {
   if (query.isError || !query.data) return <PageState title="Data source not found" />;
 
   return (
-    <section className="page">
+    <section className="management-page management-form-page">
       <div className="form-container">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--db-text-secondary)] hover:text-[var(--db-text-primary)] mb-4 transition-colors cursor-pointer"
-          onClick={() => navigate(`/data-sources/${query.data.id}`)}
-        >
-          <ArrowLeft size={14} />
-          <span>Back to Data Source</span>
-        </button>
+        <ManagementHeader
+          title={'Edit ' + query.data.name}
+          backTo={'/data-sources/' + query.data.id}
+          backLabel="Back to data source"
+        />
 
         <div className="form-card">
-          <div className="form-card-header">
-            <div>
-              <h1 className="text-lg font-semibold text-[var(--db-text-primary)] m-0">
-                Edit {query.data.name}
-              </h1>
-              <p className="text-xs text-[var(--db-text-secondary)] mt-1 mb-0">
-                Saved credentials are never redisplayed. Enter credentials only when replacing them.
-              </p>
-            </div>
-          </div>
           <DataSourceEditForm
             key={query.data.id}
             source={query.data}

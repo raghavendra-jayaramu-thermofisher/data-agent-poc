@@ -85,7 +85,7 @@ export function ExcelUploadForm({ onSubmit }: Props) {
     }
   };
 
-  const submit = handleSubmit(async ({ name }) => {
+  const submit = async ({ name }: ExcelUploadValues) => {
     if (!file) {
       setError('root', { message: 'Please select an .xlsx workbook to upload.' });
       return;
@@ -101,10 +101,10 @@ export function ExcelUploadForm({ onSubmit }: Props) {
     } catch (error) {
       setError('root', { message: (error as AppError).message ?? 'Upload failed.' });
     }
-  });
+  };
 
   return (
-    <form className="form-stack" onSubmit={submit} noValidate>
+    <form className="form-stack" onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
       <FormField
         label="Data source name"
         placeholder="e.g. Sales Report Q3"
@@ -113,8 +113,11 @@ export function ExcelUploadForm({ onSubmit }: Props) {
       />
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--db-text-muted)] mb-2">
-          Workbook File
+        <label
+          htmlFor="excel-file"
+          className="block text-xs font-medium text-[var(--db-text-secondary)] mb-2"
+        >
+          Workbook file
         </label>
 
         <input
@@ -146,7 +149,8 @@ export function ExcelUploadForm({ onSubmit }: Props) {
               <UploadCloud size={24} />
             </div>
             <p className="dropzone-title">
-              Click to choose a file <span className="font-normal text-[var(--db-text-secondary)]">or drag and drop</span>
+              Click to choose a file{' '}
+              <span className="font-normal text-[var(--db-text-secondary)]">or drag and drop</span>
             </p>
             <p className="dropzone-hint">Microsoft Excel workbook (.xlsx)</p>
           </div>
@@ -169,6 +173,7 @@ export function ExcelUploadForm({ onSubmit }: Props) {
               className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[var(--db-surface-hover)] text-[var(--db-text-secondary)] hover:text-[var(--db-danger)] transition-colors cursor-pointer"
               onClick={handleRemoveFile}
               title="Remove file"
+              aria-label="Remove file"
             >
               <X size={16} />
             </button>
@@ -190,4 +195,3 @@ export function ExcelUploadForm({ onSubmit }: Props) {
     </form>
   );
 }
-

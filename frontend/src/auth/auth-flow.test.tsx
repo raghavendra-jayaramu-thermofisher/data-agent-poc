@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { AuthProvider } from './AuthProvider';
 import { LoginPage } from './pages/LoginPage';
@@ -12,6 +12,19 @@ import { ProtectedRoute } from '../app/route-guards/ProtectedRoute';
 import { OrganizationProvider, useOrganization } from '../organizations/OrganizationProvider';
 import { authSession } from './session-storage';
 import { server } from '../test/server';
+
+// Resolve fetch after the test interceptor is installed.
+vi.mock('openapi-fetch', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('openapi-fetch')>();
+    return {
+        ...actual,
+        default: (options: Parameters<typeof actual.default>[0]) => actual.default({
+            ...options,
+            fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+        }),
+    };
+});
+
 const base = 'http://localhost:12201';
 const tokens = { access_token: 'access-1', refresh_token: 'r'.repeat(32), token_type: 'bearer', expires_in: 900 };
 const user = { id: 'user-1', email: 'user@example.com', display_name: 'Alex', is_active: true, email_verified_at: null, created_at: '2026-08-24T12:00:00Z', updated_at: '2026-08-24T12:00:00Z' };

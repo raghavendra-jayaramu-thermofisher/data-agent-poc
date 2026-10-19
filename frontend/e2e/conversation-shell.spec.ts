@@ -357,7 +357,7 @@ for (const { width, touch } of [
         expect((await settingsHeading.boundingBox())!.y).toBeGreaterThan(64);
         await page.getByRole('button', { name: 'Open navigation' }).click();
       }
-      await sidebar.getByRole('button', { name: 'New analysis', exact: true }).click();
+      await sidebar.getByRole('button', { name: 'New chat', exact: true }).click();
       await expect(page).toHaveURL(/\/ask$/);
       if (touch) await page.getByRole('button', { name: 'Open navigation' }).click();
       await sidebar.getByRole('button', { name: /Switch organization/ }).click();

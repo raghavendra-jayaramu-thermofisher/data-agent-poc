@@ -29,7 +29,6 @@ export function AuthFrame({
       </section>
       <aside className="auth-context" aria-hidden="true">
         <div>
-          <span className="eyebrow">Conversational analytics</span>
           <h2>{BRANDING.tagline}</h2>
           <p>{BRANDING.subtitle}</p>
         </div>

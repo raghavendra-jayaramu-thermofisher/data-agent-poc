@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@heroui/react';
-import { ChevronDown, Pencil, Trash2 } from 'lucide-react';
-import { ConfirmationDialog } from '../../components/ConfirmationDialog';
+import { AlertDialog, Button, Dropdown, Label } from '@heroui/react';
+import { ChevronDown, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { useId, useState } from 'react';
+import type { AppError } from '../../api/errors';
 import type { components } from '../../api/generated/schema';
 import { MarkdownDocument } from './MarkdownDocument';
 
 type Annotation = components['schemas']['KnowledgeAnnotationResponse'];
-
 export function AnnotationRow({
   annotation,
   onUpdate,
   onDelete,
   canManage,
-  isExpanded: isExpandedProp,
+  isExpanded: expandedProp,
   onToggle,
 }: {
   annotation: Annotation;
@@ -22,183 +21,212 @@ export function AnnotationRow({
   isExpanded?: boolean;
   onToggle?: () => void;
 }) {
+  const id = useId();
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(annotation.content);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isExpanded = isExpandedProp !== undefined ? isExpandedProp : internalExpanded;
-
-  const toggleExpanded = () => {
-    if (onToggle) {
-      onToggle();
-    } else {
-      setInternalExpanded((prev) => !prev);
-    }
-  };
-
-  // Synchronize content whenever annotation prop updates
-  useEffect(() => {
-    setContent(annotation.content);
-  }, [annotation.content]);
-
-  const handleStartEdit = () => {
+  const [deleting, setDeleting] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const expanded = expandedProp ?? internalExpanded;
+  const title =
+    annotation.content
+      .trim()
+      .split('\n')[0]
+      ?.replace(/^[#*\x60\s-]+/, '')
+      .replace(/[*\x60]+$/, '')
+      .trim() || 'Business knowledge';
+  const scope =
+    (
+      { datasource: 'Data source', table: 'Table', column: 'Column', metric: 'Metric' } as Record<
+        string,
+        string
+      >
+    )[annotation.scope_type] ?? 'Data source';
+  function toggle() {
+    if (onToggle) onToggle();
+    else setInternalExpanded((value) => !value);
+  }
+  function startEdit() {
     setContent(annotation.content);
     setError(null);
-    if (!isExpanded) {
-      if (isExpandedProp !== undefined) {
-        onToggle?.();
-      } else {
-        setInternalExpanded(true);
-      }
-    }
     setEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setContent(annotation.content);
-    setError(null);
-    setEditing(false);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  }
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
     if (!content.trim()) {
-      setError('Content is required.');
+      setError('Enter instructions before saving.');
       return;
     }
-    setIsSubmitting(true);
+    setSaving(true);
     setError(null);
     try {
-      await onUpdate(content);
+      await onUpdate(content.trim());
       setEditing(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update annotation.');
+    } catch (error) {
+      setError((error as AppError)?.message || 'Unable to save changes. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
-  };
-
-  const previewSnippet = annotation.content
-    ? annotation.content.replace(/^[#*`\s-]+/, '').replace(/\n+/g, ' ').trim()
-    : '';
-
-  const scopeClass =
-    annotation.scope_type === 'table'
-      ? 'annotation-badge--table'
-      : annotation.scope_type === 'column'
-      ? 'annotation-badge--column'
-      : annotation.scope_type === 'metric'
-      ? 'annotation-badge--metric'
-      : 'annotation-badge--datasource';
-
+  }
+  async function remove() {
+    setRemoving(true);
+    setDeleteError(null);
+    try {
+      await onDelete();
+      setDeleting(false);
+    } catch (error) {
+      setDeleteError(
+        (error as AppError)?.message || 'Unable to delete this knowledge. Please try again.',
+      );
+    } finally {
+      setRemoving(false);
+    }
+  }
   return (
-    <article
-      className={`annotation-row transition-all duration-150 ${
-        isExpanded || editing ? 'is-expanded' : 'is-collapsed'
-      } ${editing ? 'is-editing' : ''}`}
-    >
-      <div
-        className="annotation-heading cursor-pointer select-none group"
-        onClick={toggleExpanded}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded || editing}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleExpanded();
-          }
+    <>
+      <article className="annotation-row">
+        <div className="annotation-heading">
+          <button
+            className="annotation-toggle"
+            type="button"
+            aria-expanded={expanded || editing}
+            aria-label={
+              title + ', ' + scope + (annotation.scope_key ? ', ' + annotation.scope_key : '')
+            }
+            aria-controls={id + '-content'}
+            onClick={toggle}
+            disabled={editing}
+          >
+            <ChevronDown size={15} aria-hidden="true" />
+            <span className="annotation-title" title={title}>
+              {title}
+            </span>
+            <span className="annotation-scope">
+              <span className="annotation-badge">{scope}</span>
+              {annotation.scope_key && (
+                <span className="annotation-scope-key" title={annotation.scope_key}>
+                  {annotation.scope_key}
+                </span>
+              )}
+            </span>
+          </button>
+          {canManage && (
+            <Dropdown>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                className="annotation-more"
+                aria-label={'More actions for ' + title}
+                isDisabled={saving || editing}
+              >
+                <MoreHorizontal size={17} aria-hidden="true" />
+              </Button>
+              <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                  aria-label={'Actions for ' + title}
+                  onAction={(key) => {
+                    if (key === 'edit') startEdit();
+                    if (key === 'delete') {
+                      setDeleteError(null);
+                      setDeleting(true);
+                    }
+                  }}
+                >
+                  <Dropdown.Item id="edit" textValue="Edit knowledge">
+                    <Pencil size={14} aria-hidden="true" />
+                    <Label>Edit knowledge</Label>
+                  </Dropdown.Item>
+                  <Dropdown.Item id="delete" textValue="Delete knowledge" variant="danger">
+                    <Trash2 size={14} aria-hidden="true" />
+                    <Label>Delete knowledge</Label>
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+          )}
+        </div>
+        {(expanded || editing) && (
+          <div id={id + '-content'}>
+            {editing ? (
+              <form className="annotation-edit-form" onSubmit={(event) => void save(event)}>
+                <div className="knowledge-field">
+                  <label htmlFor={id + '-instructions'}>Instructions</label>
+                  <textarea
+                    id={id + '-instructions'}
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                    disabled={saving}
+                    rows={6}
+                    maxLength={20000}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? id + '-error' : undefined}
+                    required
+                  />
+                  {error && (
+                    <p id={id + '-error'} role="alert" className="knowledge-inline-error">
+                      {error}
+                    </p>
+                  )}
+                </div>
+                <div className="knowledge-form-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    isDisabled={saving}
+                    onPress={() => setEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" size="sm" isPending={saving}>
+                    Save changes
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="annotation-content knowledge-document-view">
+                <MarkdownDocument>{annotation.content}</MarkdownDocument>
+              </div>
+            )}
+          </div>
+        )}
+      </article>
+      <AlertDialog.Backdrop
+        isOpen={deleting}
+        isDismissable={!removing}
+        isKeyboardDismissDisabled={removing}
+        onOpenChange={(open) => {
+          if (!open && !removing) setDeleting(false);
         }}
       >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <ChevronDown
-            size={16}
-            className={`text-[var(--db-text-muted)] transition-transform duration-200 shrink-0 group-hover:text-[var(--db-primary)] ${
-              isExpanded || editing ? 'rotate-180 text-[var(--db-primary)]' : ''
-            }`}
-          />
-          <span className={`annotation-badge shrink-0 ${scopeClass}`}>
-            {annotation.scope_type}
-          </span>
-          {annotation.scope_key ? (
-            <span className="annotation-scope-key font-mono text-xs shrink-0">
-              {annotation.scope_key}
-            </span>
-          ) : null}
-          {!isExpanded && !editing ? (
-            <span className="text-xs text-[var(--db-text-muted)] truncate min-w-0 pr-2 italic">
-              {previewSnippet || 'Empty annotation'}
-            </span>
-          ) : null}
-        </div>
-        {canManage ? (
-          <div
-            className="row-actions flex items-center gap-1.5 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {editing ? (
-              <Button size="sm" variant="ghost" className="annotation-btn-ghost" onPress={handleCancelEdit}>
+        <AlertDialog.Container size="sm">
+          <AlertDialog.Dialog className="knowledge-delete-dialog">
+            <AlertDialog.Header>
+              <AlertDialog.Heading>Delete business knowledge?</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>
+              <p>This removes these instructions from the data source. This can’t be undone.</p>
+              {deleteError && (
+                <p role="alert" className="knowledge-inline-error">
+                  {deleteError}
+                </p>
+              )}
+            </AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button variant="secondary" isDisabled={removing} onPress={() => setDeleting(false)}>
                 Cancel
               </Button>
-            ) : (
-              <Button size="sm" variant="ghost" className="annotation-btn-ghost" onPress={handleStartEdit}>
-                <Pencil size={12} />
-                <span>Edit</span>
+              <Button variant="danger" isPending={removing} onPress={() => void remove()}>
+                Delete knowledge
               </Button>
-            )}
-            <ConfirmationDialog
-              triggerLabel={
-                <span className="inline-flex items-center gap-1">
-                  <Trash2 size={12} />
-                  <span>Delete</span>
-                </span>
-              }
-              triggerVariant="ghost"
-              triggerSize="sm"
-              triggerClassName="annotation-btn-ghost is-danger"
-              title="Delete business knowledge?"
-              confirmLabel="Delete"
-              onConfirm={() => void onDelete()}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {(isExpanded || editing) && (
-        editing ? (
-          <form className="form-stack p-4" onSubmit={handleSave}>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--db-text-primary)] mb-1.5">
-                Content (Markdown supported)
-              </label>
-              <textarea
-                className="w-full min-h-[220px] p-3 text-xs font-mono bg-[var(--db-surface)] border border-[var(--db-border-default)] rounded-md text-[var(--db-text-primary)] placeholder:text-[var(--db-text-muted)] outline-none focus:border-[var(--db-focus-ring)] focus:ring-1 focus:ring-[var(--db-focus-ring)]"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                disabled={isSubmitting}
-                rows={10}
-                placeholder="Enter markdown knowledge content…"
-                required
-              />
-              {error ? <p className="text-xs text-[var(--db-danger)] mt-1">{error}</p> : null}
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Button type="submit" size="sm" variant="primary" isPending={isSubmitting}>
-                Save
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onPress={handleCancelEdit} isDisabled={isSubmitting}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="annotation-content p-4 knowledge-document-view">
-            <MarkdownDocument>{annotation.content}</MarkdownDocument>
-          </div>
-        )
-      )}
-    </article>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </>
   );
 }

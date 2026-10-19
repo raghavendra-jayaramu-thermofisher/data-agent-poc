@@ -1,0 +1,223 @@
+.jobs-tabs .tabs__list-container {
+  border-radius: 0;
+}
+.jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jobs-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 10px;
+  border: 1px solid var(--db-border-default);
+  border-radius: 7px;
+  background: var(--db-surface);
+  min-width: 0;
+}
+.jobs-row:hover {
+  border-color: var(--db-border-strong);
+}
+.jobs-row-link {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 90px 62px 130px 16px;
+  gap: 14px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 4px 12px 14px;
+  color: var(--db-text-primary);
+  text-decoration: none;
+}
+.jobs-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.jobs-row-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.jobs-row-context {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--db-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jobs-row-link .management-badge {
+  justify-self: start;
+}
+.jobs-row-duration,
+.jobs-row-time {
+  font-size: 11.5px;
+  color: var(--db-text-secondary);
+  white-space: nowrap;
+}
+.jobs-row-duration {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.jobs-row-time {
+  text-align: right;
+}
+.jobs-row-chevron {
+  color: var(--db-text-muted);
+}
+.job-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 40px;
+}
+.job-overview > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.job-overview dt {
+  font-size: 12px;
+  color: var(--db-text-secondary);
+}
+.job-overview dd {
+  margin: 0;
+  font-size: 13px;
+}
+.job-progress-label {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--db-text-secondary);
+}
+.job-failure {
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  border: 1px solid color-mix(in srgb, var(--db-danger) 20%, var(--db-border-default));
+  border-radius: 7px;
+  background: var(--db-danger-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--db-danger);
+}
+.job-details {
+  border: 1px solid var(--db-border-default);
+  border-radius: 7px;
+  background: var(--db-surface);
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.job-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.job-details > summary::-webkit-details-marker {
+  display: none;
+}
+.job-details > summary svg {
+  color: var(--db-text-muted);
+}
+.job-details[open] > summary {
+  border-bottom: 1px solid var(--db-border-subtle);
+}
+.job-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+.job-details-body {
+  padding: 16px;
+  min-width: 0;
+}
+.job-details-body > [aria-label='Job diagnostics'] {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+.job-details-body .management-definition {
+  margin-bottom: 18px;
+}
+.job-event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+.job-event-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.job-event-list time {
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--db-text-secondary);
+}
+@media (max-width: 900px) {
+  .jobs-row-link {
+    grid-template-columns: 30px minmax(0, 1fr) 88px 50px 105px 14px;
+    gap: 9px;
+  }
+}
+@media (max-width: 640px) {
+  .jobs-row {
+    position: relative;
+    padding-right: 0;
+  }
+  .jobs-row-link {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 9px 12px;
+    padding: 12px;
+  }
+  .jobs-row-link > .management-row-icon {
+    display: none;
+  }
+  .jobs-row-copy {
+    grid-column: 1/-1;
+    padding-right: 25px;
+  }
+  .jobs-row-link .management-badge {
+    grid-column: 1;
+  }
+  .jobs-row-duration {
+    grid-column: 2;
+  }
+  .jobs-row-time {
+    grid-column: 3;
+  }
+  .jobs-row-chevron {
+    display: none;
+  }
+  .jobs-row > .management-more,
+  .jobs-row > .dropdown {
+    position: absolute;
+    right: 7px;
+    top: 7px;
+  }
+  .jobs-row > [data-slot='button'] {
+    position: absolute;
+    right: 7px;
+    top: 7px;
+  }
+  .jobs-tabs [role='tablist'] {
+    gap: 12px;
+  }
+  .jobs-tabs [role='tab'] {
+    font-size: 12px;
+  }
+  .job-overview {
+    gap: 20px;
+  }
+}

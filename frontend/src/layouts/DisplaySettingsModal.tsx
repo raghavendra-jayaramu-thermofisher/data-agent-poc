@@ -124,7 +124,7 @@ export function DisplaySettingsModal({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-xs text-[var(--db-text-primary)]">
-                            {key === '/ask' ? 'New analysis' : label}
+                            {key === '/ask' ? 'New chat' : label}
                           </span>
                           {fixed && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 bg-[var(--db-surface-hover)] text-[var(--db-text-secondary)] rounded">

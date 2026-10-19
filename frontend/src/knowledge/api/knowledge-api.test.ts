@@ -1,10 +1,23 @@
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '../../api/client';
 import { authSession } from '../../auth/session-storage';
 import { setApiOrganizationId } from '../../organizations/organization-store';
 import { server } from '../../test/server';
 import { generate, getDocument, listDocuments } from './knowledge-api';
+
+// Resolve fetch after MSW installs its interceptor, as in the conversation API tests.
+vi.mock('openapi-fetch', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('openapi-fetch')>();
+  return {
+    ...actual,
+    default: (options: Parameters<typeof actual.default>[0]) =>
+      actual.default({
+        ...options,
+        fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+      }),
+  };
+});
 
 beforeEach(() => {
   authSession.write({
@@ -20,8 +33,8 @@ describe('knowledge API', () => {
   it('starts generation as a durable job', async () => {
     server.use(
       http.post(`${API_BASE_URL}/api/v1/knowledge/data-sources/ds1/generate`, () =>
-        HttpResponse.json({ job_id: 'kg1', knowledge_base_id: 'kb1' }, { status: 202 })
-      )
+        HttpResponse.json({ job_id: 'kg1', knowledge_base_id: 'kb1' }, { status: 202 }),
+      ),
     );
     expect((await generate('ds1')).job_id).toBe('kg1');
   });
@@ -40,7 +53,7 @@ describe('knowledge API', () => {
             estimated_tokens: 100,
             created_at: '2026-08-24T12:00:00Z',
           },
-        ])
+        ]),
       ),
       http.get(`${API_BASE_URL}/api/v1/knowledge/data-sources/ds1/documents/d1`, () => {
         detailCalls++;
@@ -54,7 +67,7 @@ describe('knowledge API', () => {
           created_at: '2026-08-24T12:00:00Z',
           content_markdown: '# Orders',
         });
-      })
+      }),
     );
     expect((await listDocuments('ds1')).length).toBe(1);
     expect(detailCalls).toBe(0);

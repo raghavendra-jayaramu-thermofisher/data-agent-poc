@@ -1,196 +1,276 @@
-import { useQuery } from '@tanstack/react-query';
+import { Button, Tabs } from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Cpu, Eye, Pencil, Plus, RefreshCw, Star, Trash2, Unplug } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Cpu, Plus, Key, Sparkles, CheckCircle2 } from 'lucide-react';
+import type { AppError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
-import { PageState } from '../../components/PageState';
-import { StatusChip } from '../../components/StatusChip';
-import { formatLocalDateTime } from '../../lib/datetime';
+import { PageError, PageLoading } from '../../components/PageState';
+import {
+  ManagementDeleteDialog,
+  ManagementHeader,
+  ManagementMenu,
+  ManagementSearch,
+  ManagementStatus,
+} from '../../components/management/ManagementUI';
+import { notifications } from '../../components/notifications';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/models-api';
 
+type Removal = { id: string; name: string; type: 'profile' | 'connection' };
 export function ModelsPage() {
   const navigate = useNavigate();
+  const client = useQueryClient();
   const { activeOrganization } = useOrganization();
   const orgId = activeOrganization?.id ?? null;
   const canManage = activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin';
-
+  const [tab, setTab] = useState('profiles');
+  const [search, setSearch] = useState('');
+  const [deleting, setDeleting] = useState<Removal | null>(null);
   const connections = useQuery({
     queryKey: queryKeys.models.connections(orgId),
     queryFn: api.listConnections,
     enabled: Boolean(orgId),
   });
-
   const profiles = useQuery({
     queryKey: queryKeys.models.profiles(orgId),
     queryFn: api.listProfiles,
     enabled: Boolean(orgId),
   });
-
-  if ((connections.isLoading || profiles.isLoading) && !connections.data && !profiles.data) {
-    return <PageState title="Loading model configuration" loading />;
-  }
-
-  if (connections.isError || profiles.isError) {
+  const invalidate = () => client.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
+  const test = useMutation({
+    mutationFn: api.testConnection,
+    onSuccess: async (result) => {
+      await invalidate();
+      notifications.success('Connection test passed.', result.model_count + ' models available.');
+    },
+    onError: (error: AppError) => notifications.error('Connection test failed', error.message),
+  });
+  const makeDefault = useMutation({
+    mutationFn: api.setDefaultProfile,
+    onSuccess: async () => {
+      await invalidate();
+      notifications.success('Default model updated.');
+    },
+    onError: (error: AppError) =>
+      notifications.error('Unable to change the default model', error.message),
+  });
+  if (connections.isLoading || profiles.isLoading) return <PageLoading label="Loading models…" />;
+  if (connections.isError || profiles.isError)
     return (
-      <PageState
-        title="Unable to load model configuration"
-        description="Check your connection and try again."
+      <PageError
+        title="Unable to load models"
+        retry={() => {
+          void connections.refetch();
+          void profiles.refetch();
+        }}
       />
     );
-  }
-
+  const term = search.trim().toLocaleLowerCase();
+  const visibleProfiles = (profiles.data ?? []).filter((item) =>
+    (item.display_name + ' ' + item.model_name).toLocaleLowerCase().includes(term),
+  );
+  const visibleConnections = (connections.data ?? []).filter((item) =>
+    (item.name + ' ' + item.base_url).toLocaleLowerCase().includes(term),
+  );
+  const canAddProfile = Boolean(connections.data?.length);
+  const empty = (kind: 'profiles' | 'connections') => (
+    <div className="management-empty">
+      <Cpu size={26} aria-hidden="true" />
+      <h2>{search ? 'No matching ' + kind : 'No model ' + kind + ' yet'}</h2>
+      {search ? (
+        <Button variant="secondary" onPress={() => setSearch('')}>
+          Clear search
+        </Button>
+      ) : (
+        <p>
+          {kind === 'profiles'
+            ? canAddProfile
+              ? 'Add a profile to choose a model and its settings.'
+              : 'Add a connection before creating a model profile.'
+            : canManage
+              ? 'Connect your model provider to get started.'
+              : 'Ask a workspace admin to add a model connection.'}
+        </p>
+      )}
+    </div>
+  );
   return (
-    <section className="page max-w-6xl mx-auto">
-      <div className="page-header">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Cpu size={20} className="text-[var(--db-primary)]" />
-            <h1 className="text-xl font-semibold text-[var(--db-text-primary)]">Model Connections & Profiles</h1>
-          </div>
-          <p className="text-xs text-[var(--db-text-secondary)]">
-            OpenAI-compatible LLM endpoints and reasoning profiles used for SQL query generation.
-          </p>
-        </div>
-      </div>
-
-      {/* Connections Section */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--db-border-default)]">
-          <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Endpoints & Connections</h2>
-          {canManage && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded text-xs font-semibold"
-              onClick={() => navigate('/models/connections/new')}
-            >
-              <Plus size={13} />
-              <span>Add Connection</span>
-            </button>
-          )}
-        </div>
-
-        {connections.data?.length ? (
-          <div className="analytical-table-shell">
-            <table className="analytical-table" aria-label="Model connections">
-              <thead>
-                <tr>
-                  <th>Connection Name</th>
-                  <th>Status</th>
-                  <th>API Key</th>
-                  <th>Last Tested</th>
-                </tr>
-              </thead>
-              <tbody>
-                {connections.data.map((connection) => (
-                  <tr key={connection.id}>
-                    <td>
-                      <Link
-                        to={`/models/connections/${connection.id}`}
-                        className="font-medium text-[var(--db-primary)] hover:underline"
-                      >
-                        {connection.name}
-                      </Link>
-                      <div className="text-[11px] text-[var(--db-text-muted)] font-mono">{connection.base_url}</div>
-                    </td>
-                    <td>
-                      <StatusChip status={connection.status} />
-                    </td>
-                    <td className="text-xs text-[var(--db-text-secondary)]">
-                      {connection.has_api_key ? (
-                        <span className="inline-flex items-center gap-1 text-[var(--db-success)]">
-                          <Key size={11} /> Stored securely
-                        </span>
-                      ) : (
-                        'Not configured'
-                      )}
-                    </td>
-                    <td className="text-xs text-[var(--db-text-secondary)]">
-                      {connection.last_tested_at ? formatLocalDateTime(connection.last_tested_at) : 'Never'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <PageState
-            title="No model connections"
-            description="Add an OpenAI-compatible endpoint before creating a model profile."
-          />
+    <section className="management-page">
+      <ManagementHeader title="Models">
+        <ManagementSearch label="Search models" value={search} onChange={setSearch} />
+        {canManage && (
+          <Button
+            variant="primary"
+            onPress={() =>
+              void navigate(
+                tab === 'connections' || !canAddProfile
+                  ? '/models/connections/new'
+                  : '/models/profiles/new',
+              )
+            }
+          >
+            <Plus size={15} aria-hidden="true" />
+            {tab === 'connections' || !canAddProfile ? 'Add connection' : 'Add profile'}
+          </Button>
         )}
-      </div>
-
-      {/* Profiles Section */}
-      <div>
-        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--db-border-default)]">
-          <h2 className="text-sm font-semibold text-[var(--db-text-primary)]">Model Profiles</h2>
-          {canManage && connections.data?.length ? (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)] text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded text-xs font-medium"
-              onClick={() => navigate('/models/profiles/new')}
-            >
-              <Plus size={13} />
-              <span>Add Profile</span>
-            </button>
-          ) : null}
-        </div>
-
-        {profiles.data?.length ? (
-          <div className="analytical-table-shell">
-            <table className="analytical-table" aria-label="Model profiles">
-              <thead>
-                <tr>
-                  <th>Profile Name</th>
-                  <th>Model Identifier</th>
-                  <th>State</th>
-                  <th>Default</th>
-                </tr>
-              </thead>
-              <tbody>
-                {profiles.data.map((profile) => (
-                  <tr key={profile.id}>
-                    <td>
-                      <Link
-                        to={`/models/profiles/${profile.id}`}
-                        className="font-medium text-[var(--db-primary)] hover:underline flex items-center gap-1.5"
-                      >
-                        <Sparkles size={12} className="text-[var(--db-text-muted)]" />
-                        <span>{profile.display_name}</span>
-                      </Link>
-                    </td>
-                    <td className="font-mono text-xs text-[var(--db-text-primary)]">{profile.model_name}</td>
-                    <td>
-                      <span
-                        className={`inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-medium ${
-                          profile.enabled
-                            ? 'bg-[var(--db-success-soft)] text-[var(--db-success)]'
-                            : 'bg-[var(--db-surface-muted)] text-[var(--db-text-muted)]'
-                        }`}
-                      >
-                        {profile.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </td>
-                    <td>
-                      {profile.is_default ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[11px] font-semibold bg-[var(--db-signal-soft)] text-[var(--db-warning)]">
-                          <CheckCircle2 size={11} /> Default
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      </ManagementHeader>
+      {(test.isError || makeDefault.isError) && (
+        <p className="management-error" role="alert">
+          {test.error?.message || makeDefault.error?.message}
+        </p>
+      )}
+      <Tabs
+        className="management-tabs"
+        variant="secondary"
+        selectedKey={tab}
+        onSelectionChange={(key) => setTab(String(key))}
+      >
+        <Tabs.ListContainer>
+          <Tabs.List aria-label="Model settings">
+            <Tabs.Tab id="profiles">
+              Profiles
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="connections">
+              Connections
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
+        <Tabs.Panel id="profiles">
+          <div className="management-list">
+            {visibleProfiles.map((item) => (
+              <article className="management-row" key={item.id}>
+                <Link className="management-row-link" to={'/models/profiles/' + item.id}>
+                  <span className="management-row-icon">
+                    <Cpu size={17} aria-hidden="true" />
+                  </span>
+                  <span className="management-row-copy">
+                    <span className="management-row-title">{item.display_name}</span>
+                    <span className="management-row-meta">{item.model_name}</span>
+                  </span>
+                </Link>
+                <div className="management-row-tags">
+                  {item.is_default && (
+                    <span className="management-badge" data-tone="accent">
+                      Workspace default
+                    </span>
+                  )}
+                  {!item.enabled && <ManagementStatus status="disabled" />}
+                </div>
+                <ManagementMenu
+                  name={item.display_name}
+                  disabled={makeDefault.isPending}
+                  actions={[
+                    {
+                      id: 'view',
+                      label: canManage ? 'Edit profile' : 'View profile',
+                      icon: canManage ? <Pencil size={15} /> : <Eye size={15} />,
+                    },
+                    ...(canManage
+                      ? [
+                          ...(!item.is_default && item.enabled
+                            ? [
+                                {
+                                  id: 'default',
+                                  label: 'Make workspace default',
+                                  icon: <Star size={15} />,
+                                },
+                              ]
+                            : []),
+                          {
+                            id: 'delete',
+                            label: 'Delete profile',
+                            icon: <Trash2 size={15} />,
+                            danger: true,
+                            disabled: item.is_default,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  onAction={(key) => {
+                    if (key === 'view') void navigate('/models/profiles/' + item.id);
+                    if (key === 'default') makeDefault.mutate(item.id);
+                    if (key === 'delete')
+                      setDeleting({ id: item.id, name: item.display_name, type: 'profile' });
+                  }}
+                />
+              </article>
+            ))}
           </div>
-        ) : (
-          <p className="text-xs text-[var(--db-text-muted)] p-4 bg-[var(--db-surface-raised)] border border-[var(--db-border-default)] rounded">
-            No profiles configured.
-          </p>
-        )}
-      </div>
+          {!visibleProfiles.length && empty('profiles')}
+        </Tabs.Panel>
+        <Tabs.Panel id="connections">
+          <div className="management-list">
+            {visibleConnections.map((item) => (
+              <article className="management-row" key={item.id}>
+                <Link className="management-row-link" to={'/models/connections/' + item.id}>
+                  <span className="management-row-icon">
+                    <Unplug size={17} aria-hidden="true" />
+                  </span>
+                  <span className="management-row-title">{item.name}</span>
+                </Link>
+                <div className="management-row-tags">
+                  <ManagementStatus
+                    status={test.isPending && test.variables === item.id ? 'running' : item.status}
+                  />
+                </div>
+                <ManagementMenu
+                  name={item.name}
+                  disabled={test.isPending}
+                  actions={[
+                    {
+                      id: 'view',
+                      label: canManage ? 'Edit connection' : 'View connection',
+                      icon: canManage ? <Pencil size={15} /> : <Eye size={15} />,
+                    },
+                    ...(canManage
+                      ? [
+                          { id: 'test', label: 'Test connection', icon: <RefreshCw size={15} /> },
+                          {
+                            id: 'delete',
+                            label: 'Delete connection',
+                            icon: <Trash2 size={15} />,
+                            danger: true,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  onAction={(key) => {
+                    if (key === 'view') void navigate('/models/connections/' + item.id);
+                    if (key === 'test') test.mutate(item.id);
+                    if (key === 'delete')
+                      setDeleting({ id: item.id, name: item.name, type: 'connection' });
+                  }}
+                />
+              </article>
+            ))}
+          </div>
+          {!visibleConnections.length && empty('connections')}
+        </Tabs.Panel>
+      </Tabs>
+      {deleting && (
+        <ManagementDeleteDialog
+          title={'Delete model ' + deleting.type + '?'}
+          description={
+            'Remove “' +
+            deleting.name +
+            '” from this workspace? ' +
+            (deleting.type === 'connection'
+              ? 'Profiles using this connection will need another connection.'
+              : 'This can’t be undone.')
+          }
+          confirmLabel={'Delete ' + deleting.type}
+          onClose={() => setDeleting(null)}
+          onConfirm={async () => {
+            if (deleting.type === 'connection') await api.deleteConnection(deleting.id);
+            else await api.deleteProfile(deleting.id);
+            await invalidate();
+            notifications.success('Model ' + deleting.type + ' deleted.');
+          }}
+        />
+      )}
     </section>
   );
 }

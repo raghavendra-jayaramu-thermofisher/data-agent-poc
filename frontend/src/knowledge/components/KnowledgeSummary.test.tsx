@@ -4,7 +4,9 @@ import { KnowledgeSummary } from './KnowledgeSummary';
 
 describe('KnowledgeSummary', () => {
   const sampleStatus = {
-    id: 'kb-1',
+    knowledge_base_id: 'kb-1',
+    current_version_id: 'v-3',
+    last_error_code: null,
     data_source_id: 'ds-1',
     status: 'ready' as const,
     current_version_number: 3,

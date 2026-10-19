@@ -1,19 +1,11 @@
+import { Button, Tabs } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router';
-import {
-  BrainCircuit,
-  RefreshCw,
-  ArrowLeft,
-  Database,
-  BookOpen,
-  FileText,
-  Copy,
-  Check,
-} from 'lucide-react';
+import { Link, useParams } from 'react-router';
+import type { AppError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
-import { PageState } from '../../components/PageState';
-import { StatusChip } from '../../components/StatusChip';
+import { PageError, PageLoading } from '../../components/PageState';
 import { notifications } from '../../components/notifications';
 import { getDataSource } from '../../data-sources/api/data-source-api';
 import { useJobManager } from '../../jobs/JobManagerProvider';
@@ -21,13 +13,9 @@ import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/knowledge-api';
 import { BusinessKnowledgePanel } from '../components/BusinessKnowledgePanel';
 import { KnowledgeDocumentsPanel } from '../components/KnowledgeDocumentsPanel';
-import { KnowledgeSummary } from '../components/KnowledgeSummary';
-import { KnowledgeVersionsTable } from '../components/KnowledgeVersionsTable';
-import { MarkdownDocument } from '../components/MarkdownDocument';
+import { KnowledgeStatus } from '../components/KnowledgeStatus';
 import type { AnnotationValues } from '../schemas/annotation-schema';
 import '../knowledge.css';
-
-type KnowledgeTab = 'explorer' | 'annotations' | 'index';
 
 export function KnowledgeDetailPage() {
   const { dataSourceId = '' } = useParams();
@@ -36,275 +24,194 @@ export function KnowledgeDetailPage() {
   const canManage = activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin';
   const jobs = useJobManager();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<KnowledgeTab>('explorer');
+  const [activeTab, setActiveTab] = useState('explorer');
   const [search, setSearch] = useState('');
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState(false);
-
+  const [selection, setSelection] = useState<string | null>(null);
+  const enabled = Boolean(orgId && dataSourceId);
   const source = useQuery({
     queryKey: queryKeys.dataSources.detail(orgId, dataSourceId),
     queryFn: () => getDataSource(dataSourceId),
-    enabled: Boolean(dataSourceId),
+    enabled,
   });
   const status = useQuery({
     queryKey: queryKeys.knowledge.status(orgId, dataSourceId),
     queryFn: () => api.getStatus(dataSourceId),
-    enabled: Boolean(dataSourceId),
+    enabled,
   });
-  const ready = status.data?.status === 'ready';
-  const index = useQuery({
-    queryKey: queryKeys.knowledge.index(orgId, dataSourceId),
-    queryFn: () => api.getIndex(dataSourceId),
-    enabled: ready,
-  });
+  const hasSchema = status.data?.status === 'ready' || Boolean(status.data?.current_version_id);
   const documents = useQuery({
     queryKey: queryKeys.knowledge.documents(orgId, dataSourceId, ''),
     queryFn: () => api.listDocuments(dataSourceId, 'table_schema', 500),
-    enabled: ready,
+    enabled: enabled && hasSchema,
   });
+  const selectedDocumentId = documents.data?.some((document) => document.id === selection)
+    ? selection
+    : (documents.data?.[0]?.id ?? null);
   const detail = useQuery({
     queryKey: queryKeys.knowledge.document(orgId, dataSourceId, selectedDocumentId ?? ''),
     queryFn: () => api.getDocument(dataSourceId, selectedDocumentId!),
-    enabled: Boolean(selectedDocumentId),
+    enabled: enabled && hasSchema && Boolean(selectedDocumentId),
   });
   const annotations = useQuery({
     queryKey: queryKeys.knowledge.annotations(orgId, dataSourceId),
     queryFn: () => api.listAnnotations(dataSourceId),
-    enabled: Boolean(dataSourceId),
+    enabled,
   });
-  const versions = useQuery({
-    queryKey: queryKeys.knowledge.versions(orgId, dataSourceId),
-    queryFn: () => api.listVersions(dataSourceId),
-    enabled: ready,
-  });
-
+  const activeGeneration = jobs.activeJobs?.some(
+    ({ job }) =>
+      job.job_type === 'knowledge_generation' && job.input.data_source_id === dataSourceId,
+  );
   const generate = useMutation({
     mutationFn: () => api.generate(dataSourceId),
     onSuccess: async (result) => {
       await jobs.registerJob(result.job_id);
-      notifications.info('Knowledge generation started');
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledge.status(orgId, dataSourceId),
+      });
+      notifications.info('Schema refresh started.');
     },
   });
-
+  const updating = generate.isPending || activeGeneration || status.data?.status === 'generating';
   const filteredDocuments = useMemo(
     () =>
-      documents.data?.filter((document) =>
-        `${document.title} ${document.document_key}`.toLowerCase().includes(search.toLowerCase())
-      ) ?? [],
-    [documents.data, search]
+      (documents.data ?? []).filter((document) =>
+        (document.title + ' ' + document.document_key)
+          .toLocaleLowerCase()
+          .includes(search.trim().toLocaleLowerCase()),
+      ),
+    [documents.data, search],
   );
-
   const invalidateAnnotations = () =>
     queryClient.invalidateQueries({
       queryKey: queryKeys.knowledge.annotations(orgId, dataSourceId),
     });
-
-  const createAnnotation = async (values: AnnotationValues) => {
+  async function createAnnotation(values: AnnotationValues) {
     await api.createAnnotation(dataSourceId, {
       scope_type: values.scopeType,
       scope_key: values.scopeType === 'datasource' ? null : values.scopeKey,
       content: values.content,
     });
     await invalidateAnnotations();
-    notifications.success('Business knowledge added');
-  };
-
-  const updateAnnotation = async (annotationId: string, content: string) => {
-    await api.updateAnnotation(annotationId, { content });
+    notifications.success('Business knowledge added.');
+  }
+  async function updateAnnotation(id: string, content: string) {
+    await api.updateAnnotation(id, { content });
     await invalidateAnnotations();
-  };
-
-  const deleteAnnotation = async (annotationId: string) => {
-    await api.deleteAnnotation(annotationId);
+    notifications.success('Business knowledge updated.');
+  }
+  async function deleteAnnotation(id: string) {
+    await api.deleteAnnotation(id);
     await invalidateAnnotations();
-  };
-
-  const handleCopyIndexMarkdown = async () => {
-    if (!index.data?.content_markdown) return;
-    try {
-      await navigator.clipboard.writeText(index.data.content_markdown);
-      setCopiedIndex(true);
-      setTimeout(() => setCopiedIndex(false), 2000);
-    } catch {
-      // ignore
-    }
-  };
-
-  if (source.isLoading || status.isLoading) return <PageState title="Loading knowledge base" loading />;
-  if (source.isError || !source.data) return <PageState title="Data source not found" />;
-
-  const schemaCount = documents.data?.length ?? status.data?.object_count ?? 0;
-  const annotationCount = annotations.data?.length ?? 0;
-  const versionLabel = status.data?.current_version_number != null ? `v${status.data.current_version_number}` : '—';
-
+    notifications.success('Business knowledge deleted.');
+  }
+  if (source.isLoading || status.isLoading) return <PageLoading label="Loading knowledge…" />;
+  if (source.isError || !source.data)
+    return (
+      <PageError title="Unable to load this data source" retry={() => void source.refetch()} />
+    );
+  if (status.isError)
+    return <PageError title="Unable to load knowledge" retry={() => void status.refetch()} />;
   return (
-    <section className="page max-w-6xl mx-auto">
-      {/* Page Header */}
-      <div className="page-header mb-4">
-        <div>
-          <Link
-            to="/knowledge"
-            className="inline-flex items-center gap-1.5 text-xs text-[var(--db-text-muted)] hover:text-[var(--db-primary)] mb-2 font-medium transition-colors"
-          >
-            <ArrowLeft size={13} />
-            <span>Knowledge Bases</span>
+    <section
+      className="knowledge-page knowledge-detail-page"
+      aria-labelledby="knowledge-source-title"
+    >
+      <header className="knowledge-detail-header">
+        <div className="knowledge-source-heading">
+          <Link to="/knowledge" className="knowledge-back" aria-label="Back to knowledge">
+            <ArrowLeft size={18} aria-hidden="true" />
           </Link>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-[var(--db-primary-soft)] text-[var(--db-primary)]">
-              <BrainCircuit size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-[var(--db-text-primary)] leading-tight">
-                {source.data.name} Knowledge Base
-              </h1>
-              <p className="text-xs text-[var(--db-text-secondary)] mt-0.5">
-                Schema index, semantic table documentation, and business domain annotations.
+          <h1 id="knowledge-source-title">{source.data.name}</h1>
+          <KnowledgeStatus status={updating ? 'generating' : (status.data?.status ?? 'empty')} />
+        </div>
+        {canManage && (
+          <Button
+            variant={hasSchema ? 'secondary' : 'primary'}
+            isPending={Boolean(updating)}
+            isDisabled={Boolean(updating)}
+            onPress={() => generate.mutate()}
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+            {updating ? 'Updating…' : hasSchema ? 'Refresh schema' : 'Generate schema'}
+          </Button>
+        )}
+      </header>
+      {generate.isError && (
+        <p role="alert" className="knowledge-inline-error">
+          {(generate.error as unknown as AppError)?.message ||
+            'Unable to refresh the schema. Please try again.'}
+        </p>
+      )}
+      <Tabs
+        className="knowledge-tabs"
+        variant="secondary"
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(String(key))}
+      >
+        <Tabs.ListContainer>
+          <Tabs.List aria-label="Knowledge sections">
+            <Tabs.Tab id="explorer">
+              Schema explorer
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="annotations">
+              Business knowledge
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
+        <Tabs.Panel id="explorer">
+          {!hasSchema ? (
+            <div className="knowledge-empty">
+              <h2>{updating ? 'Preparing your schema' : 'Schema not set up yet'}</h2>
+              <p>
+                {updating
+                  ? 'You can leave this page while the schema updates.'
+                  : canManage
+                    ? 'Generate the schema to browse tables, views, and columns.'
+                    : 'Ask a workspace admin to generate the schema.'}
               </p>
             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <StatusChip status={status.data?.status ?? 'empty'} />
-          {canManage && (
-            <button
-              type="button"
-              disabled={generate.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--db-primary)] hover:bg-[var(--db-primary-hover)] text-[var(--db-on-primary)] rounded-md text-xs font-semibold transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              onClick={() => generate.mutate()}
-            >
-              <RefreshCw size={13} className={generate.isPending ? 'animate-spin' : ''} />
-              <span>{ready ? 'Regenerate Knowledge' : 'Generate Knowledge'}</span>
-            </button>
+          ) : documents.isError ? (
+            <PageError
+              title="Unable to load tables and views"
+              retry={() => void documents.refetch()}
+            />
+          ) : documents.isLoading ? (
+            <PageLoading label="Loading tables and views…" />
+          ) : (
+            <KnowledgeDocumentsPanel
+              search={search}
+              onSearchChange={setSearch}
+              documents={filteredDocuments}
+              selectedDocumentId={selectedDocumentId}
+              onSelectDocument={setSelection}
+              detail={detail.data}
+              detailLoading={detail.isLoading}
+              detailError={detail.isError}
+              onRetryDetail={() => void detail.refetch()}
+            />
           )}
-        </div>
-      </div>
-
-      {/* Modern Stat Bar */}
-      <KnowledgeSummary status={status.data} />
-
-      {/* Tabs Navigation */}
-      <nav className="knowledge-tabs-nav" aria-label="Knowledge sections">
-        <button
-          type="button"
-          className={`knowledge-tab-item ${activeTab === 'explorer' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('explorer')}
-        >
-          <Database size={14} />
-          <span>Schema Explorer</span>
-          <span className="knowledge-tab-badge">{schemaCount}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`knowledge-tab-item ${activeTab === 'annotations' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('annotations')}
-        >
-          <BookOpen size={14} />
-          <span>Business Knowledge</span>
-          <span className="knowledge-tab-badge">{annotationCount}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`knowledge-tab-item ${activeTab === 'index' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('index')}
-        >
-          <FileText size={14} />
-          <span>Raw Index & Versions</span>
-          <span className="knowledge-tab-badge">{versionLabel}</span>
-        </button>
-      </nav>
-
-      {/* Tab 1: Schema Explorer */}
-      {activeTab === 'explorer' && (
-        !ready ? (
-          <PageState
-            title={status.data?.status === 'generating' ? 'Knowledge is generating' : 'Knowledge not generated'}
-            description="Generation runs as a durable background job and continues if you leave this page."
-          />
-        ) : (
-          <KnowledgeDocumentsPanel
-            search={search}
-            onSearchChange={setSearch}
-            documents={filteredDocuments}
-            totalCount={documents.data?.length ?? 0}
-            selectedDocumentId={selectedDocumentId}
-            onSelectDocument={setSelectedDocumentId}
-            detail={detail.data}
-            detailLoading={detail.isLoading}
-          />
-        )
-      )}
-
-      {/* Tab 2: Business Knowledge Annotations */}
-      {activeTab === 'annotations' && (
-        <BusinessKnowledgePanel
-          annotations={annotations.data ?? []}
-          canManage={canManage}
-          onCreate={createAnnotation}
-          onUpdate={updateAnnotation}
-          onDelete={deleteAnnotation}
-        />
-      )}
-
-      {/* Tab 3: Raw Index & Versions */}
-      {activeTab === 'index' && (
-        !ready ? (
-          <PageState
-            title={status.data?.status === 'generating' ? 'Knowledge is generating' : 'Knowledge not generated'}
-            description="Generation runs as a durable background job and continues if you leave this page."
-          />
-        ) : (
-          <div className="space-y-5">
-            {/* Compact Index Card */}
-            <div className="compact-index-card">
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--db-border-subtle)]">
-                <div>
-                  <h2 className="text-base font-semibold text-[var(--db-text-primary)] m-0 leading-tight">
-                    Compact Schema Index
-                  </h2>
-                  <p className="text-xs text-[var(--db-text-muted)] mt-0.5">
-                    Concise schema summary formatted for LLM system prompt context.
-                  </p>
-                </div>
-                {index.data?.content_markdown && (
-                  <button
-                    type="button"
-                    onClick={handleCopyIndexMarkdown}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-[var(--db-surface)] hover:bg-[var(--db-surface-hover)] text-[var(--db-text-secondary)] hover:text-[var(--db-text-primary)] border border-[var(--db-border-default)] rounded-md transition-colors cursor-pointer"
-                  >
-                    {copiedIndex ? (
-                      <>
-                        <Check size={12} className="text-emerald-500" />
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} />
-                        <span>Copy Markdown</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {index.isLoading ? (
-                <PageState title="Loading index…" loading />
-              ) : index.data ? (
-                <div className="compact-index-body">
-                  <MarkdownDocument>{index.data.content_markdown}</MarkdownDocument>
-                </div>
-              ) : (
-                <p className="text-xs text-[var(--db-text-muted)] py-4 text-center">Index unavailable.</p>
-              )}
-            </div>
-
-            {/* Version History Table */}
-            <KnowledgeVersionsTable versions={versions.data ?? []} />
-          </div>
-        )
-      )}
+        </Tabs.Panel>
+        <Tabs.Panel id="annotations">
+          {annotations.isLoading ? (
+            <PageLoading label="Loading business knowledge…" />
+          ) : annotations.isError ? (
+            <PageError
+              title="Unable to load business knowledge"
+              retry={() => void annotations.refetch()}
+            />
+          ) : (
+            <BusinessKnowledgePanel
+              annotations={annotations.data ?? []}
+              canManage={canManage}
+              onCreate={createAnnotation}
+              onUpdate={updateAnnotation}
+              onDelete={deleteAnnotation}
+            />
+          )}
+        </Tabs.Panel>
+      </Tabs>
     </section>
   );
 }

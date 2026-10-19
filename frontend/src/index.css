@@ -1409,7 +1409,6 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
 .excel-export-button:disabled { opacity: .5; cursor: default; }
 .markdown-table-actions { display: flex; justify-content: flex-end; padding: 5px 8px; border-bottom: 1px solid var(--db-border-default); }
 .follow-up-suggestions { width: 100%; min-width: 0; margin-top: 12px; margin-bottom: 16px; padding-inline: 12px; container-type: inline-size; }
-.follow-up-suggestions h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--db-text-secondary); }
 .follow-up-suggestions-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 @container (min-width: 680px) {
   .follow-up-suggestions-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }

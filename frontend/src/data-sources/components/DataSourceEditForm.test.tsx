@@ -54,7 +54,7 @@ describe('editing data-source connections', () => {
   it('does not resend unchanged config and requests a test when chosen', async () => {
     const submit = vi.fn().mockResolvedValue(undefined);
     render(<DataSourceEditForm source={source} onSubmit={submit} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Save & Test Connection' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Save and test connection' }));
     await waitFor(() =>
       expect(submit).toHaveBeenCalledWith(
         { name: 'Sales Data', status: 'active', credentials: undefined },
@@ -138,7 +138,7 @@ describe('editing data-source connections', () => {
     expect(screen.queryByRole('combobox', { name: 'Host' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Username' })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Save & Test Connection' }),
+      screen.queryByRole('button', { name: 'Save and test connection' }),
     ).not.toBeInTheDocument();
   });
 });

@@ -1,96 +1,59 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { detail, documents } from '../test-fixtures';
 import { KnowledgeDocumentsPanel } from './KnowledgeDocumentsPanel';
 
+const props = {
+  search: '',
+  onSearchChange: vi.fn(),
+  documents,
+  selectedDocumentId: 'doc-orders',
+  onSelectDocument: vi.fn(),
+  detail,
+  detailLoading: false,
+};
+
 describe('KnowledgeDocumentsPanel', () => {
-  const documents = [
-    {
-      id: 'doc-1',
-      document_type: 'table_schema' as const,
-      document_key: 'dbo.orders',
-      title: 'dbo.orders',
-      metadata: {},
-      estimated_tokens: 250,
-      created_at: '2026-10-18T10:00:00Z',
-    },
-    {
-      id: 'doc-2',
-      document_type: 'table_schema' as const,
-      document_key: 'dbo.customers',
-      title: 'dbo.customers',
-      metadata: {},
-      estimated_tokens: 180,
-      created_at: '2026-10-18T10:00:00Z',
-    },
-  ];
-
-  it('auto-selects first document if none is selected', () => {
-    const handleSelect = vi.fn();
-    render(
-      <KnowledgeDocumentsPanel
-        search=""
-        onSearchChange={vi.fn()}
-        documents={documents}
-        selectedDocumentId={null}
-        onSelectDocument={handleSelect}
-        detail={undefined}
-        detailLoading={false}
-      />
+  it('shows a single schema heading and its columns without token diagnostics', () => {
+    render(<KnowledgeDocumentsPanel {...props} />);
+    expect(screen.getAllByRole('heading', { name: 'dbo.orders' })).toHaveLength(1);
+    expect(screen.getByRole('columnheader', { name: 'Column' })).toBeInTheDocument();
+    expect(screen.getByText('amount')).toBeInTheDocument();
+    expect(screen.queryByText(/tokens/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'dbo.orders' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
-
-    expect(handleSelect).toHaveBeenCalledWith('doc-1');
   });
-
-  it('renders document items and calls onSelectDocument when clicked', async () => {
-    const handleSelect = vi.fn();
+  it('selects a table without changing selection merely because search filters it out', async () => {
+    const select = vi.fn();
     const user = userEvent.setup();
-
     render(
-      <KnowledgeDocumentsPanel
-        search=""
-        onSearchChange={vi.fn()}
-        documents={documents}
-        selectedDocumentId="doc-1"
-        onSelectDocument={handleSelect}
-        detail={undefined}
-        detailLoading={false}
-      />
+      <KnowledgeDocumentsPanel {...props} documents={[documents[1]!]} onSelectDocument={select} />,
     );
-
-    expect(screen.getByText('dbo.orders')).toBeInTheDocument();
-    expect(screen.getByText('dbo.customers')).toBeInTheDocument();
-
-    await user.click(screen.getByText('dbo.customers'));
-    expect(handleSelect).toHaveBeenCalledWith('doc-2');
+    expect(select).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'dbo.customers' }));
+    expect(select).toHaveBeenCalledWith('doc-customers');
   });
-
-  it('displays schema document detail when selected', () => {
-    const detail = {
-      id: 'doc-1',
-      document_type: 'table_schema' as const,
-      document_key: 'dbo.orders',
-      title: 'dbo.orders',
-      metadata: {},
-      estimated_tokens: 250,
-      created_at: '2026-10-18T10:00:00Z',
-      content_markdown: '# Table: dbo.orders\n\nColumns: id, total_amount',
-    };
-
+  it('allows retrying a failed document load and clearing an empty search', async () => {
+    const retry = vi.fn();
+    const search = vi.fn();
+    const user = userEvent.setup();
     render(
       <KnowledgeDocumentsPanel
-        search=""
-        onSearchChange={vi.fn()}
-        documents={documents}
-        selectedDocumentId="doc-1"
-        onSelectDocument={vi.fn()}
-        detail={detail}
-        detailLoading={false}
-      />
+        {...props}
+        search="missing"
+        documents={[]}
+        detail={undefined}
+        detailError
+        onRetryDetail={retry}
+        onSearchChange={search}
+      />,
     );
-
-    expect(screen.getByRole('heading', { name: 'dbo.orders' })).toBeInTheDocument();
-    expect(screen.getByText('250 estimated tokens')).toBeInTheDocument();
-    expect(screen.getByText('Columns: id, total_amount')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(search).toHaveBeenCalledWith('');
   });
 });

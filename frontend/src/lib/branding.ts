@@ -13,10 +13,10 @@ export const BRANDING = {
   ariaHomeLabel: 'Data Agent home',
 
   /** Brand tagline */
-  tagline: 'Ask your data. Inspect the answer.',
+  tagline: 'Ask questions. Understand your data.',
 
   /** Brand subtitle description */
-  subtitle: 'Designed for trustworthy analysis, durable jobs, SQL provenance, and reusable dashboards.',
+  subtitle: 'Explore charts and tables, check the details, and save your findings in dashboards.',
 
   /** Login prompt text */
   loginPrompt: 'New to Data Agent?',

@@ -1,156 +1,112 @@
-import { useEffect } from 'react';
-import { Search, FileCode2, Table, BookOpen, X } from 'lucide-react';
+import { BookOpen, Search, Table, X } from 'lucide-react';
 import type { components } from '../../api/generated/schema';
-import { PageState } from '../../components/PageState';
+import { PageError, PageLoading } from '../../components/PageState';
 import { MarkdownDocument } from './MarkdownDocument';
-
-type DocumentSummary = components['schemas']['KnowledgeDocumentSummary'];
-type DocumentDetail = components['schemas']['KnowledgeDocumentResponse'];
 
 type Props = {
   search: string;
   onSearchChange(value: string): void;
-  documents: DocumentSummary[];
-  totalCount?: number;
+  documents: components['schemas']['KnowledgeDocumentSummary'][];
   selectedDocumentId: string | null;
   onSelectDocument(id: string): void;
-  detail: DocumentDetail | undefined;
+  detail: components['schemas']['KnowledgeDocumentResponse'] | undefined;
   detailLoading: boolean;
+  detailError?: boolean;
+  onRetryDetail?(): void;
 };
+
+function displayContent(detail: NonNullable<Props['detail']>) {
+  const heading = /^\s*#{1,3}\s+([^\n]+)\r?\n/.exec(detail.content_markdown);
+  const name = heading?.[1]?.replace(/^(?:table|view):?\s+/i, '').trim();
+  return heading && (name === detail.title || name === detail.document_key)
+    ? detail.content_markdown.slice(heading[0].length).trimStart()
+    : detail.content_markdown;
+}
 
 export function KnowledgeDocumentsPanel({
   search,
   onSearchChange,
   documents,
-  totalCount,
   selectedDocumentId,
   onSelectDocument,
   detail,
   detailLoading,
+  detailError,
+  onRetryDetail,
 }: Props) {
-  // Auto-select first document if none is selected
-  useEffect(() => {
-    if (!selectedDocumentId && documents.length > 0) {
-      onSelectDocument(documents[0].id);
-    }
-  }, [selectedDocumentId, documents, onSelectDocument]);
-
-  const displayTotal = totalCount ?? documents.length;
-
   return (
     <div className="schema-explorer-grid">
-      {/* Sidebar: Table Documents List */}
-      <aside className="schema-sidebar">
-        <div className="schema-search-box">
-          <Search size={14} className="absolute left-2.5 text-[var(--db-text-muted)] pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search tables & views…"
-            className="schema-search-input"
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => onSearchChange('')}
-              className="schema-search-clear"
-              title="Clear search"
-            >
-              <X size={13} />
-            </button>
-          ) : null}
-        </div>
-
-        <div className="flex items-center justify-between px-1 pb-1.5 mb-1.5 border-b border-[var(--db-border-subtle)] text-[11px] font-semibold text-[var(--db-text-muted)] uppercase tracking-wider">
-          <span>{search ? 'Filtered Results' : 'Schema Objects'}</span>
-          <span className="font-mono text-[10px]">
-            {search ? `${documents.length} of ${displayTotal}` : displayTotal}
-          </span>
-        </div>
-
-        <div className="schema-items-list">
-          {documents.map((document) => {
-            const isSelected = selectedDocumentId === document.id;
-            return (
+      <aside className="schema-sidebar" aria-label="Tables and views">
+        <div className="schema-sidebar-tools">
+          <div className="knowledge-search db-icon-search">
+            <Search size={15} aria-hidden="true" />
+            <input
+              type="search"
+              className="db-icon-search__input"
+              aria-label="Search tables and views"
+              placeholder="Search tables and views…"
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+            {search && (
               <button
                 type="button"
-                key={document.id}
-                className={`schema-item-btn ${isSelected ? 'is-active' : ''}`}
-                onClick={() => onSelectDocument(document.id)}
+                aria-label="Clear table search"
+                onClick={() => onSearchChange('')}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Table
-                    size={13}
-                    className={isSelected ? 'text-[var(--db-primary)] shrink-0' : 'text-[var(--db-text-muted)] shrink-0'}
-                  />
-                  <span className="truncate font-medium">{document.title}</span>
-                </div>
-                <span className="schema-item-pill">
-                  {document.estimated_tokens} tokens
-                </span>
+                <X size={14} aria-hidden="true" />
               </button>
-            );
-          })}
-
+            )}
+          </div>
+        </div>
+        <div className="schema-items-list">
+          {documents.map((document) => (
+            <button
+              type="button"
+              key={document.id}
+              className="schema-item-btn"
+              aria-pressed={selectedDocumentId === document.id}
+              title={document.title}
+              onClick={() => onSelectDocument(document.id)}
+            >
+              <Table size={14} aria-hidden="true" />
+              <span>{document.title}</span>
+            </button>
+          ))}
           {documents.length === 0 && (
-            <div className="py-12 px-4 text-center">
-              <p className="text-xs text-[var(--db-text-muted)] mb-2">No matching tables found.</p>
+            <div className="schema-no-results">
+              <p>{search ? 'No matching tables or views.' : 'No tables or views available.'}</p>
               {search && (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange('')}
-                  className="text-xs text-[var(--db-primary)] hover:underline font-medium"
-                >
-                  Clear search query
+                <button type="button" onClick={() => onSearchChange('')}>
+                  Clear search
                 </button>
               )}
             </div>
           )}
         </div>
       </aside>
-
-      {/* Main Document Reader */}
-      <article className="schema-reader">
+      <article className="schema-reader" aria-label="Schema details">
         {!selectedDocumentId ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[var(--db-text-muted)]">
-            <BookOpen size={36} className="text-[var(--db-border-default)] mb-3" />
-            <strong className="text-sm text-[var(--db-text-primary)]">Select a schema object</strong>
-            <p className="text-xs mt-1.5 max-w-sm">
-              Click any table or view on the left to inspect column definitions, data types, indexes, and documentation.
-            </p>
+          <div className="knowledge-empty">
+            <BookOpen size={26} aria-hidden="true" />
+            <h2>Choose a table or view</h2>
           </div>
         ) : detailLoading ? (
-          <PageState title="Loading schema definition…" loading />
+          <PageLoading label="Loading schema…" />
+        ) : detailError ? (
+          <PageError title="Unable to load this schema" retry={onRetryDetail} />
         ) : detail ? (
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--db-border-subtle)]">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded bg-[var(--db-primary-soft)] text-[var(--db-primary)]">
-                  <FileCode2 size={16} />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-[var(--db-text-primary)] leading-tight">
-                    {detail.title}
-                  </h2>
-                  <span className="text-[11px] font-mono text-[var(--db-text-muted)]">
-                    {detail.document_key}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono px-2.5 py-1 bg-[var(--db-surface-muted)] text-[var(--db-text-secondary)] rounded-md font-medium border border-[var(--db-border-default)]">
-                  {detail.estimated_tokens.toLocaleString()} estimated tokens
-                </span>
-              </div>
+          <>
+            <header className="schema-reader-header">
+              <Table size={15} aria-hidden="true" />
+              <h2>{detail.title}</h2>
+            </header>
+            <div className="knowledge-document-view schema-document">
+              <MarkdownDocument>{displayContent(detail)}</MarkdownDocument>
             </div>
-
-            <div className="knowledge-document-view">
-              <MarkdownDocument>{detail.content_markdown}</MarkdownDocument>
-            </div>
-          </div>
+          </>
         ) : (
-          <PageState title="Schema definition unavailable" />
+          <PageError title="Schema unavailable" retry={onRetryDetail} />
         )}
       </article>
     </div>

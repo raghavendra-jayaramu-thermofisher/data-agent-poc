@@ -66,7 +66,7 @@ describe('connection edit workflow', () => {
   });
   it('saves before starting and registering a test, then opens its result', async () => {
     show();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Save & Test Connection' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Save and test connection' }));
     expect(await screen.findByText('Connection test result')).toBeInTheDocument();
     expect(state.update).toHaveBeenCalledWith(
       's1',
@@ -81,7 +81,7 @@ describe('connection edit workflow', () => {
   it('distinguishes saved changes from a test that could not start', async () => {
     state.test.mockRejectedValueOnce(new Error('Queue unavailable'));
     show();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Save & Test Connection' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Save and test connection' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Changes saved, but the connection test could not be started: Queue unavailable',
     );

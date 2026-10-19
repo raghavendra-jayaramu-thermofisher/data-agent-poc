@@ -107,6 +107,10 @@ describe('AppShell', () => {
 
     const deleteAllBtn = screen.getByRole('button', { name: 'Delete all chats' });
     expect(deleteAllBtn).toBeInTheDocument();
+    await user.hover(deleteAllBtn);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete all chats');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     await user.click(deleteAllBtn);
 
     expect(screen.getByRole('dialog', { name: 'Delete all chats' })).toBeInTheDocument();

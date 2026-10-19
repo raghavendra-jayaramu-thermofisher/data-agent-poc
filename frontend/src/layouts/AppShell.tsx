@@ -1,6 +1,6 @@
 import { Dropdown, Label, Modal, Tooltip } from '@heroui/react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   LayoutDashboard,
   Database,
@@ -41,6 +41,46 @@ const moreNavigationItems = [
   { label: 'Models', to: '/models' },
   { label: 'Jobs', to: '/jobs' },
 ] as const;
+
+function ClearChatsButton({ onClick }: { onClick(): void }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const tooltipId = useId();
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', dismiss);
+    return () => document.removeEventListener('keydown', dismiss);
+  }, [open]);
+  return (
+    <Tooltip isOpen={open} onOpenChange={setOpen}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="sidebar-history-clear-btn"
+        aria-label="Delete all chats"
+        aria-describedby={open ? tooltipId : undefined}
+        onPointerEnter={(event) => {
+          if (event.pointerType !== 'touch') setOpen(true);
+        }}
+        onPointerLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => {
+          setOpen(false);
+          onClick();
+        }}
+      >
+        <Trash2 size={14} aria-hidden="true" />
+      </button>
+      <Tooltip.Content id={tooltipId} triggerRef={triggerRef} placement="right">
+        Delete all chats
+      </Tooltip.Content>
+    </Tooltip>
+  );
+}
 
 export function AppShell() {
   const { user, signOut } = useAuth();
@@ -115,12 +155,12 @@ export function AppShell() {
         <button
           type="button"
           className="sidebar-new"
-          aria-label="New analysis"
-          title={compact ? 'New analysis' : undefined}
+          aria-label="New chat"
+          title={compact ? 'New chat' : undefined}
           onClick={() => go('/ask')}
         >
           <Plus size={18} />
-          <span className="sidebar-label">New analysis</span>
+          <span className="sidebar-label">New chat</span>
         </button>
         <div className="sidebar-scroll">
           <nav className="sidebar-navigation" aria-label="Primary navigation">
@@ -172,19 +212,10 @@ export function AppShell() {
               <div className="sidebar-history-header">
                 <h2>Recent chats</h2>
                 {Boolean(conversations.data?.length) && (
-                  <button
-                    type="button"
-                    className="sidebar-history-clear-btn"
-                    onClick={() => {
-                      if (mobile) setMobileOpen(false);
-                      setDeleteAllOpen(true);
-                    }}
-                    title="Delete all chats"
-                    aria-label="Delete all chats"
-                  >
-                    <Trash2 size={12} aria-hidden="true" />
-                    <span>Delete all</span>
-                  </button>
+                  <ClearChatsButton onClick={() => {
+                    if (mobile) setMobileOpen(false);
+                    setDeleteAllOpen(true);
+                  }} />
                 )}
               </div>
               <div className="sidebar-search-field db-icon-search">

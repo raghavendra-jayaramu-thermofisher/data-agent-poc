@@ -148,12 +148,12 @@ export function DataSourceEditForm({
       {relational && (
         <>
           <div className="form-section-divider">
-            <span>Connection · {source.display_type.toUpperCase()}</span>
+            <span>Connection</span>
             <hr />
           </div>
           <p className="text-xs text-[var(--db-text-secondary)]">
-            After changing the host, port, database, or schema, test the connection and regenerate
-            its knowledge in Knowledge.
+            After changing connection settings, test the connection and refresh its schema in
+            Knowledge.
           </p>
           <div className="form-grid-2">
             <Controller
@@ -329,7 +329,7 @@ export function DataSourceEditForm({
           <p className="text-xs text-[var(--db-text-secondary)] -mt-2 mb-1">
             {source.kind === 'mssql' && config.authentication_mode === 'windows'
               ? 'Enter new username and password to switch to SQL authentication.'
-              : 'Stored credentials are never redisplayed. Leave both fields blank to keep the current secret.'}
+              : 'Leave both fields blank to keep the saved credentials.'}
           </p>
 
           <div className="form-grid-2">

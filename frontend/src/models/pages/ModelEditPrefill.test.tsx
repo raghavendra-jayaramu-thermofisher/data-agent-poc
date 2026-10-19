@@ -7,19 +7,48 @@ import { ModelConnectionDetailPage } from './ModelConnectionDetailPage';
 const state = vi.hoisted(() => ({
   updateProfile: vi.fn().mockResolvedValue({}),
   updateConnection: vi.fn().mockResolvedValue({}),
-  profile: { id: 'p1', connection_id: 'c1', display_name: 'Saved Model', model_name: 'saved-model-id', enabled: true, is_default: true, settings: { temperature: 0.7, max_tokens: 8000 } },
-  connection: { id: 'c1', name: 'Saved Provider', base_url: 'https://provider.example/v1', has_api_key: true, status: 'active' },
+  profile: {
+    id: 'p1',
+    connection_id: 'c1',
+    display_name: 'Saved Model',
+    model_name: 'saved-model-id',
+    enabled: true,
+    is_default: true,
+    settings: { temperature: 0.7, max_tokens: 8000 },
+  },
+  connection: {
+    id: 'c1',
+    name: 'Saved Provider',
+    base_url: 'https://provider.example/v1',
+    has_api_key: true,
+    status: 'active',
+  },
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: ({ queryFn }: { queryFn: () => unknown }) => ({ data: queryFn(), refetch: vi.fn() }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   useMutation: () => ({ mutate: vi.fn() }),
 }));
-vi.mock('../../organizations/OrganizationProvider', () => ({ useOrganization: () => ({ activeOrganization: { id: 'org1', role: 'owner' } }) }));
-vi.mock('../api/models-api', () => ({ getProfile: () => state.profile, getConnection: () => state.connection, listConnections: () => [state.connection], updateProfile: state.updateProfile, updateConnection: state.updateConnection }));
+vi.mock('../../organizations/OrganizationProvider', () => ({
+  useOrganization: () => ({ activeOrganization: { id: 'org1', role: 'owner' } }),
+}));
+vi.mock('../api/models-api', () => ({
+  getProfile: () => state.profile,
+  getConnection: () => state.connection,
+  listConnections: () => [state.connection],
+  updateProfile: state.updateProfile,
+  updateConnection: state.updateConnection,
+}));
 vi.mock('../../components/ConfirmationDialog', () => ({ ConfirmationDialog: () => null }));
 function show(kind: 'profiles' | 'connections') {
-  return render(<MemoryRouter initialEntries={[`/models/${kind}/1`]}><Routes><Route path="/models/profiles/:profileId" element={<ModelProfileDetailPage />} /><Route path="/models/connections/:connectionId" element={<ModelConnectionDetailPage />} /></Routes></MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={[`/models/${kind}/1`]}>
+      <Routes>
+        <Route path="/models/profiles/:profileId" element={<ModelProfileDetailPage />} />
+        <Route path="/models/connections/:connectionId" element={<ModelConnectionDetailPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 describe('saved model edit values', () => {
   it('saves edits and allows optional settings to be cleared', async () => {
@@ -28,14 +57,29 @@ describe('saved model edit values', () => {
     await user.clear(screen.getByLabelText('Display name'));
     await user.type(screen.getByLabelText('Display name'), 'Updated Model');
     await user.clear(screen.getByLabelText('Temperature'));
-    await user.click(screen.getByRole('button', { name: 'Save profile changes' }));
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({ display_name: 'Updated Model', model_name: 'saved-model-id', settings: { max_tokens: 8000 } })));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(state.updateProfile).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          display_name: 'Updated Model',
+          model_name: 'saved-model-id',
+          settings: { max_tokens: 8000 },
+        }),
+      ),
+    );
   });
   it('saves the prefilled connection while preserving its stored key', async () => {
     const user = userEvent.setup();
     show('connections');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(state.updateConnection).toHaveBeenCalledWith('c1', { name: 'Saved Provider', base_url: 'https://provider.example/v1', clear_api_key: false }));
+    await waitFor(() =>
+      expect(state.updateConnection).toHaveBeenCalledWith('c1', {
+        name: 'Saved Provider',
+        base_url: 'https://provider.example/v1',
+        clear_api_key: false,
+      }),
+    );
   });
   it('prefills the model profile inputs', () => {
     show('profiles');
