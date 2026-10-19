@@ -301,7 +301,8 @@ async def test_finalizer_returns_imperfect_markdown_with_quality_warning(monkeyp
     suggestions: list[str] = []
     answer = await runtime.run(job_id=JOB_ID, model=model, evidence=bundle(), follow_up_suggestions=suggestions)
 
-    assert answer == invalid
+    # The answer keeps its content; only a title is added when the model wrote none.
+    assert answer.startswith('# ') and answer.endswith(invalid)
     assert suggestions == ['Compare regions?']
     assert 'Follow-up suggestions output contract' in client.calls[0][0].content
     assert len(client.calls) == 1

@@ -1250,6 +1250,10 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
 .assistant-card--presenting .answer-main-content {
   padding: 20px clamp(16px, 3vw, 48px) 32px;
 }
+/* The toolbar already shows the answer's title, so its leading H1 is not repeated. */
+.assistant-card--presenting .assistant-markdown > h1:first-child {
+  display: none;
+}
 .assistant-card--presenting .assistant-card-artifacts {
   padding-inline: clamp(16px, 3vw, 48px);
 }

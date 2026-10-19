@@ -111,7 +111,7 @@ async def test_public_text_arrives_before_generation_finishes_and_suggestions_st
     deltas = [call.args[2] for call in runtime.await_args_list if call.args[1] == "answer.delta"]
     assert deltas[0]["text"] == "First finding. 🌍"
     finish.set()
-    assert await task == "First finding. 🌍\n\nMore findings."
+    assert await task == "# Summary\n\nFirst finding. 🌍\n\nMore findings."
     assert suggestions == ["Compare regions?"]
     assert len([call for call in runtime.await_args_list if call.args[1] == "answer.delta"]) < 5
     assert FinalAnswerRuntime._finish_execution.await_args.kwargs["total_tokens"] == 30

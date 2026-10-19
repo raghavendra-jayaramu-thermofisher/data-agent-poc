@@ -21,6 +21,12 @@ OUTER_FENCE_PATTERN = re.compile(
 )
 
 
+ATX_HEADING_PATTERN = re.compile(r"^ {0,3}(?P<marks>#{1,6})(?:[ \t]+(?P<text>.*?))?[ \t]*$")
+SETEXT_H1_PATTERN = re.compile(r"^ {0,3}=+[ \t]*$")
+SLASH_COMMAND_PATTERN = re.compile(r"^/[\w-]+\s*")
+TITLE_LENGTH = 80
+
+
 def normalize_final_answer(markdown: str) -> str:
     """Apply deterministic presentation cleanup without changing answer content."""
 
@@ -29,6 +35,99 @@ def normalize_final_answer(markdown: str) -> str:
     if match is not None:
         return match.group("body").strip()
     return stripped
+
+
+def _unfenced_lines(lines: list[str]) -> list[bool]:
+    """Mark which lines sit outside fenced code blocks."""
+    outside: list[bool] = []
+    fence: str | None = None
+    for line in lines:
+        stripped = line.lstrip()
+        marker = next((fence for fence in ("```", "~~~") if stripped.startswith(fence)), None)
+        if marker is not None:
+            outside.append(False)
+            fence = None if fence == marker else fence or marker
+            continue
+        outside.append(fence is None)
+    return outside
+
+
+def _heading_text(raw: str | None) -> str:
+    # A closing sequence of '#' is decoration, not title text.
+    return re.sub(r"(?:^|[ \t]+)#+$", "", (raw or "").strip()).strip()
+
+
+def _h1_lines(lines: list[str]) -> list[tuple[int, str]]:
+    outside = _unfenced_lines(lines)
+    found: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        if not outside[index]:
+            continue
+        match = ATX_HEADING_PATTERN.match(line)
+        if match and len(match.group("marks")) == 1:
+            found.append((index, _heading_text(match.group("text"))))
+    return found
+
+
+def _setext_to_atx(lines: list[str]) -> list[str]:
+    outside = _unfenced_lines(lines)
+    result = list(lines)
+    for index in range(1, len(lines)):
+        previous = lines[index - 1]
+        if (
+            outside[index]
+            and outside[index - 1]
+            and SETEXT_H1_PATTERN.match(lines[index])
+            and previous.strip()
+            and not ATX_HEADING_PATTERN.match(previous)
+            and (index == 1 or not lines[index - 2].strip())
+        ):
+            result[index - 1] = f"# {previous.strip()}"
+            result[index] = ""
+    return result
+
+
+def answer_title(markdown: str) -> str | None:
+    """Return the answer's title: its first level-1 heading outside code blocks."""
+    headings = [text for _, text in _h1_lines(markdown.splitlines()) if text]
+    return headings[0] if headings else None
+
+
+def fallback_title(question: str) -> str:
+    """Build a short title from the question when the answer has none."""
+    text = " ".join(question.split())
+    text = SLASH_COMMAND_PATTERN.sub("", text)
+    text = re.sub(r"[#*_`>\[\]]", "", text).strip(" .?!:;")
+    if len(text) > TITLE_LENGTH:
+        text = text[:TITLE_LENGTH].rsplit(" ", 1)[0].rstrip(" ,;:-") + "…"
+    return text[:1].upper() + text[1:] if text else "Analysis"
+
+
+def ensure_answer_title(markdown: str, question: str) -> str:
+    """Guarantee exactly one level-1 heading, placed first, so it can serve as the title.
+
+    The first level-1 heading becomes the title. Any later level-1 headings become level-2
+    sections, and content written before the title moves below it.
+    """
+    lines = _setext_to_atx(markdown.splitlines())
+    headings = [(index, text) for index, text in _h1_lines(lines) if text]
+    empty = {index for index, text in _h1_lines(lines) if not text}
+    if not headings:
+        title, body = fallback_title(question), [
+            line for index, line in enumerate(lines) if index not in empty
+        ]
+    else:
+        title_index, title = headings[0]
+        body = []
+        for index, line in enumerate(lines):
+            if index == title_index or index in empty:
+                continue
+            if any(index == other for other, _ in headings[1:]):
+                body.append(f"## {_heading_text(ATX_HEADING_PATTERN.match(line).group('text'))}")
+            else:
+                body.append(line)
+    content = "\n".join(body).strip()
+    return f"# {title}\n\n{content}" if content else f"# {title}"
 
 
 def _directive_ids(markdown: str) -> tuple[list[str], list[str]]:

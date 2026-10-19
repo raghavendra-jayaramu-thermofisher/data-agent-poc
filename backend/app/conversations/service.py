@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
+from app.conversations.titles import default_conversation_title
 from app.conversations.repository import ConversationRepository
 from app.conversations.schemas import (
     AnswerReviewCounts,
@@ -248,8 +249,7 @@ class ConversationService:
         )
         self.repo.add_message(message)
         if conversation.title is None:
-            compact = " ".join(payload.content.split())
-            conversation.title = compact[:237] + "..." if len(compact) > 240 else compact
+            conversation.title = default_conversation_title(payload.content)
         await self.session.flush()
 
         job = await JobService(self.session, self.redis, self.settings).create_job(

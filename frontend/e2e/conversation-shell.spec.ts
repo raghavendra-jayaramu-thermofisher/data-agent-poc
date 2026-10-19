@@ -61,7 +61,7 @@ for (const { width, touch } of [
           id: 'm2',
           conversation_id: 'c1',
           role: 'assistant',
-          content: `## Results\n\nHere are the results.\n\n[[artifact:${tableId}]]\n\n[[artifact:${chartId}]]\n\n## Scope\n\nReference results from the selected source.`,
+          content: `# Orders by Channel and Period\n\n## Results\n\nHere are the results.\n\n[[artifact:${tableId}]]\n\n[[artifact:${chartId}]]\n\n## Scope\n\nReference results from the selected source.`,
           job_id: 'j1',
           metadata: {},
           created_at: timestamp,
@@ -230,7 +230,11 @@ for (const { width, touch } of [
       await expect(result.getByRole('cell', { name: '120', exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Present answer', exact: true }).click();
       const presentation = page.getByRole('dialog', { name: 'Answer presentation', exact: true });
-      await expect(presentation.getByRole('heading', { name: messages[0]!.content, exact: true })).toBeVisible();
+      // The answer's own title names the presentation, shown once rather than also above the body.
+      const answerTitle = presentation.getByRole('heading', { name: 'Orders by Channel and Period', exact: true });
+      await expect(answerTitle).toBeVisible();
+      await expect(presentation.locator('h1:visible', { hasText: 'Orders by Channel and Period' })).toHaveCount(1);
+      await expect(presentation.getByText(messages[0]!.content, { exact: true })).toHaveCount(0);
       const presentationPadding = await presentation.locator('.answer-main-content:visible').evaluate(
         (element) => parseFloat(getComputedStyle(element).paddingLeft),
       );

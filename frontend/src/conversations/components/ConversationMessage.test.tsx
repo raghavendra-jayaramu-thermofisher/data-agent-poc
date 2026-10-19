@@ -236,6 +236,36 @@ describe('ConversationMessage', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
+  it('titles a presentation with the answer heading instead of the question', async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConversationMessage
+          message={{ ...assistantMessage, job_id: null, content: '# Orders by region\n\n## Summary\nFirst.\n\n## Detail\nSecond.' }}
+          question="/report show orders"
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Present answer' }));
+    const toolbar = screen.getByLabelText('Presentation controls');
+    expect(within(toolbar).getByRole('heading', { level: 1, name: 'Orders by region' })).toBeInTheDocument();
+    expect(screen.queryByText('/report show orders')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Full answer', 'Summary', 'Detail']);
+  });
+
+  it('falls back to the question when an answer has no title heading', async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConversationMessage message={{ ...assistantMessage, job_id: null, content: 'A short answer.' }} question="How many orders?" />
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Present answer' }));
+    expect(within(screen.getByLabelText('Presentation controls')).getByRole('heading', { name: 'How many orders?' })).toBeInTheDocument();
+  });
+
   it('keeps a heading-free presentation as one answer without section controls', async () => {
     const user = userEvent.setup();
     renderMessage({ ...assistantMessage, job_id: null, content: 'A short answer.' });

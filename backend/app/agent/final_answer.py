@@ -8,7 +8,11 @@ from typing import Protocol, cast
 
 from app.agent.evidence import EvidenceBundle, render_evidence_context
 from app.agent.answer_stream import AnswerStreamPublisher
-from app.agent.final_answer_validation import normalize_final_answer, validate_final_answer
+from app.agent.final_answer_validation import (
+    ensure_answer_title,
+    normalize_final_answer,
+    validate_final_answer,
+)
 from app.agent.follow_up_suggestions import extract_follow_up_suggestions
 from app.agent.models import ModelExecution
 from app.agent.repository import AgentExecutionRepository
@@ -87,13 +91,22 @@ exactly from the manifest onto its own line.
 Use surrounding prose to explain the finding or significance rather than repeat the artifact's
 contents.
 
+# Title and headings
+
+Start every answer with exactly one level-1 heading (`# `) as its title. Write a short, specific
+noun phrase, usually 3 to 10 words, naming the subject, scope, and period of this answer. Do not
+write a sentence or a question, and do not end it with punctuation. Use no other level-1 heading.
+
+Use level-2 headings (`## `) for the answer's main sections and level-3 headings (`### `) for
+subsections within a section. When using a template, keep its sections at level 2 under the title.
+
 # Output
 
 Produce the completed answer as the entire response.
 
-When using a template, begin directly with its first applicable heading, field, or content.
-Otherwise, begin with the sentence answering the question. Make every sentence part of the
-substantive answer, and end when the requested content is complete.
+After the title, when using a template, continue directly with its first applicable heading,
+field, or content. Otherwise, continue with the sentence answering the question. Make every
+sentence part of the substantive answer, and end when the requested content is complete.
 
 Return user-facing Markdown. Keep private analyst notes, internal reasoning, and execution details
 private.
@@ -198,6 +211,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
         markdown = normalize_final_answer(markdown)
         if not markdown.strip():
             raise FinalAnswerError("FINAL_ANSWER_INVALID", "The final-answer model returned an empty answer.")
+        markdown = ensure_answer_title(markdown, evidence.question)
         has_custom_instructions = bool(
             (default_instructions and default_instructions.strip())
             or (command_instructions and command_instructions.strip())

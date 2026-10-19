@@ -44,10 +44,14 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         },
     )
     monkeypatch.setattr(jobs.JobRepository, "get", AsyncMock(return_value=job))
+    conversation = SimpleNamespace(id=conversation_id, table_scope=scope, title="Count orders")
+    monkeypatch.setattr(
+        jobs.ConversationRepository, "get_for_org", AsyncMock(return_value=conversation)
+    )
     monkeypatch.setattr(
         jobs.ConversationRepository,
-        "get_for_org",
-        AsyncMock(return_value=SimpleNamespace(id=conversation_id, table_scope=scope)),
+        "first_user_message",
+        AsyncMock(return_value=SimpleNamespace(content="Count orders")),
     )
     monkeypatch.setattr(
         jobs.ConversationRepository, "source_ids", AsyncMock(return_value=[source_id])
@@ -86,7 +90,7 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         assert context["table_scope"] == [dict(scope[0], knowledge_version_id=None)]
         assert "Count orders" in context["recent_questions"]
         kwargs["follow_up_suggestions"][:] = ["Compare orders by region?"]
-        return "There are 12 orders."
+        return "# Open orders\n\nThere are 12 orders."
 
     finalizer = AsyncMock(side_effect=finalize)
     monkeypatch.setattr(jobs.FinalAnswerRuntime, "run", finalizer)
@@ -129,7 +133,10 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
     await jobs.run_chat_query_job(job_id)
     message = existing if retry else saved_messages[0]
     message.id = message.id or uuid.uuid4()
-    assert message.content == "There are 12 orders."
+    assert message.content == "# Open orders\n\nThere are 12 orders."
+    assert message.metadata_json["title"] == "Open orders"
+    # The conversation still had its automatic title, so the first answer names it.
+    assert conversation.title == "Open orders"
     assert message.metadata_json["follow_up_suggestions"] == ["Compare orders by region?"]
     assert MessageResponse.model_validate(message).metadata["follow_up_suggestions"] == [
         "Compare orders by region?"

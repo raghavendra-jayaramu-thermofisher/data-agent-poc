@@ -39,7 +39,10 @@ export const ConversationMessage = memo(function ConversationMessage({
   const rowRef = useRef<HTMLDivElement>(null);
   const presentationBodyRef = useRef<HTMLDivElement>(null);
   const presentButtonRef = useRef<HTMLButtonElement>(null);
-  const sectionCount = useMemo(() => createAnswerOutline(message.content).sections.length, [message.content]);
+  const outline = useMemo(() => createAnswerOutline(message.content), [message.content]);
+  const sectionCount = outline.sections.length;
+  const presentationTitle =
+    outline.headings.find((heading) => heading.depth === 1)?.label || question?.trim() || 'Analysis';
   const selectedIndex = selectedSection === 'document' ? 0 : Number(selectedSection.slice('section-'.length)) + 1;
 
   const navigateSection = useCallback((direction: 'previous' | 'next' | 'first' | 'last') => {
@@ -237,7 +240,7 @@ export const ConversationMessage = memo(function ConversationMessage({
     >
       {presenting ? (
         <header className="assistant-presentation-toolbar" aria-label="Presentation controls">
-          <h1 className="assistant-presentation-title">{question?.trim() || 'Analysis'}</h1>
+          <h1 className="assistant-presentation-title">{presentationTitle}</h1>
           {actions}
         </header>
       ) : null}

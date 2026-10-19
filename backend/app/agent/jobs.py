@@ -12,6 +12,7 @@ from app.agent.evidence import (
     validate_evidence,
 )
 from app.agent.final_answer import FinalAnswerError, FinalAnswerRuntime
+from app.agent.final_answer_validation import answer_title
 from app.agent.models import JobArtifact
 from app.agent.repository import AgentExecutionRepository
 from app.agent.tools import (
@@ -23,6 +24,7 @@ from app.agent.tools import (
 from app.conversations.models import Message
 from app.conversations.repository import ConversationRepository
 from app.conversations.table_scope import SourceTableScope
+from app.conversations.titles import adopt_answer_title
 from app.core.config import get_settings
 from app.core.database import get_session_factory
 from app.core.errors import AppError
@@ -241,11 +243,19 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
     async with get_session_factory()() as session:
         repo = ConversationRepository(session)
         existing = await repo.message_for_job(job_id, "assistant")
+        title = answer_title(answer)
         metadata: dict[str, object] = {
             "runtime": "deepagents+finalizer",
+            "title": title,
             "follow_up_suggestions": follow_up_suggestions,
             "model_profile_id": str(profile_id),
         }
+        conversation = await repo.get_for_org(conversation_id, organization_id)
+        if conversation is not None:
+            first_question = await repo.first_user_message(conversation_id)
+            adopt_answer_title(
+                conversation, first_question.content if first_question else None, title
+            )
         if existing is None:
             message = Message(
                 conversation_id=conversation_id,

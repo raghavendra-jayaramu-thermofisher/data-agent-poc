@@ -128,6 +128,15 @@ class ConversationRepository:
         rows.reverse()
         return rows
 
+    async def first_user_message(self, conversation_id: uuid.UUID) -> Message | None:
+        result = await self.session.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id, Message.role == "user")
+            .order_by(Message.created_at.asc(), Message.id.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def message_for_job(self, job_id: uuid.UUID, role: str) -> Message | None:
         result = await self.session.execute(
             select(Message).where(Message.job_id == job_id, Message.role == role)
