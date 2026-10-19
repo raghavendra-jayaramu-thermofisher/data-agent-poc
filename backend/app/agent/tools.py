@@ -1145,11 +1145,13 @@ def build_default_tool_registry() -> AgentToolRegistry:
         )
     )
     from app.agent.management_tools import (
+        edit_skill,
         read_saved_context,
         save_knowledge,
         save_skill,
     )
     from app.agent.tool_schemas import (
+        EditSkillArgs,
         ReadSavedContextArgs,
         SaveKnowledgeArgs,
         SaveSkillArgs,
@@ -1170,9 +1172,15 @@ def build_default_tool_registry() -> AgentToolRegistry:
         ),
         (
             "save_skill",
-            "Save the user's approved format or approach as a reusable workspace skill only on an explicit current user save request. Create by default; update only a specifically requested existing skill. It does not change the workspace default.",
+            "Save the user's approved format or approach as a reusable workspace skill only on an explicit current user save request. Create by default; replace a specifically requested existing skill only when it is rewritten as a whole. It does not change the workspace default.",
             SaveSkillArgs,
             save_skill,
+        ),
+        (
+            "edit_skill",
+            "Make small changes to an existing skill on an explicit current user request: replace, insert, append, or delete specific text without rewriting the rest. Read the skill in full first and pass its content_hash. Prefer this over save_skill for partial changes.",
+            EditSkillArgs,
+            edit_skill,
         ),
     ):
         registry.register(
@@ -1395,6 +1403,14 @@ class AuditedToolExecutor:
 def _safe_tool_input(name: str, arguments: dict[str, object]) -> dict[str, object]:
     if name in {"save_knowledge", "save_skill"}:
         return {key: value for key, value in arguments.items() if key != "content"}
+    if name == "edit_skill":
+        edits = arguments.get("edits")
+        return {
+            "instruction_id": arguments.get("instruction_id"),
+            "content_hash": arguments.get("content_hash"),
+            "authorization_quote": arguments.get("authorization_quote"),
+            "edit_ops": [item.get("op") for item in edits] if isinstance(edits, list) else [],
+        }
     if name == "execute_sql":
         return {
             "data_source_id": arguments.get("data_source_id"),

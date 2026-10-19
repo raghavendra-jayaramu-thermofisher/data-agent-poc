@@ -488,3 +488,62 @@ class SaveSkillArgs(ManagementRequestArgs):
             "Exact existing skill ID from read_saved_context to update; omit to create a skill."
         ),
     )
+
+
+MAX_SKILL_EDITS = 20
+
+
+class SkillEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    op: Literal["replace", "insert_after", "append", "delete"] = Field(
+        description=(
+            "replace: swap target_text for new_text. insert_after: add new_text as new lines "
+            "after the line ending target_text. append: add new_text as new lines at the end. "
+            "delete: remove target_text."
+        )
+    )
+    target_text: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=20000,
+        description=(
+            "Exact text copied from the skill that occurs exactly once; required for replace, "
+            "insert_after, and delete. Include more surrounding text when it is not unique."
+        ),
+    )
+    new_text: str | None = Field(
+        default=None,
+        max_length=20000,
+        description="Text to write; required for replace, insert_after, and append.",
+    )
+
+    @model_validator(mode="after")
+    def validate_operation(self) -> SkillEdit:
+        needs_target = self.op != "append"
+        needs_text = self.op != "delete"
+        if needs_target != (self.target_text is not None):
+            usage = "requires" if needs_target else "does not use"
+            raise ValueError(f"{self.op} {usage} target_text.")
+        if needs_text and not (self.new_text or "").strip():
+            raise ValueError(f"{self.op} requires non-empty new_text.")
+        if not needs_text and self.new_text is not None:
+            raise ValueError("delete does not use new_text.")
+        return self
+
+
+class EditSkillArgs(ManagementRequestArgs):
+    instruction_id: uuid.UUID = Field(
+        description="Exact existing skill ID from read_saved_context."
+    )
+    content_hash: str = Field(
+        pattern=r"^[0-9a-f]{64}$",
+        description=(
+            "content_hash returned when reading this skill in full; the edit is refused if the "
+            "skill changed since."
+        ),
+    )
+    edits: list[SkillEdit] = Field(
+        min_length=1,
+        max_length=MAX_SKILL_EDITS,
+        description="Small changes applied in order; all succeed or none are saved.",
+    )

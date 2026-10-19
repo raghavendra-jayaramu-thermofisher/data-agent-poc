@@ -166,21 +166,16 @@ After the Markdown answer, append exactly one XML block on a new line:
   <suggestion>Second distinct useful question based on the answer</suggestion>
   <suggestion>Third useful question, when warranted</suggestion>
 </follow_up_suggestions>
-Aim for two or three distinct, helpful follow-up questions, but treat this as a guideline,
-not a quota or an upper limit. Let the completed answer and the user's likely next questions
-determine the count. Include more than three when there are additional valuable, distinct
-directions to explore. Include one when only one is useful, and none when no useful next step
-exists. Never add filler just to reach a count.
-Explore different meaningful next steps, rather than variations of the same question.
-First finish the answer, then derive suggestions from its specific findings, comparisons,
-exceptions, or unresolved questions. Each suggestion must help the user understand a finding
-more deeply or decide a useful next step; prioritize the most valuable questions first.
-Use self-contained questions the user can send directly. Keep each as short as possible while
-preserving the context and intent; length may vary with the question. Avoid generic invitations
-such as 'Would you like more details?', restating the answer, or repeating answered questions.
-Check that each next analysis is feasible with the verified schema and available data. Keep
-the existing data-source and table scope. Do not assume unavailable fields, historical snapshots,
-or causal explanations that the data cannot support. Do not invent facts in the suggestions.
+First finish the answer. Then suggest what this user would most likely ask next to understand
+or act on it, given their question and the conversation so far.
+- Anchor each suggestion to a specific finding, gap, or caveat in this answer.
+- Keep the answer's scope (population, filters, period) and change exactly one thing.
+- Write the full scope into the question so it can be sent as is, in the user's own terms.
+- Suggest only what the verified schema and evidence can answer; keep the data-source and
+  table scope, and do not invent facts.
+- Give each suggestion a different direction: no two may change the same kind of thing (for
+  example, two that only add a breakdown). Most useful first. Usually two or three; fewer when
+  fewer are useful. Never add filler, generic invitations, or already answered questions.
 Use an empty block when no useful next step exists. XML-escape question text. No attributes,
 nested tags, code fences, or text after this block. This is metadata, not answer prose.
 Generate the answer and suggestions together; do not call tools to generate suggestions.""")

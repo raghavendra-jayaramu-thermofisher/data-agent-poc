@@ -382,7 +382,7 @@ async def collect_evidence(
                 else {"error_code": item.error_code, "error_message": item.error_message},
             }
             for item in tools
-            if item.tool_name in {"save_knowledge", "save_skill"}
+            if item.tool_name in {"save_knowledge", "save_skill", "edit_skill"}
             and item.status in {"succeeded", "failed"}
         ),
     )

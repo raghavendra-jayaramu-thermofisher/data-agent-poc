@@ -36,7 +36,9 @@ class ProviderDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_finalizer_persists_the_provider_reason_in_execution(self):
         runtime = FinalAnswerRuntime.__new__(FinalAnswerRuntime)
-        runtime.settings = SimpleNamespace(final_answer_timeout_seconds=60)
+        runtime.settings = SimpleNamespace(
+            final_answer_timeout_seconds=60, final_answer_streaming_enabled=False
+        )
         client = SimpleNamespace(chat_completion=AsyncMock(side_effect=ModelProviderError("MODEL_PROVIDER_REJECTED_REQUEST", "Provider rejected request.", diagnostics={"http_status": 400, "provider_message": "Unsupported parameter", "parameter": "temperature", "provider_error_response": {"body": "extra provider detail"}})))
         runtime.client_factory = lambda *_: client
         runtime._start_execution = AsyncMock(return_value=uuid.uuid4())

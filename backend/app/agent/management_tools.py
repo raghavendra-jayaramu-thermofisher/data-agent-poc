@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
 from typing import Any
@@ -26,7 +27,7 @@ def explicit_management_request(message: str, quote: str, kind: str) -> bool:
     prefix = r"(?:please\s+|can you\s+|could you\s+|would you\s+|i want you to\s+)*"
     verbs = {
         "knowledge": r"(?:save|remember|add|create|update|record|store)",
-        "skills": r"(?:save|create|update|store|add)",
+        "skills": r"(?:save|create|update|store|add|edit|change|modify|remove|insert|append)",
     }
     pattern = rf"(?:^|[.!?]\s+|\n){prefix}{verbs[kind]}\b[^.!?\n]*"
     for match in re.finditer(pattern, message, re.IGNORECASE):
@@ -39,6 +40,67 @@ def explicit_management_request(message: str, quote: str, kind: str) -> bool:
         if re.search(domain, request, re.IGNORECASE):
             return True
     return False
+
+
+def content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _snippet(text: str, limit: int = 300) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _find_once(content: str, target: str, index: int) -> int:
+    start = content.find(target)
+    if start < 0:
+        raise AgentToolError(
+            "SKILL_EDIT_TARGET_NOT_FOUND",
+            f"Edit {index}: target_text was not found; copy it exactly from the current skill.",
+        )
+    if content.find(target, start + 1) >= 0:
+        raise AgentToolError(
+            "SKILL_EDIT_TARGET_AMBIGUOUS",
+            f"Edit {index}: target_text occurs more than once; include more surrounding text.",
+        )
+    return start
+
+
+def apply_skill_edits(
+    content: str, edits: list[dict[str, Any]]
+) -> tuple[str, list[dict[str, object]]]:
+    """Apply text edits in order without the model rewriting untouched instructions."""
+    changes: list[dict[str, object]] = []
+    for index, edit in enumerate(edits, start=1):
+        op, target, new_text = edit["op"], edit.get("target_text"), edit.get("new_text")
+        if op == "append":
+            content = f"{content.rstrip(chr(10))}\n{new_text}"
+            changes.append({"op": op, "added": _snippet(new_text)})
+            continue
+        start = _find_once(content, target, index)
+        end = start + len(target)
+        if op == "replace":
+            content = content[:start] + new_text + content[end:]
+            changes.append({"op": op, "removed": _snippet(target), "added": _snippet(new_text)})
+        elif op == "insert_after":
+            line_end = content.find("\n", end)
+            if line_end < 0:
+                content = f"{content}\n{new_text}"
+            else:
+                content = f"{content[: line_end + 1]}{new_text}\n{content[line_end + 1 :]}"
+            changes.append({"op": op, "after": _snippet(target), "added": _snippet(new_text)})
+        else:
+            whole_line = (start == 0 or content[start - 1] == "\n") and (
+                end == len(content) or content[end] == "\n"
+            )
+            if whole_line and end < len(content):
+                end += 1
+            elif whole_line and start > 0:
+                start -= 1
+            content = content[:start] + content[end:]
+            changes.append({"op": op, "removed": _snippet(target)})
+    if not content.strip():
+        raise AgentToolError("TOOL_ARGUMENT_INVALID", "The edited skill must still contain text.")
+    return content, changes
 
 
 async def _actor(
@@ -92,6 +154,7 @@ async def read_saved_context(
                     "command": item.command,
                     "is_default": item.is_default,
                     "content": item.content if item_id else item.content[:1000],
+                    "content_hash": content_hash(item.content),
                 }
         else:
             source_id = _parse_source_id(context, arguments)
@@ -262,5 +325,56 @@ async def save_skill(
             "name": name,
             "command": command,
             "content": content,
+            "url": "/skills",
+        }
+
+
+async def edit_skill(
+    context: AgentToolContext, arguments: dict[str, object], _tool_id: uuid.UUID
+) -> dict[str, object]:
+    async with get_session_factory()() as session:
+        user_id = await _actor(session, context, arguments, "skills")
+        service = InstructionService(session)
+        try:
+            item = await service.require_instruction(
+                uuid.UUID(str(arguments["instruction_id"])), context.organization_id
+            )
+        except AppError as exc:
+            raise AgentToolError(exc.code, exc.message) from exc
+        if content_hash(item.content) != arguments["content_hash"]:
+            raise AgentToolError(
+                "SKILL_CHANGED",
+                "The skill changed since it was read; read it in full again before editing.",
+            )
+        edited, changes = apply_skill_edits(item.content, list(arguments["edits"]))
+        try:
+            item = await service.update_instruction(
+                instruction_id=item.id,
+                organization_id=context.organization_id,
+                payload=InstructionUpdate(content=edited),
+            )
+        except (AppError, ValueError) as exc:
+            raise AgentToolError(
+                getattr(exc, "code", "TOOL_ARGUMENT_INVALID"), getattr(exc, "message", str(exc))
+            ) from exc
+        item_id, name, command = item.id, item.name, item.command
+        AuditService(session).record(
+            organization_id=context.organization_id,
+            user_id=user_id,
+            action="agent_instruction.edited",
+            resource_type="agent_instruction",
+            resource_id=item_id,
+            metadata={"chat_job_id": str(context.job_id), "edit_count": len(changes)},
+        )
+        await session.commit()
+        return {
+            "ok": True,
+            "action": "edited",
+            "kind": "skill",
+            "instruction_id": str(item_id),
+            "name": name,
+            "command": command,
+            "changes": changes,
+            "content_hash": content_hash(edited),
             "url": "/skills",
         }

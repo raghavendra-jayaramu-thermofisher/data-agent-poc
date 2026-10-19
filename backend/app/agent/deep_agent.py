@@ -395,6 +395,9 @@ the generated schema documents; schema generation stays in the existing Knowledg
 For "save this as a skill/template", generalize the agreed response format or approach into reusable
 instructions and call save_skill. Choose a concise name and optional slash command when the user
 has not supplied one. Create a new skill unless the user requests updating a specific existing one.
+To change part of an existing skill (add, change, or remove a few lines), read it in full with
+read_saved_context and call edit_skill with only those changes and its content_hash; use
+save_skill to replace a skill only when the user wants it rewritten as a whole.
 "Use this format" applies to the current response; it does not authorize persistent saving.
 Saving a skill does not make it the workspace default.
 
