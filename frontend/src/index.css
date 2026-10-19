@@ -343,6 +343,28 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
    Form Fields & Feedback States
    ========================================================================== */
 
+.auth-page--simple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 100dvh;
+  padding: 32px 24px;
+  overflow: visible;
+  background: var(--db-surface);
+}
+
+.auth-page--simple .auth-panel {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
 [data-slot="base"] {
   display: flex;
   flex-direction: column;
@@ -447,6 +469,12 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
   background: var(--db-surface-hover) !important;
   color: var(--db-text-primary) !important;
   border-color: var(--db-border-strong) !important;
+}
+
+.secret-field-row .secret-field-toggle {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
 }
 
 .form-row-between {
