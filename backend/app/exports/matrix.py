@@ -73,7 +73,7 @@ def build_matrix_excel(payload: dict, state: MatrixViewState) -> bytes:
     ):
         for cell in row:
             cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="4B123F")
+            cell.fill = PatternFill("solid", fgColor="5B5FC7")
     for index, node in enumerate(rows, start=header_depth + 1):
         label = text(index, 1, node["label"])
         label.alignment = Alignment(indent=max(0, node["depth"] - 1))

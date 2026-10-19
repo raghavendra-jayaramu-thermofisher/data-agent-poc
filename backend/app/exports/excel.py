@@ -57,7 +57,7 @@ def build_excel(table: ExcelTableExport) -> bytes:
             item.data_type = "s"  # Preserve literal text such as =SUM(...), never create formulas.
         if header:
             item.font = Font(bold=True, color="FFFFFF")
-            item.fill = PatternFill("solid", fgColor="4B123F")
+            item.fill = PatternFill("solid", fgColor="5B5FC7")
         return item
 
     sheet.append([cell(header, header=True) for header in table.headers])
