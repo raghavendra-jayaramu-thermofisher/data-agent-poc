@@ -47,14 +47,22 @@ If `sudo` asks for a password, enter the Ubuntu password created during WSL setu
 
 Redis is enabled to start when Ubuntu starts; the explicit start command also works if it is already running. Keep this Ubuntu window open. Systemd services alone do not keep the WSL instance alive.
 
+Alternatively, start Redis from Windows PowerShell without a password prompt. This runs as root inside Ubuntu and keeps the WSL instance alive while the window stays open:
+
+```powershell
+wsl -d Ubuntu -u root -- bash -c 'service redis-server start; redis-cli ping; exec sleep infinity'
+```
+
 ## 3. Start the backend API
 
 Open another ordinary **Windows PowerShell** window:
 
 ```powershell
 Set-Location C:\Projects\data-agent\space\poc\backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 12201
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 12201 --timeout-graceful-shutdown 3
 ```
+
+`--timeout-graceful-shutdown 3` stops the API within a few seconds of **Ctrl+C**. Without it, shutdown waits for open browser tabs to close their live job-event connections, which can take a long time.
 
 Wait for the application startup message. The API runs at:
 
@@ -155,6 +163,33 @@ Set-Location C:\Projects\data-agent\space\poc\backend
 
 Then start the API and worker again. Starting the existing application does not require recreating its database or reinstalling dependencies.
 
+## Restart after a code change
+
+Restart only the processes whose code changed. PostgreSQL and Redis keep running.
+
+| Changed | Restart |
+| --- | --- |
+| Backend API routes, exports, services | API |
+| Agent prompts, tools, job handling (`backend/app/agent`, `backend/app/jobs`) | Worker (and the API if shared code changed) |
+| Frontend (`frontend/src`) | Nothing: the Vite dev server reloads automatically |
+| `backend\.env` or `frontend\.env.local` | The process that reads that file |
+
+To stop the API, worker and frontend at once, run this in **Windows PowerShell**:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn app.main|app\.worker|vite' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+Confirm nothing is still running (no output means all are stopped):
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn app.main|app\.worker|vite' } | Select-Object ProcessId, CommandLine
+```
+
+Then start them again with steps 3 to 5, and check with step 6.
+
+If a window is stuck at "Waiting for connections to close", press **Ctrl+C** a second time to force it to quit.
+
 ## Stop everything
 
 1. Press **Ctrl+C** in the frontend window.
@@ -187,7 +222,8 @@ This preserves the project, database, environment files, and uploaded data. Post
 ## Troubleshooting
 
 - **`node` or `npm.cmd` is not recognized:** open a new PowerShell window. Node.js is installed under `C:\Program Files\nodejs`; verify that this directory is on Windows PATH.
-- **Redis connection refused:** open Ubuntu, start `redis-server`, and verify `redis-cli ping` returns `PONG`.
+- **Redis connection refused** (the worker exits with `Error 22 connecting to 127.0.0.1:6379`): start Redis with step 2 and verify `redis-cli ping` returns `PONG`, then start the worker again.
+- **API takes long to stop:** press **Ctrl+C** a second time, or start the API with `--timeout-graceful-shutdown 3` as in step 3.
 - **PostgreSQL connection refused:** verify `postgresql-x64-18` is running and `DATABASE_URL` uses the correct port.
 - **PostgreSQL authentication failure:** review the database username/password in `backend\.env` and ensure that account has access to `dbassistant`.
 - **API or frontend port already in use:** stop the existing instance before starting another. Docker and manual startup use the same default API/frontend ports.
