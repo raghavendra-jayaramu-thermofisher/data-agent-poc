@@ -14,7 +14,7 @@ from app.core.models import TimestampMixin
 class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
-        Index("ix_conversations_org_updated", "organization_id", "updated_at"),
+        Index("ix_conversations_org_updated", "organization_id", "updated_at", "id"),
         Index("ix_conversations_created_by", "created_by", "updated_at"),
     )
 
@@ -53,7 +53,7 @@ class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
         CheckConstraint("role IN ('user','assistant')", name="valid_role"),
-        Index("ix_messages_conversation_created", "conversation_id", "created_at"),
+        Index("ix_messages_conversation_created", "conversation_id", "created_at", "id"),
         Index("ix_messages_job", "job_id"),
     )
 

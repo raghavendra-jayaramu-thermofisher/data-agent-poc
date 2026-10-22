@@ -100,9 +100,9 @@ for (const width of [1280, 390]) {
             status: 503,
             json: { error: { code: 'UNAVAILABLE', message: 'Please retry.' } },
           });
-        } else if (path.endsWith('/conversations/c1/messages')) json = messages;
-        else if (path.endsWith('/conversations/c1')) json = { ...conversation, messages };
-        else if (path.endsWith('/conversations')) json = [conversation];
+        } else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
+        else if (path.endsWith('/conversations/c1')) json = conversation;
+        else if (path.endsWith('/conversations')) json = { items: [conversation], next_cursor: null, has_more: false };
         else if (path.endsWith('/data-sources')) json = [source];
         else if (path.endsWith('/execution'))
           json = { tools: [], models: [], sql: [], artifacts: [] };

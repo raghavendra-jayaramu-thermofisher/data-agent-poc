@@ -6,7 +6,8 @@ export const queryKeys = {
     },
     conversations: {
         all: (orgId: string | null) => ['conversations', orgId] as const,
-        list: (orgId: string | null) => ['conversations', orgId, 'list'] as const,
+        lists: (orgId: string | null) => ['conversations', orgId, 'list'] as const,
+        list: (orgId: string | null, search = '') => ['conversations', orgId, 'list', search] as const,
         detail: (orgId: string | null, id: string) => ['conversations', orgId, 'detail', id] as const,
         messages: (orgId: string | null, id: string) => ['conversations', orgId, 'messages', id] as const,
     },

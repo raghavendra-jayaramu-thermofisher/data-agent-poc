@@ -165,7 +165,7 @@ for (const { width, touch } of [
             created_at: timestamp,
             updated_at: timestamp,
           }));
-        else if (path.endsWith('/conversations/c1/messages')) json = messages;
+        else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
         else if (path.endsWith('/conversations/c1')) {
           if (method === 'PATCH') {
             expect(route.request().postDataJSON()).toEqual({ title: 'Shipment review' });
@@ -174,9 +174,9 @@ for (const { width, touch } of [
           } else if (method === 'DELETE') {
             deleted.push('c1');
             return route.fulfill({ status: 204 });
-          } else json = { ...conversation, messages };
+          } else json = conversation;
         } else if (path.endsWith('/conversations'))
-          json = deleted.includes('c1') ? [] : [conversation];
+          json = { items: deleted.includes('c1') ? [] : [conversation], next_cursor: null, has_more: false };
         else if (path.endsWith('/data-sources')) json = [source];
         else if (path.endsWith('/execution')) json = { tools: [], models: [], sql, artifacts };
         await route.fulfill({ json });

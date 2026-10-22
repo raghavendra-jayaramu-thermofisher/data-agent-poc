@@ -105,9 +105,9 @@ for (const { width, touch } of [
               updated_at: timestamp,
             },
           ];
-        else if (path.endsWith('/conversations/c1/messages')) json = messages;
-        else if (path.endsWith('/conversations/c1')) json = { ...conversation, messages };
-        else if (path.endsWith('/conversations')) json = [conversation];
+        else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
+        else if (path.endsWith('/conversations/c1')) json = conversation;
+        else if (path.endsWith('/conversations')) json = { items: [conversation], next_cursor: null, has_more: false };
         else if (path.endsWith('/execution'))
           json = { tools: [], models: [], sql: [], artifacts: [artifact] };
         else if (path.endsWith('/exports/excel')) {

@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authSession } from '../../auth/session-storage';
 import { setApiOrganizationId } from '../../organizations/organization-store';
 import { server } from '../../test/server';
-import { createConversation, listMessages, renameConversation, submitMessage } from './conversation-api';
+import {
+  createConversation,
+  listConversations,
+  listMessages,
+  renameConversation,
+  submitMessage,
+} from './conversation-api';
 
 // Resolve fetch after MSW starts instead of capturing the original fetch during imports.
 vi.mock('openapi-fetch', async (importOriginal) => {
@@ -49,11 +55,30 @@ describe('conversation API', () => {
   });
 
   it('loads durable messages independently of browser job state', async () => {
-    server.use(http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json([
+    server.use(http.get('http://localhost:12201/api/v1/conversations/c1/messages', () => HttpResponse.json({ items: [
       { id: 'm1', conversation_id: 'c1', role: 'user', content: 'Question', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:00Z' },
       { id: 'm2', conversation_id: 'c1', role: 'assistant', content: '**Answer**', job_id: 'j1', metadata: {}, created_at: '2026-08-24T12:00:03Z' },
-    ])));
-    const messages = await listMessages('c1');
-    expect(messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    ], next_cursor: null, has_more: false })));
+    const page = await listMessages('c1');
+    expect(page.items.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(page.has_more).toBe(false);
+  });
+
+  it('passes the opaque cursor and search to the paged endpoints', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get('http://localhost:12201/api/v1/conversations', ({ request }) => {
+        seen.push(new URL(request.url).search);
+        return HttpResponse.json({ items: [], next_cursor: null, has_more: false });
+      }),
+      http.get('http://localhost:12201/api/v1/conversations/c1/messages', ({ request }) => {
+        seen.push(new URL(request.url).search);
+        return HttpResponse.json({ items: [], next_cursor: null, has_more: false });
+      }),
+    );
+    await listConversations('rev', 'next-token');
+    await listMessages('c1', 'older-token');
+    await listConversations('');
+    expect(seen).toEqual(['?search=rev&cursor=next-token', '?cursor=older-token', '']);
   });
 });

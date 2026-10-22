@@ -30,9 +30,9 @@ test('conversation result → save to dashboard → provenance → background re
   await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: user }));
   await page.route('**/api/v1/organizations', (route) => route.fulfill({ json: [org] }));
   await page.route('**/api/v1/data-sources', (route) => route.fulfill({ json: [source] }));
-  await page.route('**/api/v1/conversations/c1/messages**', (route) => route.fulfill({ json: messages }));
-  await page.route('**/api/v1/conversations/c1', (route) => route.fulfill({ json: { ...conversation, messages } }));
-  await page.route('**/api/v1/conversations', (route) => route.fulfill({ json: [conversation] }));
+  await page.route('**/api/v1/conversations/c1/messages**', (route) => route.fulfill({ json: { items: messages, next_cursor: null, has_more: false } }));
+  await page.route('**/api/v1/conversations/c1', (route) => route.fulfill({ json: conversation }));
+  await page.route('**/api/v1/conversations', (route) => route.fulfill({ json: { items: [conversation], next_cursor: null, has_more: false } }));
   await page.route('**/api/v1/jobs/**', async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/v1/jobs/j1/execution') return route.fulfill({ json: trace });

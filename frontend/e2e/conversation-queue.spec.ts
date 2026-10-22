@@ -121,9 +121,9 @@ for (const width of [1600, 1280, 390]) {
           status: 202,
           json: { conversation_id: 'c1', message_id: 'm2', job_id: 'j2', status: 'queued' },
         });
-      } else if (path.endsWith('/conversations/c1/messages')) json = messages;
-      else if (path.endsWith('/conversations/c1')) json = { ...conversation, messages };
-      else if (path.endsWith('/conversations')) json = [conversation];
+      } else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
+      else if (path.endsWith('/conversations/c1')) json = conversation;
+      else if (path.endsWith('/conversations')) json = { items: [conversation], next_cursor: null, has_more: false };
       else if (/\/jobs\/j[12]\/events$/.test(path)) {
         const id = path.includes('/j1/') ? 'j1' : 'j2';
         const count = streams.get(id) ?? 0;

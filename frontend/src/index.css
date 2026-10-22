@@ -2701,3 +2701,17 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
 @media (max-width: 600px) {
   .matrix-scroll tbody th, .matrix-scroll .matrix-corner { min-width: 160px; max-width: 220px; }
 }
+
+/* Infinite list paging */
+.load-more-sentinel {
+  min-height: 1px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--db-text-muted);
+}
+
+.load-more-button {
+  color: var(--db-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}

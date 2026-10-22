@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime
 
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,14 +13,18 @@ from app.conversations.repository import ConversationRepository
 from app.conversations.schemas import (
     AnswerReviewCounts,
     ConversationCreate,
+    ConversationPage,
     ConversationRename,
     ConversationResponse,
     MessageCreate,
+    MessagePage,
+    MessageResponse,
     MessageVerificationUpdate,
 )
 from app.conversations.table_scope import SourceTableScope, resolve_table_scope
 from app.core.config import Settings
 from app.core.errors import AppError
+from app.core.pagination import CursorCodec, split_page
 from app.core.time import utc_now
 from app.data_sources.service import DataSourceService
 from app.instructions.repository import InstructionRepository
@@ -113,27 +118,55 @@ class ConversationService:
             raise AppError("CONVERSATION_NOT_FOUND", "Conversation not found.", 404)
         return item
 
-    async def to_response(
-        self, item: Conversation, review_counts: AnswerReviewCounts | None = None
-    ) -> ConversationResponse:
-        response = ConversationResponse.model_validate(item)
-        response.data_source_ids = await self.repo.source_ids(item.id)
-        if review_counts is None:
-            counts = await self.repo.answer_review_counts([item.id])
-            review_counts = counts.get(item.id, AnswerReviewCounts())
-        response.answer_review_counts = review_counts
-        return response
+    async def to_response(self, item: Conversation) -> ConversationResponse:
+        return (await self.to_responses([item]))[0]
 
-    async def list_responses_for_org(self, organization_id: uuid.UUID) -> list[ConversationResponse]:
-        rows = await self.list_for_org(organization_id)
-        counts = await self.repo.answer_review_counts([item.id for item in rows])
+    async def to_responses(self, items: list[Conversation]) -> list[ConversationResponse]:
+        ids = [item.id for item in items]
+        sources = await self.repo.source_ids_for(ids)
+        counts = await self.repo.answer_review_counts(ids)
         return [
-            await self.to_response(item, counts.get(item.id, AnswerReviewCounts()))
-            for item in rows
+            ConversationResponse.model_validate(item).model_copy(update={
+                "data_source_ids": sources.get(item.id, []),
+                "answer_review_counts": counts.get(item.id, AnswerReviewCounts()),
+            })
+            for item in items
         ]
 
-    async def list_for_org(self, organization_id: uuid.UUID) -> list[Conversation]:
-        return await self.repo.list_for_org(organization_id)
+    async def list_page(
+        self, organization_id: uuid.UUID, *, search: str, cursor: str | None, limit: int
+    ) -> ConversationPage:
+        search = search.strip()
+        codec = CursorCodec(self.settings, "conversations", organization_id, search.casefold())
+        after = codec.decode(cursor, [datetime.fromisoformat, uuid.UUID]) if cursor else None
+        rows, has_more = split_page(await self.repo.list_page_for_org(
+            organization_id, search=search, after=after, limit=limit
+        ), limit)
+        return ConversationPage(
+            items=await self.to_responses(rows),
+            next_cursor=codec.encode([rows[-1].updated_at, rows[-1].id]) if has_more else None,
+            has_more=has_more,
+        )
+
+    async def message_page(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        *,
+        cursor: str | None,
+        limit: int,
+    ) -> MessagePage:
+        await self.require_for_org(conversation_id, organization_id)
+        codec = CursorCodec(self.settings, "messages", organization_id, conversation_id)
+        before = codec.decode(cursor, [datetime.fromisoformat, uuid.UUID]) if cursor else None
+        rows, has_more = split_page(
+            await self.repo.list_message_page(conversation_id, before=before, limit=limit), limit
+        )
+        return MessagePage(
+            items=[MessageResponse.model_validate(row) for row in reversed(rows)],
+            next_cursor=codec.encode([rows[-1].created_at, rows[-1].id]) if has_more else None,
+            has_more=has_more,
+        )
 
     async def delete(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         item = await self.require_for_org(conversation_id, organization_id)

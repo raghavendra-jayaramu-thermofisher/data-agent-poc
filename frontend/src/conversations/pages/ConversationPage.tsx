@@ -9,7 +9,6 @@ import { useJobManager } from '../../jobs/JobManagerProvider';
 import { isTerminalJobStatus } from '../../jobs/types';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import { useAuth } from '../../auth/AuthProvider';
-import type { ConversationMessage as Message } from '../api/conversation-api';
 import * as api from '../api/conversation-api';
 import { AnalysisFailure } from '../components/AnalysisFailure';
 import { AnalysisProgress } from '../components/AnalysisProgress';
@@ -18,7 +17,12 @@ import { ConversationMessage } from '../components/ConversationMessage';
 import { FollowUpChatComposer } from '../components/FollowUpChatComposer';
 import { ConversationActions } from '../components/ConversationActions';
 import { orderConversationTurns } from '../components/conversation-turns';
-import { useConversation, useConversationMessages } from '../hooks/useConversations';
+import { LoadMoreSentinel } from '../../components/LoadMoreSentinel';
+import {
+  appendMessage,
+  useConversation,
+  useConversationMessages,
+} from '../hooks/useConversations';
 
 type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
 
@@ -80,24 +84,15 @@ export function ConversationPage() {
   const appendOptimisticMessage = useCallback(
     (accepted: api.MessageAccepted, content: string) => {
       if (!conversationId) return;
-      queryClient.setQueryData<Message[]>(
-        queryKeys.conversations.messages(orgId, conversationId),
-        (current = []) => {
-          if (current.some((message) => message.id === accepted.message_id)) return current;
-          return [
-            ...current,
-            {
-              id: accepted.message_id,
-              conversation_id: conversationId,
-              role: 'user',
-              content,
-              job_id: accepted.job_id,
-              metadata: {},
-              created_at: new Date().toISOString(),
-            },
-          ];
-        },
-      );
+      appendMessage(queryClient, orgId, {
+        id: accepted.message_id,
+        conversation_id: conversationId,
+        role: 'user',
+        content,
+        job_id: accepted.job_id,
+        metadata: {},
+        created_at: new Date().toISOString(),
+      });
     },
     [conversationId, orgId, queryClient],
   );
@@ -113,7 +108,7 @@ export function ConversationPage() {
         });
         appendOptimisticMessage(accepted, content);
         await jobManager.registerJob(accepted.job_id);
-        await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.lists(orgId) });
       } finally {
         setIsSubmitting(false);
       }
@@ -139,9 +134,26 @@ export function ConversationPage() {
   }, [conversationId, location.pathname, location.state, navigate, submit]);
 
   // Follow incoming text only while the reader has stayed near the bottom.
+  const newestMessageId = messages.messages.at(-1)?.id;
   useLayoutEffect(() => {
     if (followScrollRef.current) scrollAnchorRef.current?.scrollIntoView({ behavior: 'instant' });
-  }, [messages.data?.length, activeRunningJob?.job.id, activeRunningJob?.answer?.text.length]);
+  }, [newestMessageId, activeRunningJob?.job.id, activeRunningJob?.answer?.text.length]);
+
+  // Older pages are prepended above the reader; keep the visible messages where they were.
+  const oldestMessageId = messages.messages[0]?.id;
+  const prependAnchorRef = useRef<{ oldestId: string | undefined; height: number } | null>(null);
+  const loadOlderMessages = useCallback(() => {
+    const scroll = workspaceRef.current?.querySelector<HTMLElement>('.chat-main-scroll');
+    prependAnchorRef.current = { oldestId: oldestMessageId, height: scroll?.scrollHeight ?? 0 };
+    void messages.fetchNextPage();
+  }, [messages, oldestMessageId]);
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    if (!anchor || anchor.oldestId === oldestMessageId) return;
+    prependAnchorRef.current = null;
+    const scroll = workspaceRef.current?.querySelector<HTMLElement>('.chat-main-scroll');
+    if (scroll) scroll.scrollTop += scroll.scrollHeight - anchor.height;
+  }, [oldestMessageId]);
 
   useEffect(() => {
     if (!composerElement) return;
@@ -193,7 +205,7 @@ export function ConversationPage() {
       />
     );
   }
-  if (messages.isError) {
+  if (messages.isError && !messages.isFetchNextPageError) {
     return (
       <PageError
         title="Unable to load messages"
@@ -205,7 +217,7 @@ export function ConversationPage() {
 
   const sourceMap = new Map((dataSources.data ?? []).map((source) => [source.id, source]));
 
-  const durableMessages = orderConversationTurns(messages.data ?? []);
+  const durableMessages = orderConversationTurns(messages.messages);
   const latestAssistantId = durableMessages.findLast((message) => message.role === 'assistant')?.id;
   const assistantJobIds = new Set(
     durableMessages
@@ -311,6 +323,16 @@ export function ConversationPage() {
 
         {/* Message Stream */}
         <div className="chat-message-stream" aria-label="Conversation messages">
+          {durableMessages.length > 0 && (
+            <LoadMoreSentinel
+              hasMore={messages.hasNextPage}
+              isLoading={messages.isFetchingNextPage}
+              isError={messages.isFetchNextPageError}
+              onLoadMore={loadOlderMessages}
+              loadingLabel="Loading earlier messages…"
+              endLabel={messages.data && messages.data.pages.length > 1 ? 'Start of conversation' : undefined}
+            />
+          )}
           {durableMessages.length ? (
             messageTimeline
           ) : (

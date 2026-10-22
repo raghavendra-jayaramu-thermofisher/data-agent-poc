@@ -10,17 +10,19 @@ from app.auth.dependencies import get_current_organization, get_current_user
 from app.auth.models import User
 from app.conversations.schemas import (
     ConversationCreate,
-    ConversationDetailResponse,
+    ConversationPage,
     ConversationRename,
     ConversationResponse,
     MessageAcceptedResponse,
     MessageCreate,
+    MessagePage,
     MessageResponse,
     MessageVerificationUpdate,
 )
 from app.conversations.service import ConversationService
 from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
+from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from app.core.redis import get_redis
 from app.organizations.models import Organization, OrganizationMembership
 
@@ -45,34 +47,32 @@ async def create_conversation(
     return await service.to_response(item)
 
 
-@router.get("", response_model=list[ConversationResponse])
+@router.get("", response_model=ConversationPage)
 async def list_conversations(
+    search: str = Query(default="", max_length=240),
+    cursor: str | None = Query(default=None, max_length=1024),
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
-) -> list[ConversationResponse]:
+) -> ConversationPage:
     organization, _ = context
-    service = ConversationService(session, settings)
-    return await service.list_responses_for_org(organization.id)
+    return await ConversationService(session, settings).list_page(
+        organization.id, search=search, cursor=cursor, limit=limit
+    )
 
 
-@router.get("/{conversation_id}", response_model=ConversationDetailResponse)
+@router.get("/{conversation_id}", response_model=ConversationResponse)
 async def get_conversation(
     conversation_id: uuid.UUID,
-    message_limit: int = Query(default=200, ge=1, le=500),
     context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
-) -> ConversationDetailResponse:
+) -> ConversationResponse:
     organization, _ = context
     service = ConversationService(session, settings)
     item = await service.require_for_org(conversation_id, organization.id)
-    base = await service.to_response(item)
-    messages = await service.repo.list_messages(item.id, limit=message_limit)
-    return ConversationDetailResponse(
-        **base.model_dump(),
-        messages=[MessageResponse.model_validate(message) for message in messages],
-    )
+    return await service.to_response(item)
 
 
 @router.patch("/{conversation_id}", response_model=ConversationResponse)
@@ -112,19 +112,19 @@ async def delete_all_conversations(
     await service.delete_all(organization.id)
 
 
-@router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
+@router.get("/{conversation_id}/messages", response_model=MessagePage)
 async def list_messages(
     conversation_id: uuid.UUID,
-    limit: int = Query(default=200, ge=1, le=500),
+    cursor: str | None = Query(default=None, max_length=1024),
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
-) -> list[MessageResponse]:
+) -> MessagePage:
     organization, _ = context
-    service = ConversationService(session, settings)
-    await service.require_for_org(conversation_id, organization.id)
-    rows = await service.repo.list_messages(conversation_id, limit=limit)
-    return [MessageResponse.model_validate(row) for row in rows]
+    return await ConversationService(session, settings).message_page(
+        conversation_id, organization.id, cursor=cursor, limit=limit
+    )
 
 
 @router.post(

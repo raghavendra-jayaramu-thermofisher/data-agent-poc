@@ -200,9 +200,9 @@ for (const { width, large, wide } of [
             updated_at: timestamp,
           },
         ];
-      else if (path.endsWith('/conversations/c1/messages')) json = messages;
-      else if (path.endsWith('/conversations/c1')) json = { ...conversation, messages };
-      else if (path.endsWith('/conversations')) json = [conversation];
+      else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
+      else if (path.endsWith('/conversations/c1')) json = conversation;
+      else if (path.endsWith('/conversations')) json = { items: [conversation], next_cursor: null, has_more: false };
       else if (path.endsWith('/data-sources')) json = [source];
       else if (path.endsWith('/execution'))
         json = { tools: [], models: [], sql: [sql], artifacts: [artifact] };

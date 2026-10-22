@@ -3,23 +3,31 @@ import type { components } from '../../api/generated/schema';
 
 type S = components['schemas'];
 export type Conversation = S['ConversationResponse'];
-export type ConversationDetail = S['ConversationDetailResponse'];
+export type ConversationPage = S['ConversationPage'];
+export type MessagePage = S['MessagePage'];
 export type ConversationMessage = S['app__conversations__schemas__MessageResponse'];
 export type ConversationCreate = S['ConversationCreate'];
 export type MessageCreate = S['MessageCreate'];
 export type MessageAccepted = S['MessageAcceptedResponse'];
 
-export function listConversations(): Promise<Conversation[]> {
-  return withAuthRefresh(() => apiClient.GET('/api/v1/conversations'));
+export function listConversations(
+  search: string,
+  cursor?: string | null,
+  signal?: AbortSignal,
+): Promise<ConversationPage> {
+  return withAuthRefresh(() => apiClient.GET('/api/v1/conversations', {
+    params: { query: { search: search || undefined, cursor } },
+    signal,
+  }));
 }
 
 export function createConversation(body: ConversationCreate): Promise<Conversation> {
   return withAuthRefresh(() => apiClient.POST('/api/v1/conversations', { body }));
 }
 
-export function getConversation(id: string, messageLimit = 200): Promise<ConversationDetail> {
+export function getConversation(id: string): Promise<Conversation> {
   return withAuthRefresh(() => apiClient.GET('/api/v1/conversations/{conversation_id}', {
-    params: { path: { conversation_id: id }, query: { message_limit: messageLimit } },
+    params: { path: { conversation_id: id } },
   }));
 }
 
@@ -30,9 +38,15 @@ export function renameConversation(id: string, title: string): Promise<Conversat
   }));
 }
 
-export function listMessages(id: string, limit = 200): Promise<ConversationMessage[]> {
+/** Newest messages first; `cursor` continues toward older messages. Items are chronological. */
+export function listMessages(
+  id: string,
+  cursor?: string | null,
+  signal?: AbortSignal,
+): Promise<MessagePage> {
   return withAuthRefresh(() => apiClient.GET('/api/v1/conversations/{conversation_id}/messages', {
-    params: { path: { conversation_id: id }, query: { limit } },
+    params: { path: { conversation_id: id }, query: { cursor } },
+    signal,
   }));
 }
 
@@ -50,12 +64,7 @@ export async function deleteConversation(id: string): Promise<void> {
 }
 
 export async function deleteAllConversations(): Promise<void> {
-  try {
-    await withAuthRefresh(() => apiClient.DELETE('/api/v1/conversations' as any));
-  } catch {
-    const list = await listConversations();
-    await Promise.all(list.map((c) => deleteConversation(c.id)));
-  }
+  await withAuthRefresh(() => apiClient.DELETE('/api/v1/conversations'));
 }
 
 export function saveVerification(message: ConversationMessage, body: S['MessageVerificationUpdate']): Promise<ConversationMessage> {

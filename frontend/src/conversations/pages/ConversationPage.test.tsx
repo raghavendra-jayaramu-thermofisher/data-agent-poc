@@ -87,8 +87,18 @@ const source = {
 
 function RecentChats() {
   const chats = useConversationList();
-  return <RecentConversations conversations={chats.data ?? []} />;
+  return <RecentConversations conversations={chats.conversations} />;
 }
+
+const page = <T,>(items: T[], next_cursor: string | null = null) => ({
+  items,
+  next_cursor,
+  has_more: next_cursor !== null,
+});
+const messagePages = (...pages: unknown[][]) => ({
+  pages: pages.map((items) => page(items)),
+  pageParams: pages.map(() => null),
+});
 
 function renderPage(state?: object, withRecent = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -109,13 +119,13 @@ function renderPage(state?: object, withRecent = false) {
 function baseHandlers(messageProvider: () => unknown[] = () => []) {
   server.use(
     http.get('http://localhost:12201/api/v1/conversations/c1', () =>
-      HttpResponse.json({ ...conversation, messages: [] }),
+      HttpResponse.json(conversation),
     ),
     http.get('http://localhost:12201/api/v1/conversations/c1/messages', () =>
-      HttpResponse.json(messageProvider()),
+      HttpResponse.json(page(messageProvider())),
     ),
     http.get('http://localhost:12201/api/v1/conversations', () =>
-      HttpResponse.json([conversation]),
+      HttpResponse.json(page([conversation])),
     ),
     http.get('http://localhost:12201/api/v1/data-sources', () => HttpResponse.json([source])),
     http.get('http://localhost:12201/api/v1/models/profiles', () => HttpResponse.json([])),
@@ -135,6 +145,45 @@ describe('durable conversation workspace', () => {
       configurable: true,
       value: vi.fn(),
     });
+  });
+
+  it('loads the newest messages first and earlier pages on demand', async () => {
+    const message = (id: string, role: string, minute: number) => ({
+      id,
+      conversation_id: 'c1',
+      role,
+      content: `Message ${id}`,
+      job_id: null,
+      metadata: {},
+      created_at: `2026-08-24T12:0${minute}:00Z`,
+    });
+    const cursors: (string | null)[] = [];
+    baseHandlers();
+    server.use(
+      http.get('http://localhost:12201/api/v1/conversations/c1/messages', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        cursors.push(cursor);
+        return HttpResponse.json(
+          cursor === 'older'
+            ? page([message('m1', 'user', 1), message('m2', 'assistant', 2)])
+            : page([message('m3', 'user', 3), message('m4', 'assistant', 4)], 'older'),
+        );
+      }),
+    );
+    renderPage();
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Message m4')).toBeInTheDocument();
+    expect(screen.queryByText('Message m1')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Message m1')).toBeInTheDocument();
+    expect(cursors).toEqual([null, 'older']);
+    const stream = screen.getByLabelText('Conversation messages');
+    const order = ['m1', 'm2', 'm3', 'm4'].map((id) => stream.textContent!.indexOf(`Message ${id}`));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(screen.getByText('Start of conversation')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
   });
 
   it('replaces a read-only streamed preview with the authoritative saved answer', async () => {
@@ -183,16 +232,19 @@ describe('durable conversation workspace', () => {
       manager.jobs = [
         { ...manager.jobs[0]!, job: { ...manager.jobs[0]!.job, status: 'succeeded' } },
       ];
-      client.setQueryData(queryKeys.conversations.messages('org-1', 'c1'), [
-        question,
-        {
-          ...question,
-          id: 'a1',
-          role: 'assistant',
-          content: 'The final saved answer.',
-          metadata: {},
-        },
-      ]);
+      client.setQueryData(
+        queryKeys.conversations.messages('org-1', 'c1'),
+        messagePages([
+          question,
+          {
+            ...question,
+            id: 'a1',
+            role: 'assistant',
+            content: 'The final saved answer.',
+            metadata: {},
+          },
+        ]),
+      );
     });
     expect(await screen.findByText('The final saved answer.')).toBeInTheDocument();
     expect(screen.queryByRole('article', { name: 'Answer being written' })).not.toBeInTheDocument();
@@ -222,9 +274,10 @@ describe('durable conversation workspace', () => {
     expect(answerRenders).not.toHaveBeenCalled();
 
     await act(async () => {
-      client.setQueryData(queryKeys.conversations.messages('org-1', 'c1'), [
-        { ...answer, content: '# Customer report\n\nUpdated backlog.' },
-      ]);
+      client.setQueryData(
+        queryKeys.conversations.messages('org-1', 'c1'),
+        messagePages([{ ...answer, content: '# Customer report\n\nUpdated backlog.' }]),
+      );
     });
     expect(await screen.findByText('Updated backlog.')).toBeInTheDocument();
     expect(answerRenders).toHaveBeenCalled();
@@ -312,9 +365,11 @@ describe('durable conversation workspace', () => {
     let saved = { ...conversation };
     server.use(
       http.get('http://localhost:12201/api/v1/conversations/c1', () =>
-        HttpResponse.json({ ...saved, messages: [] }),
+        HttpResponse.json(saved),
       ),
-      http.get('http://localhost:12201/api/v1/conversations', () => HttpResponse.json([saved])),
+      http.get('http://localhost:12201/api/v1/conversations', () =>
+        HttpResponse.json(page([saved])),
+      ),
       http.patch('http://localhost:12201/api/v1/conversations/c1', async ({ request }) => {
         expect(await request.json()).toEqual({ title: 'Monthly revenue review' });
         saved = { ...saved, title: 'Monthly revenue review' };

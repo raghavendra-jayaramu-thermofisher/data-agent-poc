@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.schemas import AnswerReviewCounts
+from app.core.pagination import keyset_page
 from app.jobs.models import Job
+
+UNTITLED_CONVERSATION = "Untitled analysis"
 
 
 class ConversationRepository:
@@ -53,22 +57,44 @@ class ConversationRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_for_org(self, organization_id: uuid.UUID, limit: int = 100) -> list[Conversation]:
-        result = await self.session.execute(
-            select(Conversation)
-            .where(Conversation.organization_id == organization_id)
-            .order_by(Conversation.updated_at.desc())
-            .limit(limit)
-        )
+    async def list_page_for_org(
+        self,
+        organization_id: uuid.UUID,
+        *,
+        search: str,
+        after: Sequence[object] | None,
+        limit: int,
+    ) -> list[Conversation]:
+        statement = select(Conversation).where(Conversation.organization_id == organization_id)
+        if search:
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            title = func.coalesce(
+                func.nullif(func.trim(Conversation.title), ""), UNTITLED_CONVERSATION
+            )
+            statement = statement.where(title.ilike(f"%{escaped}%", escape="\\"))
+        result = await self.session.execute(keyset_page(
+            statement, [Conversation.updated_at, Conversation.id],
+            after=after, descending=True, limit=limit,
+        ))
         return list(result.scalars().all())
 
     async def source_ids(self, conversation_id: uuid.UUID) -> list[uuid.UUID]:
+        return (await self.source_ids_for([conversation_id])).get(conversation_id, [])
+
+    async def source_ids_for(
+        self, conversation_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        if not conversation_ids:
+            return {}
         result = await self.session.execute(
-            select(ConversationDataSource.data_source_id)
-            .where(ConversationDataSource.conversation_id == conversation_id)
-            .order_by(ConversationDataSource.data_source_id)
+            select(ConversationDataSource.conversation_id, ConversationDataSource.data_source_id)
+            .where(ConversationDataSource.conversation_id.in_(conversation_ids))
+            .order_by(ConversationDataSource.conversation_id, ConversationDataSource.data_source_id)
         )
-        return list(result.scalars().all())
+        sources: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for conversation_id, data_source_id in result.all():
+            sources.setdefault(conversation_id, []).append(data_source_id)
+        return sources
 
     async def answer_review_counts(
         self, conversation_ids: list[uuid.UUID]
@@ -94,16 +120,14 @@ class ConversationRepository:
             for row in result.all()
         }
 
-    async def list_messages(
-        self, conversation_id: uuid.UUID, *, limit: int = 200
+    async def list_message_page(
+        self, conversation_id: uuid.UUID, *, before: Sequence[object] | None, limit: int
     ) -> list[Message]:
-        # Keep chronological ordering for the UI/agent. The backend bounds history sent to the model separately.
-        result = await self.session.execute(
-            select(Message)
-            .where(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at.asc())
-            .limit(limit)
-        )
+        """Newest messages first, continuing toward older ones; callers restore chronology."""
+        result = await self.session.execute(keyset_page(
+            select(Message).where(Message.conversation_id == conversation_id),
+            [Message.created_at, Message.id], after=before, descending=True, limit=limit,
+        ))
         return list(result.scalars().all())
 
     async def recent_messages(

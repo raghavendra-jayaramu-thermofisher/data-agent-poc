@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.conversations.table_scope import SourceTableScope
+from app.core.pagination import CursorPage
 
 
 class ConversationCreate(BaseModel):
@@ -123,8 +124,12 @@ class MessageAcceptedResponse(BaseModel):
     job_id: uuid.UUID
 
 
-class ConversationDetailResponse(ConversationResponse):
-    messages: list[MessageResponse] = Field(default_factory=list)
+class ConversationPage(CursorPage[ConversationResponse]):
+    """Conversations, most recently updated first."""
+
+
+class MessagePage(CursorPage[MessageResponse]):
+    """Chronological messages; next_cursor continues toward older messages."""
 
 
 class MessageVerificationUpdate(BaseModel):

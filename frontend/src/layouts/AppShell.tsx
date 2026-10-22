@@ -30,6 +30,7 @@ import { DisplaySettingsModal } from './DisplaySettingsModal';
 import { preferences } from '../lib/preferences';
 import { BrandLogo } from '../components/BrandLogo';
 import { UserAvatar } from '../components/UserAvatar';
+import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 
 const navigationItems = [
   { label: 'Dashboards', to: '/dashboards', icon: LayoutDashboard },
@@ -93,10 +94,13 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => preferences.get('navigationCollapsed') ?? false);
   const navigate = useNavigate();
   const location = useLocation();
-  const conversations = useConversationList();
-  const recentList = (conversations.data ?? []).filter((chat) =>
-    (chat.title?.trim() || 'Untitled analysis').toLowerCase().includes(searchFilter.toLowerCase()),
-  );
+  const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchQuery(searchFilter.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchFilter]);
+  const conversations = useConversationList(searchQuery);
+  const recentList = conversations.conversations;
   const accountName = user?.display_name?.trim() || user?.email || 'Account';
   const visibleMoreItems = moreNavigationItems.filter(({ to }) => isTabVisible(to));
   const moreActive = visibleMoreItems.some(({ to }) => location.pathname.startsWith(to));
@@ -211,7 +215,7 @@ export function AppShell() {
             <section className="sidebar-history" aria-label="Recent chats">
               <div className="sidebar-history-header">
                 <h2>Recent chats</h2>
-                {Boolean(conversations.data?.length) && (
+                {Boolean(recentList.length || searchQuery) && (
                   <ClearChatsButton onClick={() => {
                     if (mobile) setMobileOpen(false);
                     setDeleteAllOpen(true);
@@ -248,7 +252,17 @@ export function AppShell() {
                   Loading chats…
                 </p>
               )}
-              {conversations.isError && (
+              {recentList.length > 0 && (
+                <LoadMoreSentinel
+                  className="sidebar-history-state"
+                  hasMore={conversations.hasNextPage}
+                  isLoading={conversations.isFetchingNextPage}
+                  isError={conversations.isFetchNextPageError}
+                  onLoadMore={() => void conversations.fetchNextPage()}
+                  loadingLabel="Loading more chats…"
+                />
+              )}
+              {conversations.isError && !conversations.isFetchNextPageError && (
                 <button
                   className="sidebar-history-state"
                   type="button"

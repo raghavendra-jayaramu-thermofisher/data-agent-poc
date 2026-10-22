@@ -185,9 +185,9 @@ for (const { width, cancel } of [
             active_file: null,
           },
         ];
-      else if (path.endsWith('/conversations/c1/messages')) json = messages;
-      else if (path.endsWith('/conversations/c1')) json = { ...conversation, messages };
-      else if (path.endsWith('/conversations')) json = [conversation];
+      else if (path.endsWith('/conversations/c1/messages')) json = { items: messages, next_cursor: null, has_more: false };
+      else if (path.endsWith('/conversations/c1')) json = conversation;
+      else if (path.endsWith('/conversations')) json = { items: [conversation], next_cursor: null, has_more: false };
       else if (path.endsWith('/jobs/j1/execution'))
         json = { tools: [], models: [], sql: [sql], artifacts: [chart] };
       else if (path.endsWith('/jobs/j1/cancel')) {

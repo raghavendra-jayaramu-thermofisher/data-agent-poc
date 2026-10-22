@@ -25,16 +25,16 @@ test('Task 3 durable analysis survives navigation/reload and reconciles the fina
   await page.route('**/api/v1/models/profiles', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/v1/conversations', async (route) => {
     if (route.request().method() === 'POST') return route.fulfill({ status: 201, json: conversation });
-    return route.fulfill({ json: [conversation] });
+    return route.fulfill({ json: { items: [conversation], next_cursor: null, has_more: false } });
   });
-  await page.route('**/api/v1/conversations/c1', (route) => route.fulfill({ json: { ...conversation, messages: [] } }));
+  await page.route('**/api/v1/conversations/c1', (route) => route.fulfill({ json: conversation }));
   await page.route('**/api/v1/conversations/c1/messages**', async (route) => {
     if (route.request().method() === 'POST') return route.fulfill({ status: 202, json: { message_id: 'm1', job_id: 'j-chat' } });
     const messages = finalAnswer ? [
       { id: 'm1', conversation_id: 'c1', role: 'user', content: 'Why did revenue fall?', job_id: 'j-chat', metadata: {}, created_at: '2026-08-24T12:00:01Z' },
       { id: 'm2', conversation_id: 'c1', role: 'assistant', content: '**Revenue declined 8%**, led by enterprise churn.', job_id: 'j-chat', metadata: {}, created_at: '2026-08-24T12:00:06Z' },
     ] : [];
-    return route.fulfill({ json: messages });
+    return route.fulfill({ json: { items: messages, next_cursor: null, has_more: false } });
   });
   await page.route('**/api/v1/jobs**', (route) => {
     const url = new URL(route.request().url());

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,9 +16,13 @@ vi.mock('../organizations/OrganizationProvider', () => ({
 const mockConversations = vi.hoisted(() => ({
   list: [{ id: 'c1', title: 'Revenue analysis' }],
   deleteAll: vi.fn().mockResolvedValue(undefined),
+  search: vi.fn(),
 }));
 vi.mock('../conversations/hooks/useConversations', () => ({
-  useConversationList: () => ({ data: mockConversations.list }),
+  useConversationList: (search: string) => {
+    mockConversations.search(search);
+    return { conversations: mockConversations.list, hasNextPage: false };
+  },
   useDeleteConversation: () => ({ mutate: vi.fn() }),
   useDeleteAllConversations: () => ({
     mutate: mockConversations.deleteAll,
@@ -63,6 +67,24 @@ describe('AppShell', () => {
     await userEvent.setup().click(screen.getByRole('menuitem', { name: /^Templates$/ }));
     expect(screen.getByText('Templates content')).toBeInTheDocument();
     expect(screen.queryByText('AI Instructions & Commands')).not.toBeInTheDocument();
+  });
+
+  it('searches chat history on the server after the user pauses typing', async () => {
+    const user = userEvent.setup();
+    mockConversations.search.mockClear();
+    render(
+      <MemoryRouter initialEntries={['/ask']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/ask" element={<div>Ask content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByRole('textbox', { name: 'Search conversation history' }), ' rev ');
+    await waitFor(() => expect(mockConversations.search).toHaveBeenLastCalledWith('rev'));
+    expect(mockConversations.search).not.toHaveBeenCalledWith(' r');
   });
 
   it('hides and restores chat history while persisting the collapsed state', async () => {

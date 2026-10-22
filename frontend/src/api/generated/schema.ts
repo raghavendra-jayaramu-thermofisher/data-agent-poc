@@ -147,7 +147,8 @@ export interface paths {
         put?: never;
         /** Create Conversation */
         post: operations["create_conversation_api_v1_conversations_post"];
-        delete?: never;
+        /** Delete All Conversations */
+        delete: operations["delete_all_conversations_api_v1_conversations_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -435,6 +436,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Excel */
+        post: operations["export_excel_api_v1_exports_excel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructions": {
         parameters: {
             query?: never;
@@ -520,6 +538,23 @@ export interface paths {
         get: operations["get_html_artifact_api_v1_jobs__job_id__artifacts__artifact_id__html_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Matrix */
+        post: operations["export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -959,40 +994,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exports/excel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Export Excel */
-        post: operations["export_excel_api_v1_exports_excel_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Export Matrix */
-        post: operations["export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1105,44 +1106,17 @@ export interface components {
             /** Title */
             title?: string | null;
         };
-        /** ConversationDetailResponse */
-        ConversationDetailResponse: {
-            answer_review_counts?: components["schemas"]["AnswerReviewCounts"];
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Created By
-             * Format: uuid
-             */
-            created_by: string;
-            /** Data Source Ids */
-            data_source_ids?: string[];
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Messages */
-            messages?: components["schemas"]["app__conversations__schemas__MessageResponse"][];
-            /** Model Profile Id */
-            model_profile_id: string | null;
-            /**
-             * Organization Id
-             * Format: uuid
-             */
-            organization_id: string;
-            /** Table Scope */
-            table_scope?: components["schemas"]["SourceTableScope"][];
-            /** Title */
-            title: string | null;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
+        /**
+         * ConversationPage
+         * @description Conversations, most recently updated first.
+         */
+        ConversationPage: {
+            /** Has More */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["ConversationResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** ConversationRename */
         ConversationRename: {
@@ -1486,6 +1460,23 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** ExcelTableExport */
+        ExcelTableExport: {
+            /** Headers */
+            headers: string[];
+            /** Rows */
+            rows: (string | number | boolean | null)[][];
+            /**
+             * Title
+             * @default Table
+             */
+            title: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
         };
         /** ExcelUploadResponse */
         ExcelUploadResponse: {
@@ -1931,6 +1922,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** MatrixViewState */
+        MatrixViewState: {
+            /** Collapsed Columns */
+            collapsed_columns?: string[];
+            /** Collapsed Rows */
+            collapsed_rows?: string[];
+        };
         /** MessageAcceptedResponse */
         MessageAcceptedResponse: {
             /**
@@ -1950,6 +1948,18 @@ export interface components {
             content: string;
             /** Model Profile Id */
             model_profile_id?: string | null;
+        };
+        /**
+         * MessagePage
+         * @description Chronological messages; next_cursor continues toward older messages.
+         */
+        MessagePage: {
+            /** Has More */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["app__conversations__schemas__MessageResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** MessageVerificationUpdate */
         MessageVerificationUpdate: {
@@ -2544,30 +2554,6 @@ export interface components {
             /** Verified By Name */
             verified_by_name?: string | null;
         };
-        /** ExcelTableExport */
-        ExcelTableExport: {
-            /**
-             * Title
-             * @default Table
-             */
-            title: string;
-            /** Headers */
-            headers: string[];
-            /** Rows */
-            rows: (string | number | boolean | null)[][];
-            /**
-             * Truncated
-             * @default false
-             */
-            truncated: boolean;
-        };
-        /** MatrixViewState */
-        MatrixViewState: {
-            /** Collapsed Rows */
-            collapsed_rows?: string[];
-            /** Collapsed Columns */
-            collapsed_columns?: string[];
-        };
     };
     responses: never;
     parameters: never;
@@ -2830,7 +2816,11 @@ export interface operations {
     };
     list_conversations_api_v1_conversations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                search?: string;
+                cursor?: string | null;
+                limit?: number;
+            };
             header?: {
                 "X-Organization-ID"?: string | null;
             };
@@ -2845,7 +2835,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConversationResponse"][];
+                    "application/json": components["schemas"]["ConversationPage"];
                 };
             };
             /** @description Validation Error */
@@ -2894,11 +2884,38 @@ export interface operations {
             };
         };
     };
+    delete_all_conversations_api_v1_conversations_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_conversation_api_v1_conversations__conversation_id__get: {
         parameters: {
-            query?: {
-                message_limit?: number;
-            };
+            query?: never;
             header?: {
                 "X-Organization-ID"?: string | null;
             };
@@ -2915,7 +2932,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConversationDetailResponse"];
+                    "application/json": components["schemas"]["ConversationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3000,6 +3017,7 @@ export interface operations {
     list_messages_api_v1_conversations__conversation_id__messages_get: {
         parameters: {
             query?: {
+                cursor?: string | null;
                 limit?: number;
             };
             header?: {
@@ -3018,7 +3036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__conversations__schemas__MessageResponse"][];
+                    "application/json": components["schemas"]["MessagePage"];
                 };
             };
             /** @description Validation Error */
@@ -3788,6 +3806,41 @@ export interface operations {
             };
         };
     };
+    export_excel_api_v1_exports_excel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExcelTableExport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_instructions_api_v1_instructions_get: {
         parameters: {
             query?: never;
@@ -4041,6 +4094,44 @@ export interface operations {
                 };
                 content: {
                     "text/html": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                job_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixViewState"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
                 };
             };
             /** @description Validation Error */
@@ -5126,79 +5217,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    export_excel_api_v1_exports_excel_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Organization-ID"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ExcelTableExport"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Organization-ID"?: string | null;
-            };
-            path: {
-                job_id: string;
-                artifact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MatrixViewState"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

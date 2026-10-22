@@ -88,7 +88,7 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
             if (job.job_type === 'chat_query' && job.conversation_id) {
                 await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(orgId, job.conversation_id) });
                 await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(orgId, job.conversation_id) });
-                await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(orgId) });
+                await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.lists(orgId) });
             }
         }
         return job;

@@ -302,66 +302,21 @@
         "title": "ConversationCreate",
         "type": "object"
       },
-      "ConversationDetailResponse": {
+      "ConversationPage": {
+        "description": "Conversations, most recently updated first.",
         "properties": {
-          "answer_review_counts": {
-            "$ref": "#/components/schemas/AnswerReviewCounts"
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
           },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "created_by": {
-            "format": "uuid",
-            "title": "Created By",
-            "type": "string"
-          },
-          "data_source_ids": {
+          "items": {
             "items": {
-              "format": "uuid",
-              "type": "string"
+              "$ref": "#/components/schemas/ConversationResponse"
             },
-            "title": "Data Source Ids",
+            "title": "Items",
             "type": "array"
           },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "messages": {
-            "items": {
-              "$ref": "#/components/schemas/app__conversations__schemas__MessageResponse"
-            },
-            "title": "Messages",
-            "type": "array"
-          },
-          "model_profile_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Profile Id"
-          },
-          "organization_id": {
-            "format": "uuid",
-            "title": "Organization Id",
-            "type": "string"
-          },
-          "table_scope": {
-            "items": {
-              "$ref": "#/components/schemas/SourceTableScope"
-            },
-            "title": "Table Scope",
-            "type": "array"
-          },
-          "title": {
+          "next_cursor": {
             "anyOf": [
               {
                 "type": "string"
@@ -370,24 +325,15 @@
                 "type": "null"
               }
             ],
-            "title": "Title"
-          },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
+            "title": "Next Cursor"
           }
         },
         "required": [
-          "id",
-          "organization_id",
-          "title",
-          "created_by",
-          "model_profile_id",
-          "created_at",
-          "updated_at"
+          "items",
+          "next_cursor",
+          "has_more"
         ],
-        "title": "ConversationDetailResponse",
+        "title": "ConversationPage",
         "type": "object"
       },
       "ConversationRename": {
@@ -1208,6 +1154,65 @@
         "title": "DatabaseCredentials",
         "type": "object"
       },
+      "ExcelTableExport": {
+        "properties": {
+          "headers": {
+            "items": {
+              "maxLength": 512,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "title": "Headers",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "maxLength": 32767,
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "maxItems": 100000,
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "default": "Table",
+            "maxLength": 240,
+            "title": "Title",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "headers",
+          "rows"
+        ],
+        "title": "ExcelTableExport",
+        "type": "object"
+      },
       "ExcelUploadResponse": {
         "properties": {
           "data_source": {
@@ -1690,6 +1695,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -1779,18 +1795,6 @@
           "status": {
             "title": "Status",
             "type": "string"
-          },
-          "duration_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Duration Ms"
           }
         },
         "required": [
@@ -2333,6 +2337,31 @@
         "title": "MSSQLDataSourceCreate",
         "type": "object"
       },
+      "MatrixViewState": {
+        "additionalProperties": false,
+        "properties": {
+          "collapsed_columns": {
+            "items": {
+              "pattern": "^c[a-f0-9]{24}$",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Collapsed Columns",
+            "type": "array"
+          },
+          "collapsed_rows": {
+            "items": {
+              "pattern": "^r[a-f0-9]{24}$",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Collapsed Rows",
+            "type": "array"
+          }
+        },
+        "title": "MatrixViewState",
+        "type": "object"
+      },
       "MessageAcceptedResponse": {
         "properties": {
           "job_id": {
@@ -2379,6 +2408,40 @@
           "content"
         ],
         "title": "MessageCreate",
+        "type": "object"
+      },
+      "MessagePage": {
+        "description": "Chronological messages; next_cursor continues toward older messages.",
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/app__conversations__schemas__MessageResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "MessagePage",
         "type": "object"
       },
       "MessageVerificationUpdate": {
@@ -3966,90 +4029,6 @@
         ],
         "title": "MessageResponse",
         "type": "object"
-      },
-      "ExcelTableExport": {
-        "properties": {
-          "title": {
-            "type": "string",
-            "maxLength": 240,
-            "title": "Title",
-            "default": "Table"
-          },
-          "headers": {
-            "items": {
-              "type": "string",
-              "maxLength": 512
-            },
-            "type": "array",
-            "maxItems": 256,
-            "minItems": 1,
-            "title": "Headers"
-          },
-          "rows": {
-            "items": {
-              "items": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 32767
-                  },
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "maxItems": 100000,
-            "title": "Rows"
-          },
-          "truncated": {
-            "type": "boolean",
-            "title": "Truncated",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "headers",
-          "rows"
-        ],
-        "title": "ExcelTableExport"
-      },
-      "MatrixViewState": {
-        "properties": {
-          "collapsed_rows": {
-            "items": {
-              "type": "string",
-              "pattern": "^r[a-f0-9]{24}$"
-            },
-            "type": "array",
-            "maxItems": 5000,
-            "title": "Collapsed Rows"
-          },
-          "collapsed_columns": {
-            "items": {
-              "type": "string",
-              "pattern": "^c[a-f0-9]{24}$"
-            },
-            "type": "array",
-            "maxItems": 5000,
-            "title": "Collapsed Columns"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "MatrixViewState"
       }
     },
     "securitySchemes": {
@@ -4408,9 +4387,94 @@
       }
     },
     "/api/v1/conversations": {
+      "delete": {
+        "operationId": "delete_all_conversations_api_v1_conversations_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete All Conversations",
+        "tags": [
+          "conversations"
+        ]
+      },
       "get": {
         "operationId": "list_conversations_api_v1_conversations_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 240,
+              "title": "Search",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "X-Organization-ID",
@@ -4433,11 +4497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ConversationResponse"
-                  },
-                  "title": "Response List Conversations Api V1 Conversations Get",
-                  "type": "array"
+                  "$ref": "#/components/schemas/ConversationPage"
                 }
               }
             },
@@ -4597,18 +4657,6 @@
             }
           },
           {
-            "in": "query",
-            "name": "message_limit",
-            "required": false,
-            "schema": {
-              "default": 200,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Message Limit",
-              "type": "integer"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Organization-ID",
             "required": false,
@@ -4630,7 +4678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                  "$ref": "#/components/schemas/ConversationResponse"
                 }
               }
             },
@@ -4746,11 +4794,28 @@
           },
           {
             "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 200,
-              "maximum": 500,
+              "default": 30,
+              "maximum": 100,
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
@@ -4778,11 +4843,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/app__conversations__schemas__MessageResponse"
-                  },
-                  "title": "Response List Messages Api V1 Conversations  Conversation Id  Messages Get",
-                  "type": "array"
+                  "$ref": "#/components/schemas/MessagePage"
                 }
               }
             },
@@ -6325,6 +6386,71 @@
         ]
       }
     },
+    "/api/v1/exports/excel": {
+      "post": {
+        "operationId": "export_excel_api_v1_exports_excel_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcelTableExport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Excel",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/api/v1/instructions": {
       "get": {
         "operationId": "list_instructions_api_v1_instructions_get",
@@ -6831,6 +6957,86 @@
           }
         },
         "summary": "Get Html Artifact",
+        "tags": [
+          "job execution"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
+      "post": {
+        "operationId": "export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatrixViewState"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Matrix",
         "tags": [
           "job execution"
         ]
@@ -8949,151 +9155,6 @@
         "summary": "Readiness",
         "tags": [
           "health"
-        ]
-      }
-    },
-    "/api/v1/exports/excel": {
-      "post": {
-        "tags": [
-          "exports"
-        ],
-        "summary": "Export Excel",
-        "operationId": "export_excel_api_v1_exports_excel_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "X-Organization-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Organization-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExcelTableExport"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/matrix/excel": {
-      "post": {
-        "operationId": "export_matrix_api_v1_jobs__job_id__artifacts__artifact_id__matrix_excel_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Job Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "artifact_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Artifact Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Organization-ID",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Organization-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MatrixViewState"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Export Matrix",
-        "tags": [
-          "job execution"
         ]
       }
     }
