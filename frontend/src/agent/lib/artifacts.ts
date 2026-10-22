@@ -77,5 +77,13 @@ export function parseTableArtifact(artifact: JobArtifact): AnalyticalTableModel 
     dataSourceId,
     display,
     columnLabels,
+    paging: artifact.table_rows?.has_more
+      ? {
+          jobId: artifact.job_id,
+          artifactId: artifact.id,
+          storedRowCount: artifact.table_rows.stored_row_count,
+          nextCursor: artifact.table_rows.next_cursor,
+        }
+      : undefined,
   };
 }

@@ -561,6 +561,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Table Rows */
+        get: operations["list_table_rows_api_v1_jobs__job_id__artifacts__artifact_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/artifacts/{artifact_id}/table/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Table
+         * @description Export every stored row in the viewer's current sort and search.
+         */
+        post: operations["export_table_api_v1_jobs__job_id__artifacts__artifact_id__table_excel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -1628,6 +1665,7 @@ export interface components {
             };
             /** Source Sql Execution Id */
             source_sql_execution_id: string | null;
+            table_rows?: components["schemas"]["TableRowsInfo"] | null;
         };
         /** JobExecutionTraceResponse */
         JobExecutionTraceResponse: {
@@ -2393,6 +2431,28 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** TableExcelRequest */
+        TableExcelRequest: {
+            /**
+             * Descending
+             * @default false
+             */
+            descending: boolean;
+            /** Headers */
+            headers?: string[] | null;
+            /**
+             * Search
+             * @default
+             */
+            search: string;
+            /** Sort */
+            sort?: string | null;
+            /**
+             * Title
+             * @default Table
+             */
+            title: string;
+        };
         /** TableIdentifier */
         TableIdentifier: {
             /** Name */
@@ -2414,6 +2474,31 @@ export interface components {
             primary_key: string[];
             /** Schema */
             schema: string | null;
+        };
+        /**
+         * TableRowsInfo
+         * @description Paging state for a table artifact whose rows are trimmed in the execution trace.
+         */
+        TableRowsInfo: {
+            /** Has More */
+            has_more: boolean;
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Stored Row Count */
+            stored_row_count: number;
+        };
+        /** TableRowsPage */
+        TableRowsPage: {
+            /** Columns */
+            columns: string[];
+            /** Has More */
+            has_more: boolean;
+            /** Matching Count */
+            matching_count: number;
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Rows */
+            rows: unknown[][];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -4122,6 +4207,84 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MatrixViewState"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_table_rows_api_v1_jobs__job_id__artifacts__artifact_id__rows_get: {
+        parameters: {
+            query?: {
+                sort?: string | null;
+                descending?: boolean;
+                search?: string;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                job_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableRowsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_table_api_v1_jobs__job_id__artifacts__artifact_id__table_excel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                job_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableExcelRequest"];
             };
         };
         responses: {

@@ -16,6 +16,7 @@ export const queryKeys = {
         list: (orgId: string | null, status?: string) => ['jobs', orgId, 'list', status ?? 'all'] as const,
         detail: (orgId: string | null, id: string) => ['jobs', orgId, 'detail', id] as const,
         execution: (orgId: string | null, id: string) => ['jobs', orgId, 'execution', id] as const,
+        tableRows: (orgId: string | null, artifactId: string, query: object) => ['jobs', orgId, 'table-rows', artifactId, query] as const,
     },
     dataSources: {
         all: (orgId: string | null) => ['data-sources', orgId] as const,

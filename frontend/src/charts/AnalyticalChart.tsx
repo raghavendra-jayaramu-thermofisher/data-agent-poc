@@ -4,7 +4,7 @@ import type { EChartsType } from 'echarts';
 import { BarChart3, Table2, Copy, Download, Search, X, ChartNoAxesCombined } from 'lucide-react';
 import { AnalyticalTable, type TableViewState } from '../analytics/table/AnalyticalTable';
 import { toTsv, type AnalyticalTableModel } from '../analytics/table/table-domain';
-import { excelTableFromModel } from '../analytics/table/excel-export';
+import { downloadExcel, excelTableFromModel } from '../analytics/table/excel-export';
 import { useExcelExport } from '../analytics/table/useExcelExport';
 import {
   ArtifactFrame,
@@ -164,7 +164,7 @@ export function AnalyticalChart({
   );
   const data = useMemo(() => dataModel(model), [model]);
   const { pending, exportExcel } = useExcelExport(() =>
-    excelTableFromModel(data, `${model.title} data`),
+    downloadExcel(excelTableFromModel(data, `${model.title} data`)),
   );
   const pointCount = isCircularChart(model)
     ? model.points.length

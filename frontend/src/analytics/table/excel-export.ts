@@ -20,15 +20,20 @@ export function excelTableFromModel(model: AnalyticalTableModel, title: string):
   };
 }
 
-export async function downloadExcel(table: ExcelTableExport) {
+export async function downloadExcel(table: ExcelTableExport): Promise<{ truncated: boolean }> {
   const file = await withAuthRefresh(() => apiClient.POST('/api/v1/exports/excel', {
     body: table,
     parseAs: 'blob',
   }));
+  saveWorkbook(file, table.title);
+  return { truncated: Boolean(table.truncated) };
+}
+
+export function saveWorkbook(file: Blob, title: string) {
   const url = URL.createObjectURL(file);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${table.title.replace(/[^\p{L}\p{N}._ -]+/gu, '_').replace(/^[ ._]+|[ ._]+$/g, '').slice(0, 120) || 'Table'}.xlsx`;
+  link.download = `${title.replace(/[^\p{L}\p{N}._ -]+/gu, '_').replace(/^[ ._]+|[ ._]+$/g, '').slice(0, 120) || 'Table'}.xlsx`;
   document.body.append(link);
   link.click();
   link.remove();

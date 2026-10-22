@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse, Response
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.agent.html_artifacts import HTML_CONTENT_SECURITY_POLICY, HtmlArtifactStorage
 from app.agent.matrix import CreateMatrixArgs, MatrixError, MatrixViewState, validate_stored_matrix
+from app.agent.models import JobArtifact
 from app.agent.repository import AgentExecutionRepository
 from app.agent.schemas import (
     JobArtifactResponse,
@@ -17,12 +19,23 @@ from app.agent.schemas import (
     SQLExecutionResponse,
     ToolExecutionResponse,
 )
+from app.agent.table_rows import (
+    DEFAULT_TABLE_PAGE_SIZE,
+    MAX_TABLE_PAGE_SIZE,
+    TRACE_TABLE_ROWS,
+    TableRowsPage,
+    TableView,
+    first_page_info,
+    stored_table,
+    table_rows_page,
+    table_view_rows,
+)
 from app.auth.dependencies import get_current_organization
 from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
 from app.core.errors import AppError
 from app.core.redis import get_redis
-from app.exports.excel import export_filename
+from app.exports.excel import ExcelTableExport, build_excel, export_filename
 from app.exports.matrix import build_matrix_excel
 from app.jobs.service import JobService
 from app.organizations.models import Organization, OrganizationMembership
@@ -146,6 +159,104 @@ async def get_job_execution_trace(
             ModelExecutionResponse.model_validate(item) for item in await repo.list_model(job_id)
         ],
         artifacts=[
-            JobArtifactResponse.model_validate(item) for item in await repo.list_artifacts(job_id)
+            trace_artifact(item, organization.id, settings)
+            for item in await repo.list_artifacts(job_id)
         ],
+    )
+
+
+def trace_artifact(
+    artifact: JobArtifact, organization_id: uuid.UUID, settings: Settings
+) -> JobArtifactResponse:
+    response = JobArtifactResponse.model_validate(artifact)
+    rows = artifact.payload.get("rows")
+    if artifact.kind != "table" or not isinstance(rows, list):
+        return response
+    # Copy rather than mutate the ORM payload, which the session would otherwise persist.
+    return response.model_copy(update={
+        "payload": {**artifact.payload, "rows": rows[:TRACE_TABLE_ROWS]},
+        "table_rows": first_page_info(settings, organization_id, artifact.id, len(rows)),
+    })
+
+
+async def require_table_artifact(
+    session: AsyncSession,
+    settings: Settings,
+    organization_id: uuid.UUID,
+    job_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+) -> JobArtifact:
+    await JobService(session, get_redis(), settings).get_for_org(job_id, organization_id)
+    artifact = await AgentExecutionRepository(session).get_artifact_for_job(job_id, artifact_id)
+    if artifact is None or artifact.kind != "table":
+        raise AppError("TABLE_ARTIFACT_NOT_FOUND", "Table artifact not found.", 404)
+    return artifact
+
+
+@router.get("/{job_id}/artifacts/{artifact_id}/rows", response_model=TableRowsPage)
+async def list_table_rows(
+    job_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    sort: str | None = Query(default=None, max_length=512),
+    descending: bool = False,
+    search: str = Query(default="", max_length=240),
+    cursor: str | None = Query(default=None, max_length=1024),
+    limit: int = Query(default=DEFAULT_TABLE_PAGE_SIZE, ge=1, le=MAX_TABLE_PAGE_SIZE),
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> TableRowsPage:
+    organization, _ = context
+    artifact = await require_table_artifact(session, settings, organization.id, job_id, artifact_id)
+    view = TableView(sort=sort, descending=descending, search=search)
+    return await run_in_threadpool(
+        table_rows_page, settings, organization.id, artifact.id, artifact.payload, view,
+        cursor=cursor, limit=limit,
+    )
+
+
+class TableExcelRequest(TableView):
+    title: str = Field(default="Table", max_length=240)
+    headers: list[str] | None = Field(default=None, max_length=256)
+
+
+@router.post(
+    "/{job_id}/artifacts/{artifact_id}/table/excel",
+    response_class=Response,
+    responses={
+        200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}}
+    },
+)
+async def export_table(
+    job_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    request: TableExcelRequest,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Export every stored row in the viewer's current sort and search."""
+    organization, _ = context
+    artifact = await require_table_artifact(session, settings, organization.id, job_id, artifact_id)
+    columns, rows = stored_table(artifact.payload)
+    if request.headers is not None and len(request.headers) != len(columns):
+        raise AppError("TABLE_HEADERS_INVALID", "Provide one header per column.", 400)
+
+    def build() -> bytes:
+        return build_excel(ExcelTableExport(
+            title=request.title,
+            headers=request.headers or columns,
+            rows=table_view_rows(columns, rows, request),
+            truncated=artifact.payload.get("truncated") is True,
+        ))
+
+    content = await run_in_threadpool(build)
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{export_filename(request.title)}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )

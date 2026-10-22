@@ -1,6 +1,14 @@
 export type AnalyticalValue = string | number | boolean | null | Record<string, unknown> | unknown[];
 export type AnalyticalRow = { id: string; values: Record<string, AnalyticalValue> };
 
+/** Present when the stored table has more rows than arrived with the execution trace. */
+export type TablePaging = {
+  jobId: string;
+  artifactId: string;
+  storedRowCount: number;
+  nextCursor: string | null;
+};
+
 export type AnalyticalTableModel = {
   columns: string[];
   rows: AnalyticalRow[];
@@ -9,6 +17,7 @@ export type AnalyticalTableModel = {
   dataSourceId?: string | null;
   display?: 'expanded' | 'collapsed' | 'hidden' | 'auto';
   columnLabels?: Record<string, string>;
+  paging?: TablePaging;
 };
 
 const UPPERCASE_TOKENS = new Set(['id', 'url', 'api', 'kpi', 'sql', 'sku', 'tsv', 'csv', 'db', 'ip']);

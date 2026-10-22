@@ -384,3 +384,7 @@
     transition: none;
   }
 }
+.analytical-table-more td {
+  padding: 6px 12px;
+  border: 0;
+}

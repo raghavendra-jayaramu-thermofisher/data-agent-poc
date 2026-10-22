@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.agent.table_rows import TableRowsInfo
+
 
 class ToolExecutionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -71,6 +73,8 @@ class JobArtifactResponse(BaseModel):
     source_sql_execution_id: uuid.UUID | None
     payload: dict[str, object]
     created_at: datetime
+    # Tables only: the trace carries the first rows; the rest are paged from the rows endpoint.
+    table_rows: TableRowsInfo | None = None
 
 
 class JobExecutionTraceResponse(BaseModel):

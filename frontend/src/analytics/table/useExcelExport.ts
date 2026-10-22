@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { notifications } from '../../components/notifications';
-import { downloadExcel, type ExcelTableExport } from './excel-export';
 
-export function useExcelExport(getTable: () => ExcelTableExport) {
+/** Runs one workbook download at a time and reports the outcome. */
+export function useExcelExport(exportWorkbook: () => Promise<{ truncated: boolean }>) {
   const [pending, setPending] = useState(false);
   const running = useRef(false);
   async function exportExcel() {
@@ -10,10 +10,9 @@ export function useExcelExport(getTable: () => ExcelTableExport) {
     running.current = true;
     setPending(true);
     try {
-      const table = getTable();
-      await downloadExcel(table);
+      const { truncated } = await exportWorkbook();
       notifications.success(
-        table.truncated
+        truncated
           ? 'Excel downloaded with all available rows. The source result was truncated.'
           : 'Excel downloaded',
       );

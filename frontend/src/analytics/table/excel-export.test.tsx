@@ -54,7 +54,7 @@ describe('Excel table export', () => {
 
   it('prevents duplicate exports and lets a failed download be retried', async () => {
     let reject!: (error: Error) => void;
-    vi.mocked(downloadExcel).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; })).mockResolvedValue(undefined);
+    vi.mocked(downloadExcel).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; })).mockResolvedValue({ truncated: false });
     const user = userEvent.setup();
     render(<ExcelExportButton getTable={() => excelTableFromModel(model, 'Orders')} />);
     await user.dblClick(screen.getByRole('button', { name: 'Export to Excel' }));
