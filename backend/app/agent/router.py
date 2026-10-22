@@ -23,12 +23,13 @@ from app.agent.table_rows import (
     DEFAULT_TABLE_PAGE_SIZE,
     MAX_TABLE_PAGE_SIZE,
     TRACE_TABLE_ROWS,
+    StoredTable,
+    StoredTableCache,
     TableRowsPage,
     TableView,
     first_page_info,
     stored_table,
     table_rows_page,
-    table_view_rows,
 )
 from app.auth.dependencies import get_current_organization
 from app.core.config import Settings, get_settings
@@ -179,18 +180,26 @@ def trace_artifact(
     })
 
 
-async def require_table_artifact(
+STORED_TABLES = StoredTableCache()
+
+
+async def load_stored_table(
     session: AsyncSession,
     settings: Settings,
     organization_id: uuid.UUID,
     job_id: uuid.UUID,
     artifact_id: uuid.UUID,
-) -> JobArtifact:
+) -> StoredTable:
+    # Access is checked on every request; only the immutable rows come from the cache.
     await JobService(session, get_redis(), settings).get_for_org(job_id, organization_id)
-    artifact = await AgentExecutionRepository(session).get_artifact_for_job(job_id, artifact_id)
-    if artifact is None or artifact.kind != "table":
+    repo = AgentExecutionRepository(session)
+    if await repo.artifact_kind_for_job(job_id, artifact_id) != "table":
         raise AppError("TABLE_ARTIFACT_NOT_FOUND", "Table artifact not found.", 404)
-    return artifact
+    table = STORED_TABLES.get(artifact_id)
+    if table is None:
+        table = stored_table(await repo.artifact_payload(artifact_id) or {})
+        STORED_TABLES.put(artifact_id, table)
+    return table
 
 
 @router.get("/{job_id}/artifacts/{artifact_id}/rows", response_model=TableRowsPage)
@@ -207,11 +216,11 @@ async def list_table_rows(
     settings: Settings = Depends(get_settings),
 ) -> TableRowsPage:
     organization, _ = context
-    artifact = await require_table_artifact(session, settings, organization.id, job_id, artifact_id)
+    table = await load_stored_table(session, settings, organization.id, job_id, artifact_id)
     view = TableView(sort=sort, descending=descending, search=search)
     return await run_in_threadpool(
-        table_rows_page, settings, organization.id, artifact.id, artifact.payload, view,
-        cursor=cursor, limit=limit,
+        table_rows_page, settings, organization.id, artifact_id, table, view,
+        cursor=cursor, limit=limit, cache=STORED_TABLES,
     )
 
 
@@ -237,17 +246,16 @@ async def export_table(
 ) -> Response:
     """Export every stored row in the viewer's current sort and search."""
     organization, _ = context
-    artifact = await require_table_artifact(session, settings, organization.id, job_id, artifact_id)
-    columns, rows = stored_table(artifact.payload)
-    if request.headers is not None and len(request.headers) != len(columns):
+    table = await load_stored_table(session, settings, organization.id, job_id, artifact_id)
+    if request.headers is not None and len(request.headers) != len(table.columns):
         raise AppError("TABLE_HEADERS_INVALID", "Provide one header per column.", 400)
 
     def build() -> bytes:
         return build_excel(ExcelTableExport(
             title=request.title,
-            headers=request.headers or columns,
-            rows=table_view_rows(columns, rows, request),
-            truncated=artifact.payload.get("truncated") is True,
+            headers=request.headers or table.columns,
+            rows=STORED_TABLES.view_rows(artifact_id, table, request),
+            truncated=table.truncated,
         ))
 
     content = await run_in_threadpool(build)

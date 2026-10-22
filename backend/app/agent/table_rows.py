@@ -9,8 +9,11 @@ signed and bound to the artifact, sort and search so it cannot be replayed again
 from __future__ import annotations
 
 import re
+import threading
 import uuid
+from collections import OrderedDict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel, Field
@@ -48,7 +51,14 @@ class TableView(BaseModel):
     search: str = Field(default="", max_length=240)
 
 
-def stored_table(payload: dict[str, object]) -> tuple[list[str], list[list[object]]]:
+@dataclass(frozen=True, slots=True)
+class StoredTable:
+    columns: list[str]
+    rows: list[list[object]]
+    truncated: bool
+
+
+def stored_table(payload: dict[str, object]) -> StoredTable:
     columns, rows = payload.get("columns"), payload.get("rows")
     if (
         payload.get("schema_version") != 1
@@ -58,7 +68,7 @@ def stored_table(payload: dict[str, object]) -> tuple[list[str], list[list[objec
         or not all(isinstance(row, list) for row in rows)
     ):
         raise AppError("TABLE_ARTIFACT_INVALID", "The stored table is invalid.", 422)
-    return columns, rows
+    return StoredTable(columns, rows, payload.get("truncated") is True)
 
 
 def _number(value: object) -> Decimal | None:
@@ -105,6 +115,58 @@ def table_view_rows(
     return present + empty
 
 
+def _view_key(artifact_id: uuid.UUID, view: TableView) -> tuple:
+    return (artifact_id, view.sort, view.descending, view.search.strip().casefold())
+
+
+class StoredTableCache:
+    """Recently read stored tables and their sorted or searched row orders.
+
+    Stored results never change once the job finishes, so entries never go stale. Parsing a large
+    payload and sorting it costs hundreds of milliseconds, which every scroll page would otherwise
+    repeat. Views share the table's row objects, so only `max_tables` bounds memory.
+    """
+
+    def __init__(self, max_tables: int = 3, max_views: int = 12) -> None:
+        self._max_tables, self._max_views = max_tables, max_views
+        self._tables: OrderedDict[uuid.UUID, StoredTable] = OrderedDict()
+        self._views: OrderedDict[tuple, list[list[object]]] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, artifact_id: uuid.UUID) -> StoredTable | None:
+        with self._lock:
+            table = self._tables.get(artifact_id)
+            if table is not None:
+                self._tables.move_to_end(artifact_id)
+            return table
+
+    def put(self, artifact_id: uuid.UUID, table: StoredTable) -> None:
+        with self._lock:
+            self._tables[artifact_id] = table
+            self._tables.move_to_end(artifact_id)
+            while len(self._tables) > self._max_tables:
+                evicted, _ = self._tables.popitem(last=False)
+                for key in [key for key in self._views if key[0] == evicted]:
+                    del self._views[key]
+
+    def view_rows(
+        self, artifact_id: uuid.UUID, table: StoredTable, view: TableView
+    ) -> list[list[object]]:
+        key = _view_key(artifact_id, view)
+        with self._lock:
+            cached = self._views.get(key)
+            if cached is not None:
+                self._views.move_to_end(key)
+                return cached
+        rows = table_view_rows(table.columns, table.rows, view)
+        with self._lock:
+            if artifact_id in self._tables:
+                self._views[key] = rows
+                while len(self._views) > self._max_views:
+                    self._views.popitem(last=False)
+        return rows
+
+
 def _codec(settings: Settings, organization_id: uuid.UUID, artifact_id: uuid.UUID, view: TableView):
     return CursorCodec(
         settings,
@@ -136,23 +198,27 @@ def table_rows_page(
     settings: Settings,
     organization_id: uuid.UUID,
     artifact_id: uuid.UUID,
-    payload: dict[str, object],
+    table: StoredTable,
     view: TableView,
     *,
     cursor: str | None,
     limit: int,
+    cache: StoredTableCache | None = None,
 ) -> TableRowsPage:
-    columns, rows = stored_table(payload)
     codec = _codec(settings, organization_id, artifact_id, view)
     offset = int(codec.decode(cursor, [int])[0]) if cursor else 0
     if offset < 0:
         raise AppError("INVALID_CURSOR", "The page cursor is invalid.", 400)
-    selected = table_view_rows(columns, rows, view)
+    selected = (
+        cache.view_rows(artifact_id, table, view)
+        if cache
+        else table_view_rows(table.columns, table.rows, view)
+    )
     page = selected[offset : offset + limit]
     end = offset + len(page)
     has_more = end < len(selected)
     return TableRowsPage(
-        columns=columns,
+        columns=table.columns,
         rows=page,
         matching_count=len(selected),
         next_cursor=codec.encode([end]) if has_more else None,

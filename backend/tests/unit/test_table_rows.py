@@ -12,7 +12,9 @@ from openpyxl import load_workbook
 from app.agent import router
 from app.agent.table_rows import (
     TRACE_TABLE_ROWS,
+    StoredTableCache,
     TableView,
+    stored_table,
     table_rows_page,
     table_view_rows,
 )
@@ -36,7 +38,8 @@ def collect(artifact_id, data, view, limit, *, organization_id=ORG):
     rows, cursor, matching = [], None, None
     while True:
         page = table_rows_page(
-            SETTINGS, organization_id, artifact_id, data, view, cursor=cursor, limit=limit
+            SETTINGS, organization_id, artifact_id, stored_table(data), view,
+            cursor=cursor, limit=limit,
         )
         rows += page.rows
         matching = page.matching_count
@@ -86,7 +89,8 @@ def test_pages_cover_the_view_without_duplicates_or_gaps(view):
 def test_cursor_is_bound_to_artifact_view_and_organization():
     data, artifact_id = payload(500), uuid.uuid4()
     view = TableView(sort="amount")
-    first = table_rows_page(SETTINGS, ORG, artifact_id, data, view, cursor=None, limit=100)
+    table = stored_table(data)
+    first = table_rows_page(SETTINGS, ORG, artifact_id, table, view, cursor=None, limit=100)
     for organization_id, other_artifact, other_view in [
         (OTHER_ORG, artifact_id, view),
         (ORG, uuid.uuid4(), view),
@@ -95,7 +99,7 @@ def test_cursor_is_bound_to_artifact_view_and_organization():
     ]:
         with pytest.raises(AppError) as error:
             table_rows_page(
-                SETTINGS, organization_id, other_artifact, data, other_view,
+                SETTINGS, organization_id, other_artifact, table, other_view,
                 cursor=first.next_cursor, limit=100,
             )
         assert error.value.code == "INVALID_CURSOR"
@@ -115,7 +119,7 @@ def test_trace_sends_first_rows_and_a_cursor_that_continues_exactly_after_them()
     assert artifact.payload == stored  # the ORM payload is never trimmed in place
     rest, _ = collect(artifact.id, stored, TableView(), 200)
     second = table_rows_page(
-        SETTINGS, ORG, artifact.id, stored, TableView(),
+        SETTINGS, ORG, artifact.id, stored_table(stored), TableView(),
         cursor=response.table_rows.next_cursor, limit=200,
     )
     assert second.rows == rest[TRACE_TABLE_ROWS : TRACE_TABLE_ROWS + 200]
@@ -135,7 +139,11 @@ def test_trace_leaves_small_tables_and_other_artifacts_complete():
 
 def route_mocks(monkeypatch, artifact, *, forbidden=False):
     authorized = AsyncMock(side_effect=AppError("JOB_NOT_FOUND", "x", 404) if forbidden else None)
-    repo = SimpleNamespace(get_artifact_for_job=AsyncMock(return_value=artifact))
+    repo = SimpleNamespace(
+        artifact_kind_for_job=AsyncMock(return_value=artifact.kind),
+        artifact_payload=AsyncMock(return_value=artifact.payload),
+    )
+    monkeypatch.setattr(router, "STORED_TABLES", StoredTableCache())
     monkeypatch.setattr(router, "AgentExecutionRepository", lambda _: repo)
     monkeypatch.setattr(router, "JobService", lambda *_: SimpleNamespace(get_for_org=authorized))
     monkeypatch.setattr(router, "get_redis", lambda: None)
@@ -154,7 +162,8 @@ async def test_rows_endpoint_checks_the_job_organization_before_reading(monkeypa
         )
     assert error.value.status_code == 404
     authorized.assert_awaited_once_with(job_id, OTHER_ORG)
-    repo.get_artifact_for_job.assert_not_awaited()
+    repo.artifact_kind_for_job.assert_not_awaited()
+    repo.artifact_payload.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -193,3 +202,43 @@ async def test_excel_export_contains_every_stored_row_in_the_requested_view(monk
             context=(SimpleNamespace(id=ORG), None), session=object(), settings=SETTINGS,
         )
     assert error.value.code == "TABLE_HEADERS_INVALID"
+
+
+@pytest.mark.asyncio
+async def test_rows_endpoint_reads_the_payload_once_but_checks_access_every_time(monkeypatch):
+    artifact = SimpleNamespace(id=uuid.uuid4(), kind="table", payload=payload(900))
+    authorized, repo = route_mocks(monkeypatch, artifact)
+    job_id, context = uuid.uuid4(), (SimpleNamespace(id=ORG), None)
+    first = await router.list_table_rows(
+        job_id, artifact.id, "amount", True, "", None, 200,
+        context=context, session=object(), settings=SETTINGS,
+    )
+    second = await router.list_table_rows(
+        job_id, artifact.id, "amount", True, "", first.next_cursor, 200,
+        context=context, session=object(), settings=SETTINGS,
+    )
+    view = TableView(sort="amount", descending=True)
+    expected = table_view_rows(COLUMNS, artifact.payload["rows"], view)
+    assert first.rows + second.rows == expected[:400]
+    assert authorized.await_count == 2 and repo.artifact_kind_for_job.await_count == 2
+    repo.artifact_payload.assert_awaited_once()
+
+
+def test_cache_evicts_least_recently_used_tables_and_their_views():
+    cache = StoredTableCache(max_tables=2, max_views=3)
+    ids = [uuid.uuid4() for _ in range(3)]
+    tables = [stored_table(payload(5)) for _ in ids]
+    cache.put(ids[0], tables[0])
+    cache.put(ids[1], tables[1])
+    sorted_first = cache.view_rows(ids[0], tables[0], TableView(sort="amount"))
+    assert cache.view_rows(ids[0], tables[0], TableView(sort="amount")) is sorted_first
+    assert cache.get(ids[0]) is tables[0]  # now most recently used
+    cache.put(ids[2], tables[2])
+    assert cache.get(ids[1]) is None and cache.get(ids[0]) is tables[0]
+    cache.put(ids[1], tables[1])
+    assert list(cache._tables) == [ids[0], ids[1]]  # ids[2] was least recently used
+    # Views never outlive their table, and an uncached table's view is computed but not kept.
+    assert {key[0] for key in cache._views} <= {ids[0], ids[1]}
+    loose = cache.view_rows(uuid.uuid4(), tables[0], TableView(search="ref-1"))
+    assert loose == table_view_rows(COLUMNS, tables[0].rows, TableView(search="ref-1"))
+    assert len(cache._views) <= 3

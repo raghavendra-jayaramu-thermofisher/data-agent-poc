@@ -121,6 +121,11 @@ primary presentation owner:
   validation. You may also deliberately use it when a small inline Markdown table is necessary
   at a specific point in a longer explanation.
 
+Return a requested detail listing with one query and one table artifact; the UI stores and pages
+up to the `stored_row_limit` reported by `execute_sql`. Never split one listing across several
+queries with OFFSET/FETCH or row-number ranges. When `stored_result_truncated` is true, say the
+listing is capped at that limit and suggest narrower filters instead of paging through the rest.
+
 Markdown tables are appropriate only when their rows are not already presented by a visible
 table or chart artifact. Multiple tables are allowed when they contain genuinely different
 result sets needed by the explanation.

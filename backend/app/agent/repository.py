@@ -116,6 +116,23 @@ class AgentExecutionRepository:
         )
         return result.scalar_one_or_none()
 
+    async def artifact_kind_for_job(
+        self, job_id: uuid.UUID, artifact_id: uuid.UUID
+    ) -> str | None:
+        result = await self.session.execute(
+            select(JobArtifact.kind).where(
+                JobArtifact.job_id == job_id,
+                JobArtifact.id == artifact_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def artifact_payload(self, artifact_id: uuid.UUID) -> dict[str, object] | None:
+        result = await self.session.execute(
+            select(JobArtifact.payload).where(JobArtifact.id == artifact_id)
+        )
+        return result.scalar_one_or_none()
+
     async def answer_artifact_for_job(self, job_id: uuid.UUID) -> JobArtifact | None:
         result = await self.session.execute(
             select(JobArtifact)

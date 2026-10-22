@@ -64,10 +64,12 @@ class Settings(BaseSettings):
     agent_max_tool_calls: int = Field(default=150, ge=1, le=500)
     agent_max_sql_attempts: int = Field(default=150, ge=1, le=500)
     agent_query_timeout_seconds: int = Field(default=60, ge=1, le=600)
-    agent_result_max_rows: int = Field(default=10000, ge=1, le=100000)
-    agent_result_max_bytes: int = Field(default=10_000_000, ge=1024, le=100_000_000)
-    agent_model_result_max_rows: int = Field(default=500, ge=1, le=5000)
-    agent_model_result_max_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
+    # Stored results back the UI table, which pages rows from the server.
+    agent_result_max_rows: int = Field(default=50000, ge=1, le=100000)
+    agent_result_max_bytes: int = Field(default=30_000_000, ge=1024, le=100_000_000)
+    # The model sees only a small preview; every later agent step resends it.
+    agent_model_result_max_rows: int = Field(default=200, ge=1, le=5000)
+    agent_model_result_max_bytes: int = Field(default=32_768, ge=1024, le=10_000_000)
     agent_chart_max_rows: int = Field(default=2000, ge=2, le=5000)
     agent_matrix_enabled: bool = True
     agent_matrix_max_nodes: int = Field(default=5000, ge=10, le=10000)

@@ -441,9 +441,17 @@ async def execute_sql(
             "table_artifact_id": str(artifact_id),
             "table_display": display_mode,
             "stored_row_count": len(rows),
+            "stored_row_limit": context.settings.agent_result_max_rows,
             "preview_row_count": preview_row_count,
             "stored_result_truncated": truncated,
             "preview_truncated": preview_truncated,
+            "listing_guidance": (
+                "The stored result reached its limit. Do not page through the remaining rows "
+                "with more queries; tell the user the listing is capped and suggest narrower "
+                "filters."
+                if truncated
+                else None
+            ),
             "evidence_warning": (
                 "The model received only a partial preview. Do not make totals, percentages, "
                 "rankings, distributions, primary-reason, or whole-population claims from this "
