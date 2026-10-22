@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.models import JobArtifact, ModelExecution, SQLExecution, ToolExecution
+from app.models.models import ModelProfile
+from app.models.pricing import ModelPrice, model_call_cost
 
 
 class AgentExecutionRepository:
@@ -20,6 +23,30 @@ class AgentExecutionRepository:
 
     def add_model(self, item: ModelExecution) -> None:
         self.session.add(item)
+
+    async def job_cost(self, job_id: uuid.UUID) -> Decimal | None:
+        """Total priced cost of a job's model calls so far; None until a call has a cost."""
+        return await self.session.scalar(
+            select(func.sum(ModelExecution.cost)).where(ModelExecution.job_id == job_id)
+        )
+
+    async def price_model_execution(self, item: ModelExecution) -> None:
+        """Copy the profile's current prices onto the call and record its cost."""
+        profile = await self.session.get(ModelProfile, item.model_profile_id)
+        price = ModelPrice(
+            input_per_million=profile.input_price_per_million if profile else None,
+            output_per_million=profile.output_price_per_million if profile else None,
+            cached_input_per_million=profile.cached_input_price_per_million if profile else None,
+        )
+        item.input_price_per_million = price.input_per_million
+        item.output_price_per_million = price.output_per_million
+        item.cached_input_price_per_million = price.cached_input_per_million
+        item.cost = model_call_cost(
+            price,
+            input_tokens=item.input_tokens,
+            output_tokens=item.output_tokens,
+            cached_input_tokens=item.cached_input_tokens,
+        )
 
     def add_artifact(self, item: JobArtifact) -> None:
         self.session.add(item)
@@ -145,3 +172,14 @@ class AgentExecutionRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+
+def model_usage_event(item: ModelExecution, job_cost: Decimal | None) -> dict[str, object]:
+    """Payload for the event published after each model call, used for the live job cost."""
+    return {
+        "input_tokens": item.input_tokens,
+        "output_tokens": item.output_tokens,
+        "cached_input_tokens": item.cached_input_tokens,
+        "cost": None if item.cost is None else float(item.cost),
+        "job_cost": None if job_cost is None else float(job_cost),
+    }

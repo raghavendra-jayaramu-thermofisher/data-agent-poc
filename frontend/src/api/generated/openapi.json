@@ -2720,6 +2720,39 @@
       },
       "ModelExecutionResponse": {
         "properties": {
+          "cached_input_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Price Per Million"
+          },
+          "cached_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Tokens"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -2759,6 +2792,17 @@
             "title": "Id",
             "type": "string"
           },
+          "input_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Price Per Million"
+          },
           "input_tokens": {
             "anyOf": [
               {
@@ -2783,6 +2827,17 @@
             "format": "uuid",
             "title": "Model Profile Id",
             "type": "string"
+          },
+          "output_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Price Per Million"
           },
           "output_tokens": {
             "anyOf": [
@@ -2858,6 +2913,20 @@
       "ModelProfileCreate": {
         "additionalProperties": false,
         "properties": {
+          "cached_input_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M cached input tokens.",
+            "title": "Cached Input Price Per Million"
+          },
           "connection_id": {
             "format": "uuid",
             "title": "Connection Id",
@@ -2874,6 +2943,20 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "input_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M input tokens.",
+            "title": "Input Price Per Million"
+          },
           "is_default": {
             "default": false,
             "title": "Is Default",
@@ -2884,6 +2967,20 @@
             "minLength": 1,
             "title": "Model Name",
             "type": "string"
+          },
+          "output_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M output tokens.",
+            "title": "Output Price Per Million"
           },
           "settings": {
             "additionalProperties": true,
@@ -2901,6 +2998,17 @@
       },
       "ModelProfileResponse": {
         "properties": {
+          "cached_input_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Price Per Million"
+          },
           "connection_id": {
             "format": "uuid",
             "title": "Connection Id",
@@ -2924,6 +3032,17 @@
             "title": "Id",
             "type": "string"
           },
+          "input_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Price Per Million"
+          },
           "is_default": {
             "title": "Is Default",
             "type": "boolean"
@@ -2936,6 +3055,17 @@
             "format": "uuid",
             "title": "Organization Id",
             "type": "string"
+          },
+          "output_price_per_million": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Price Per Million"
           },
           "settings": {
             "additionalProperties": true,
@@ -2966,6 +3096,20 @@
       "ModelProfileUpdate": {
         "additionalProperties": false,
         "properties": {
+          "cached_input_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M cached input tokens.",
+            "title": "Cached Input Price Per Million"
+          },
           "connection_id": {
             "anyOf": [
               {
@@ -3002,6 +3146,20 @@
             ],
             "title": "Enabled"
           },
+          "input_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M input tokens.",
+            "title": "Input Price Per Million"
+          },
           "model_name": {
             "anyOf": [
               {
@@ -3014,6 +3172,20 @@
               }
             ],
             "title": "Model Name"
+          },
+          "output_price_per_million": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "USD per 1M output tokens.",
+            "title": "Output Price Per Million"
           },
           "settings": {
             "anyOf": [

@@ -15,7 +15,7 @@ from app.agent.final_answer_validation import (
 )
 from app.agent.follow_up_suggestions import extract_follow_up_suggestions
 from app.agent.models import ModelExecution
-from app.agent.repository import AgentExecutionRepository
+from app.agent.repository import AgentExecutionRepository, model_usage_event
 from app.agent.tools import AgentCancelledError, append_agent_event, run_cancellable
 from app.core.config import Settings
 from app.core.database import get_session_factory
@@ -315,6 +315,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
             input_tokens=usage.input_tokens if usage else None,
             output_tokens=usage.output_tokens if usage else None,
             total_tokens=usage.total_tokens if usage else None,
+            cached_input_tokens=usage.cached_input_tokens if usage else None,
         )
         return completion.text
 
@@ -395,6 +396,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
         input_tokens: int | None = None,
         output_tokens: int | None = None,
         total_tokens: int | None = None,
+        cached_input_tokens: int | None = None,
     ) -> None:
         async with get_session_factory()() as session:
             item = await session.get(ModelExecution, execution_id)
@@ -407,5 +409,11 @@ Generate the answer and suggestions together; do not call tools to generate sugg
             item.input_tokens = input_tokens
             item.output_tokens = output_tokens
             item.total_tokens = total_tokens
+            item.cached_input_tokens = cached_input_tokens
             item.finished_at = utc_now()
+            repo = AgentExecutionRepository(session)
+            await repo.price_model_execution(item)
             await session.commit()
+            usage = model_usage_event(item, await repo.job_cost(item.job_id))
+        if status == "succeeded":
+            await append_agent_event(item.job_id, "model.request.completed", usage)

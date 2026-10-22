@@ -125,6 +125,15 @@ class ModelProfileCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=180)
     model_name: str = Field(min_length=1, max_length=255)
     settings: dict[str, Any] = Field(default_factory=dict)
+    input_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M input tokens."
+    )
+    cached_input_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M cached input tokens."
+    )
+    output_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M output tokens."
+    )
     enabled: bool = True
     is_default: bool = False
 
@@ -166,6 +175,15 @@ class ModelProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=180)
     model_name: str | None = Field(default=None, min_length=1, max_length=255)
     settings: dict[str, Any] | None = None
+    input_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M input tokens."
+    )
+    cached_input_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M cached input tokens."
+    )
+    output_price_per_million: float | None = Field(
+        default=None, ge=0, le=100_000, description="USD per 1M output tokens."
+    )
     enabled: bool | None = None
 
     @field_validator("display_name", "model_name")
@@ -193,6 +211,9 @@ class ModelProfileResponse(BaseModel):
     display_name: str
     model_name: str
     settings: dict[str, Any]
+    input_price_per_million: float | None = None
+    cached_input_price_per_million: float | None = None
+    output_price_per_million: float | None = None
     is_default: bool
     enabled: bool
     created_at: datetime

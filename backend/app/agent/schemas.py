@@ -56,6 +56,11 @@ class ModelExecutionResponse(BaseModel):
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    cached_input_tokens: int | None = None
+    input_price_per_million: float | None = None
+    cached_input_price_per_million: float | None = None
+    output_price_per_million: float | None = None
+    cost: float | None = None
     error_code: str | None
     error_message: str | None
     provider_error_response: dict[str, object] | None = None

@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from decimal import Decimal
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -91,6 +93,14 @@ class ModelExecution(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cached_input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Prices copied from the profile when the call is recorded, so later price edits keep history.
+    input_price_per_million: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    cached_input_price_per_million: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 6), nullable=True
+    )
+    output_price_per_million: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider_error_response: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,17 @@ from app.models.schemas import (
     ModelProfileUpdate,
 )
 from app.secrets.service import SecretRepository, SecretService
+
+PRICE_FIELDS = (
+    "input_price_per_million",
+    "cached_input_price_per_million",
+    "output_price_per_million",
+)
+
+
+def _price(value: float | None) -> Decimal | None:
+    # Through str so 1.25 is stored as 1.25, not the float's binary expansion.
+    return None if value is None else Decimal(str(value))
 
 
 class ModelConfigurationService:
@@ -220,6 +232,9 @@ class ModelConfigurationService:
             display_name=payload.display_name,
             model_name=payload.model_name,
             settings=payload.settings,
+            input_price_per_million=_price(payload.input_price_per_million),
+            cached_input_price_per_million=_price(payload.cached_input_price_per_million),
+            output_price_per_million=_price(payload.output_price_per_million),
             enabled=payload.enabled,
             is_default=make_default,
         )
@@ -256,6 +271,10 @@ class ModelConfigurationService:
             item.model_name = payload.model_name
         if payload.settings is not None:
             item.settings = payload.settings
+        # A price sent as null clears it; an omitted price is left unchanged.
+        for field in PRICE_FIELDS:
+            if field in payload.model_fields_set:
+                setattr(item, field, _price(getattr(payload, field)))
         if payload.enabled is not None and payload.enabled != item.enabled:
             if not payload.enabled and item.is_default:
                 item.is_default = False

@@ -14,6 +14,7 @@ import * as api from '../api/models-api';
 import {
   modelProfileSchema,
   parseOptionalNumberInput,
+  PRICE_FIELDS,
   type ModelProfileValues,
 } from '../schemas/model-schemas';
 
@@ -70,6 +71,9 @@ export function NewModelProfilePage() {
         enabled: values.enabled,
         is_default: values.isDefault,
         settings,
+        input_price_per_million: values.inputPrice ?? null,
+        cached_input_price_per_million: values.cachedInputPrice ?? null,
+        output_price_per_million: values.outputPrice ?? null,
       });
       await client.invalidateQueries({ queryKey: queryKeys.models.all(orgId) });
       void navigate('/models');
@@ -135,6 +139,23 @@ export function NewModelProfilePage() {
               error={errors.maxTokens?.message}
             />
           </div>
+          <fieldset className="model-pricing-fields">
+            <legend>Pricing (USD per 1M tokens)</legend>
+            <p>Used to calculate the cost of each question. Leave blank if unknown.</p>
+            <div className="form-grid-3">
+              {PRICE_FIELDS.map((price) => (
+                <FormField
+                  key={price.name}
+                  label={price.label}
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  {...register(price.name, { setValueAs: parseOptionalNumberInput })}
+                  error={errors[price.name]?.message}
+                />
+              ))}
+            </div>
+          </fieldset>
           <div className="management-switches">
             <Controller
               control={control}

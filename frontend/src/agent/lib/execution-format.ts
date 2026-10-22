@@ -12,6 +12,42 @@ export function formatElapsed(startedAt: string, finishedAt: string | null | und
   return Number.isFinite(milliseconds) && milliseconds >= 0 ? formatDuration(milliseconds) : '—';
 }
 
+/** US dollars; small per-call costs keep four decimals so they don't round to $0.00. */
+export function formatCost(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `$${value.toFixed(value < 1 ? 4 : 2)}`;
+}
+
+export type UsageSummary = {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Sum of priced calls; null when no call has a cost. */
+  cost: number | null;
+  /** Calls with tokens but no cost because the model profile has no price. */
+  unpricedCalls: number;
+};
+
+export function summarizeUsage(
+  models: ReadonlyArray<{
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cost?: number | null;
+  }>,
+): UsageSummary {
+  let cost: number | null = null;
+  let unpricedCalls = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const model of models) {
+    inputTokens += model.input_tokens ?? 0;
+    outputTokens += model.output_tokens ?? 0;
+    if (model.cost != null) cost = (cost ?? 0) + model.cost;
+    else if (model.input_tokens != null || model.output_tokens != null) unpricedCalls += 1;
+  }
+  return { calls: models.length, inputTokens, outputTokens, cost, unpricedCalls };
+}
+
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null) return '—';
   if (bytes < 1024) return `${bytes} B`;

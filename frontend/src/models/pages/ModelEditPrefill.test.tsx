@@ -15,6 +15,9 @@ const state = vi.hoisted(() => ({
     enabled: true,
     is_default: true,
     settings: { temperature: 0.7, max_tokens: 8000 },
+    input_price_per_million: 2,
+    cached_input_price_per_million: 0.1,
+    output_price_per_million: 10,
   },
   connection: {
     id: 'c1',
@@ -65,6 +68,30 @@ describe('saved model edit values', () => {
           display_name: 'Updated Model',
           model_name: 'saved-model-id',
           settings: { max_tokens: 8000 },
+        }),
+      ),
+    );
+  });
+  it('prefills and saves model prices, clearing a price left blank', async () => {
+    const user = userEvent.setup();
+    show('profiles');
+    expect(screen.getByLabelText('Input price')).toHaveValue(2);
+    expect(screen.getByLabelText('Cached input price')).toHaveValue(0.1);
+    expect(screen.getByLabelText('Output price')).toHaveValue(10);
+    const inputPrice = screen.getByLabelText('Input price') as HTMLInputElement;
+    await user.type(inputPrice, '1.25', {
+      initialSelectionStart: 0,
+      initialSelectionEnd: inputPrice.value.length,
+    });
+    await user.clear(screen.getByLabelText('Cached input price'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(state.updateProfile).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          input_price_per_million: 1.25,
+          cached_input_price_per_million: null,
+          output_price_per_million: 10,
         }),
       ),
     );

@@ -3,6 +3,7 @@ import { ChevronRight, Square } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import type { ManagedJob } from '../../jobs/types';
 import { getSafeJobEventLabel } from '../../jobs/sse/job-events';
+import { formatCost } from '../../agent/lib/execution-format';
 import './AnalysisProgress.css';
 
 function secondsBetween(start: string, endMs: number) {
@@ -37,6 +38,7 @@ export function AnalysisProgress({
     : (getSafeJobEventLabel(events.at(-1)) ??
       (job.status === 'queued' ? 'Waiting to start' : 'Working on your request…'));
   const elapsed = secondsBetween(job.created_at, now);
+  const liveCost = latestJobCost(events);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -76,6 +78,11 @@ export function AnalysisProgress({
           </span>
           <ChevronRight className="analysis-progress-chevron" size={14} aria-hidden="true" />
         </button>
+        {liveCost != null && (
+          <span className="analysis-progress-cost" aria-label={`Cost so far ${formatCost(liveCost)}`}>
+            {formatCost(liveCost)}
+          </span>
+        )}
         <span className="analysis-progress-elapsed" aria-label={`${elapsed} seconds elapsed`}>
           {formatDuration(elapsed)}
         </span>
@@ -129,4 +136,15 @@ export function AnalysisProgress({
       )}
     </section>
   );
+}
+
+/** Running job cost from the newest model usage event, which carries the job total so far. */
+function latestJobCost(events: ReadonlyArray<{ event_type: string; payload: Record<string, unknown> }>) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]!;
+    if (event.event_type !== 'model.request.completed') continue;
+    const cost = event.payload.job_cost;
+    if (typeof cost === 'number' && Number.isFinite(cost)) return cost;
+  }
+  return null;
 }

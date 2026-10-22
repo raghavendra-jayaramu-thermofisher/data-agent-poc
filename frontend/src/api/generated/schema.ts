@@ -2092,6 +2092,12 @@ export interface components {
         };
         /** ModelExecutionResponse */
         ModelExecutionResponse: {
+            /** Cached Input Price Per Million */
+            cached_input_price_per_million?: number | null;
+            /** Cached Input Tokens */
+            cached_input_tokens?: number | null;
+            /** Cost */
+            cost?: number | null;
             /** Error Code */
             error_code: string | null;
             /** Error Message */
@@ -2103,6 +2109,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Input Price Per Million */
+            input_price_per_million?: number | null;
             /** Input Tokens */
             input_tokens: number | null;
             /**
@@ -2117,6 +2125,8 @@ export interface components {
              * Format: uuid
              */
             model_profile_id: string;
+            /** Output Price Per Million */
+            output_price_per_million?: number | null;
             /** Output Tokens */
             output_tokens: number | null;
             /** Phase */
@@ -2140,6 +2150,11 @@ export interface components {
         /** ModelProfileCreate */
         ModelProfileCreate: {
             /**
+             * Cached Input Price Per Million
+             * @description USD per 1M cached input tokens.
+             */
+            cached_input_price_per_million?: number | null;
+            /**
              * Connection Id
              * Format: uuid
              */
@@ -2152,12 +2167,22 @@ export interface components {
              */
             enabled: boolean;
             /**
+             * Input Price Per Million
+             * @description USD per 1M input tokens.
+             */
+            input_price_per_million?: number | null;
+            /**
              * Is Default
              * @default false
              */
             is_default: boolean;
             /** Model Name */
             model_name: string;
+            /**
+             * Output Price Per Million
+             * @description USD per 1M output tokens.
+             */
+            output_price_per_million?: number | null;
             /** Settings */
             settings?: {
                 [key: string]: unknown;
@@ -2165,6 +2190,8 @@ export interface components {
         };
         /** ModelProfileResponse */
         ModelProfileResponse: {
+            /** Cached Input Price Per Million */
+            cached_input_price_per_million?: number | null;
             /**
              * Connection Id
              * Format: uuid
@@ -2184,6 +2211,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Input Price Per Million */
+            input_price_per_million?: number | null;
             /** Is Default */
             is_default: boolean;
             /** Model Name */
@@ -2193,6 +2222,8 @@ export interface components {
              * Format: uuid
              */
             organization_id: string;
+            /** Output Price Per Million */
+            output_price_per_million?: number | null;
             /** Settings */
             settings: {
                 [key: string]: unknown;
@@ -2205,14 +2236,29 @@ export interface components {
         };
         /** ModelProfileUpdate */
         ModelProfileUpdate: {
+            /**
+             * Cached Input Price Per Million
+             * @description USD per 1M cached input tokens.
+             */
+            cached_input_price_per_million?: number | null;
             /** Connection Id */
             connection_id?: string | null;
             /** Display Name */
             display_name?: string | null;
             /** Enabled */
             enabled?: boolean | null;
+            /**
+             * Input Price Per Million
+             * @description USD per 1M input tokens.
+             */
+            input_price_per_million?: number | null;
             /** Model Name */
             model_name?: string | null;
+            /**
+             * Output Price Per Million
+             * @description USD per 1M output tokens.
+             */
+            output_price_per_million?: number | null;
             /** Settings */
             settings?: {
                 [key: string]: unknown;

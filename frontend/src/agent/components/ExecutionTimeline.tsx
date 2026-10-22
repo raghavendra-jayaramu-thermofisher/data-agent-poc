@@ -1,5 +1,6 @@
 import type { ExecutionTrace } from '../api/execution-api';
 import { normalizeTrace } from '../lib/normalize-trace';
+import { JobUsageSummary } from './JobUsageSummary';
 import { ModelExecutionCard } from './ModelExecutionCard';
 import { SqlExecutionBlock } from './SqlExecutionBlock';
 import { ToolExecutionCard } from './ToolExecutionCard';
@@ -24,6 +25,7 @@ export function ExecutionTimeline({
 
   return (
     <div className="execution-timeline space-y-2 mt-2" aria-label="Execution trace">
+      <JobUsageSummary models={trace.models ?? []} />
       {allEntries.length > entries.length ? (
         <p className="text-[11px] text-[var(--db-text-muted)] mb-2" role="status">
           Showing the first 500 persisted execution records.

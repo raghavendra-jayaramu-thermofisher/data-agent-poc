@@ -10,7 +10,7 @@ from typing import Any, Protocol
 import httpx
 
 from app.agent.models import ModelExecution
-from app.agent.repository import AgentExecutionRepository
+from app.agent.repository import AgentExecutionRepository, model_usage_event
 from app.agent.tools import (
     AgentLimitError,
     AgentToolContext,
@@ -764,7 +764,10 @@ def _content_text(content: object) -> str:
     return "\n".join(parts)
 
 
-def extract_usage(response: object) -> tuple[int | None, int | None, int | None]:
+def extract_usage(
+    response: object,
+) -> tuple[int | None, int | None, int | None, int | None]:
+    """Return input, output, total and cached input tokens reported for one model call."""
     candidates: list[object] = []
     llm_output = getattr(response, "llm_output", None)
     if isinstance(llm_output, dict):
@@ -793,8 +796,23 @@ def extract_usage(response: object) -> tuple[int | None, int | None, int | None]
         )
         total_tokens = _nonnegative_int(candidate.get("total_tokens"))
         if input_tokens is not None or output_tokens is not None or total_tokens is not None:
-            return input_tokens, output_tokens, total_tokens
-    return None, None, None
+            return input_tokens, output_tokens, total_tokens, _cached_input_tokens(candidate)
+    return None, None, None, None
+
+
+def _cached_input_tokens(usage: dict[object, object]) -> int | None:
+    # LangChain reports input_token_details.cache_read; raw OpenAI usage reports
+    # prompt_tokens_details.cached_tokens.
+    for key, field in (
+        ("input_token_details", "cache_read"),
+        ("prompt_tokens_details", "cached_tokens"),
+    ):
+        details = usage.get(key)
+        if isinstance(details, dict):
+            cached = _nonnegative_int(details.get(field))
+            if cached is not None:
+                return cached
+    return None
 
 
 def _nonnegative_int(value: object) -> int | None:
@@ -847,7 +865,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
         ) -> None:
             started = self._started_at.pop(str(run_id), utc_now())
             finished = utc_now()
-            input_tokens, output_tokens, total_tokens = extract_usage(response)
+            input_tokens, output_tokens, total_tokens, cached_input_tokens = extract_usage(response)
 
             async def _record() -> None:
                 async with self._record_lock:
@@ -863,11 +881,19 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             input_tokens=input_tokens,
                             output_tokens=output_tokens,
                             total_tokens=total_tokens,
+                            cached_input_tokens=cached_input_tokens,
                             started_at=started,
                             finished_at=finished,
                         )
+                        await repo.price_model_execution(model_exec)
                         repo.add_model(model_exec)
                         await session.commit()
+                        usage = model_usage_event(
+                            model_exec, await repo.job_cost(self.audit_context.job_id)
+                        )
+                    await append_agent_event(
+                        self.audit_context.job_id, "model.request.completed", usage
+                    )
 
             self._schedule(_record())
 

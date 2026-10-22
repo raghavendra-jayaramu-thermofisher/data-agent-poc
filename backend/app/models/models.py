@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
+from decimal import Decimal
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +54,14 @@ class ModelProfile(TimestampMixin, Base):
             unique=True,
             postgresql_where=text("is_default = true"),
         ),
+        *(
+            CheckConstraint(f"{name} >= 0", name=f"{name}_nonnegative")
+            for name in (
+                "input_price_per_million",
+                "cached_input_price_per_million",
+                "output_price_per_million",
+            )
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -66,5 +76,11 @@ class ModelProfile(TimestampMixin, Base):
     settings: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
+    # USD per one million tokens; kept out of `settings`, which is sent to the provider.
+    input_price_per_million: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    cached_input_price_per_million: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 6), nullable=True
+    )
+    output_price_per_million: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))

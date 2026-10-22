@@ -17,6 +17,7 @@ class ModelUsage:
     input_tokens: int | None = None
     output_tokens: int | None = None
     total_tokens: int | None = None
+    cached_input_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,10 +334,13 @@ class OpenAICompatibleClient:
             raw = value.get(name)
             return raw if isinstance(raw, int) and raw >= 0 else None
 
+        details = value.get("prompt_tokens_details")
+        cached = details.get("cached_tokens") if isinstance(details, dict) else None
         usage = ModelUsage(
             input_tokens=token("prompt_tokens"),
             output_tokens=token("completion_tokens"),
             total_tokens=token("total_tokens"),
+            cached_input_tokens=cached if isinstance(cached, int) and cached >= 0 else None,
         )
         if usage.input_tokens is None and usage.output_tokens is None and usage.total_tokens is None:
             return None

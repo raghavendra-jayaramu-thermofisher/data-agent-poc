@@ -6,6 +6,7 @@ import { listDataSources } from '../../data-sources/api/data-source-api';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import { useExecutionTrace } from '../hooks/useExecutionTrace';
 import { ArtifactRenderer } from './ArtifactRenderer';
+import { JobUsageSummary } from './JobUsageSummary';
 import { hasArtifactDirectives } from '../lib/artifact-directives';
 import { AssistantResponseRenderer } from '../../conversations/components/AssistantResponseRenderer';
 import type { JobArtifact } from '../api/execution-api';
@@ -89,6 +90,7 @@ export function MessageAnalysisDetails({
 
       {footerActions ? (
         <footer className="assistant-card-footer assistant-card-footer--actions-only">
+          <JobUsageSummary models={trace.data?.models ?? []} className="assistant-card-usage" />
           {footerActions}
         </footer>
       ) : null}

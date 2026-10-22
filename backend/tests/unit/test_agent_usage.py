@@ -29,4 +29,4 @@ def test_extract_usage_uses_only_reported_values_and_does_not_invent_total() -> 
         llm_output=None,
         generations=[[SimpleNamespace(message=message)]],
     )
-    assert extract_usage(response) == (10, 4, None)
+    assert extract_usage(response) == (10, 4, None, None)

@@ -81,6 +81,28 @@ describe('AnalysisProgress', () => {
     expect(screen.getByLabelText('10 seconds elapsed')).toHaveTextContent('10s');
   });
 
+  it('shows the running cost from the latest model usage event', () => {
+    const usage = (sequence: number, jobCost: number | null) => ({
+      sequence,
+      event_type: 'model.request.completed',
+      level: 'info',
+      payload: { cost: 0.002, job_cost: jobCost },
+      created_at: '2026-09-16T12:00:05.000Z',
+    });
+    const { rerender } = render(
+      <AnalysisProgress managedJob={managedJob} onCancel={() => undefined} />,
+    );
+    expect(screen.queryByLabelText(/Cost so far/)).not.toBeInTheDocument();
+
+    rerender(
+      <AnalysisProgress
+        managedJob={{ ...managedJob, events: [...managedJob.events, usage(5, 0.0042), usage(6, 0.0061)] }}
+        onCancel={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Cost so far $0.0061')).toHaveTextContent('$0.0061');
+  });
+
   it('uses a clear stop action and prevents repeated cancellation', () => {
     const onCancel = vi.fn(async () => undefined);
     render(<AnalysisProgress managedJob={managedJob} onCancel={onCancel} />);

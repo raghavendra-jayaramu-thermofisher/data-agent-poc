@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Switch } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Star, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 import type { AppError } from '../../api/errors';
@@ -20,8 +20,10 @@ import { notifications } from '../../components/notifications';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/models-api';
 import {
+  formatPrice,
   modelProfileSchema,
   parseOptionalNumberInput,
+  PRICE_FIELDS,
   type ModelProfileValues,
 } from '../schemas/model-schemas';
 
@@ -141,6 +143,12 @@ export function ModelProfileDetailPage() {
                 <dd>{item.settings.max_tokens}</dd>
               </>
             )}
+            {PRICE_FIELDS.map((price) => (
+              <Fragment key={price.name}>
+                <dt>{price.label} (USD per 1M tokens)</dt>
+                <dd>{formatPrice(item[price.apiField])}</dd>
+              </Fragment>
+            ))}
           </dl>
         )}
       </section>
@@ -188,6 +196,9 @@ function ProfileEdit({
       isDefault: profile.is_default,
       temperature: typeof settings.temperature === 'number' ? settings.temperature : undefined,
       maxTokens: typeof settings.max_tokens === 'number' ? settings.max_tokens : undefined,
+      inputPrice: profile.input_price_per_million ?? undefined,
+      cachedInputPrice: profile.cached_input_price_per_million ?? undefined,
+      outputPrice: profile.output_price_per_million ?? undefined,
     },
   });
 
@@ -205,6 +216,9 @@ function ProfileEdit({
         model_name: values.modelName,
         enabled: values.enabled,
         settings: nextSettings,
+        input_price_per_million: values.inputPrice ?? null,
+        cached_input_price_per_million: values.cachedInputPrice ?? null,
+        output_price_per_million: values.outputPrice ?? null,
       });
 
       if (values.isDefault && !profile.is_default) {
@@ -281,6 +295,32 @@ function ProfileEdit({
           )}
         />
       </div>
+
+      <fieldset className="model-pricing-fields">
+        <legend>Pricing (USD per 1M tokens)</legend>
+        <p>Used to calculate the cost of each question. Leave blank if unknown.</p>
+        <div className="form-grid-3">
+          {PRICE_FIELDS.map((price) => (
+            <Controller
+              key={price.name}
+              control={control}
+              name={price.name}
+              render={({ field }) => (
+                <FormField
+                  label={price.label}
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  {...field}
+                  value={field.value ?? ''}
+                  onChange={(event) => field.onChange(parseOptionalNumberInput(event.target.value))}
+                  error={errors[price.name]?.message}
+                />
+              )}
+            />
+          ))}
+        </div>
+      </fieldset>
 
       <div className="management-switches">
         <Controller

@@ -29,11 +29,26 @@ export const modelProfileSchema = z.object({
   isDefault: z.boolean(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().max(1_000_000).optional(),
+  // USD per one million tokens; used to cost each model call.
+  inputPrice: z.number().min(0).max(100_000).optional(),
+  cachedInputPrice: z.number().min(0).max(100_000).optional(),
+  outputPrice: z.number().min(0).max(100_000).optional(),
 });
+
+export const PRICE_FIELDS = [
+  { name: 'inputPrice', label: 'Input price', apiField: 'input_price_per_million' },
+  { name: 'cachedInputPrice', label: 'Cached input price', apiField: 'cached_input_price_per_million' },
+  { name: 'outputPrice', label: 'Output price', apiField: 'output_price_per_million' },
+] as const;
 
 export type ModelProfileValues = z.infer<typeof modelProfileSchema>;
 
 export function parseOptionalNumberInput(value: unknown): number | undefined {
   if (value === '' || value === null || value === undefined) return undefined;
   return Number(value);
+}
+
+/** Show a per-million-token price as entered, without rounding small cached rates away. */
+export function formatPrice(value: number | null | undefined): string {
+  return value === null || value === undefined ? 'Not set' : `$${value}`;
 }

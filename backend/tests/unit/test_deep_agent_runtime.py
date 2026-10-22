@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 
@@ -204,11 +205,25 @@ async def test_model_audit_callback_records_from_langchain_worker_thread(monkeyp
             del job_id
             return len(recorded) + 1
 
+        async def price_model_execution(self, item) -> None:
+            item.cost = Decimal("0.004")
+
+        async def job_cost(self, job_id):
+            del job_id
+            return Decimal("0.010")
+
         def add_model(self, item) -> None:
             recorded.append(item)
 
+    events = []
+
+    async def fake_event(job_id, event_type, payload, level="info"):
+        del job_id, level
+        events.append((event_type, payload))
+
     monkeypatch.setattr(module, "get_session_factory", lambda: lambda: FakeSession())
     monkeypatch.setattr(module, "AgentExecutionRepository", FakeRepository)
+    monkeypatch.setattr(module, "append_agent_event", fake_event)
 
     context = AgentAuditContext(
         job_id=uuid.uuid4(),
@@ -231,6 +246,19 @@ async def test_model_audit_callback_records_from_langchain_worker_thread(monkeyp
     assert recorded[0].phase == "analysis"
     assert recorded[0].status == "succeeded"
     assert recorded[0].total_tokens == 14
+    # Each recorded call publishes its cost and the job's running total for the live display.
+    assert events == [
+        (
+            "model.request.completed",
+            {
+                "input_tokens": 10,
+                "output_tokens": 4,
+                "cached_input_tokens": None,
+                "cost": 0.004,
+                "job_cost": 0.01,
+            },
+        )
+    ]
 
 
 def test_model_error_diagnostics_do_not_store_provider_content() -> None:

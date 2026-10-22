@@ -1,7 +1,7 @@
 import { Bot, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatLocalDateTime } from '../../lib/datetime';
 import type { ModelExecution } from '../api/execution-api';
-import { formatElapsed, sanitizeOperationalText } from '../lib/execution-format';
+import { formatCost, formatElapsed, sanitizeOperationalText } from '../lib/execution-format';
 
 function token(value: number | null) {
   return value == null ? '—' : value.toLocaleString();
@@ -30,7 +30,7 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
         </span>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 text-[10px] bg-[var(--db-surface-muted)] p-2 rounded">
+      <div className="grid grid-cols-5 gap-2 text-[10px] bg-[var(--db-surface-muted)] p-2 rounded">
         <div>
           <span className="text-[var(--db-text-muted)] block">Input Tokens</span>
           <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.input_tokens)}</span>
@@ -42,6 +42,15 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
         <div>
           <span className="text-[var(--db-text-muted)] block">Total Tokens</span>
           <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.total_tokens)}</span>
+        </div>
+        <div>
+          <span className="text-[var(--db-text-muted)] block">Cost</span>
+          <span
+            className="font-semibold font-mono text-[var(--db-text-primary)]"
+            title={execution.cost == null ? 'No price set for this model profile' : undefined}
+          >
+            {formatCost(execution.cost)}
+          </span>
         </div>
         <div>
           <span className="text-[var(--db-text-muted)] block">Started</span>
