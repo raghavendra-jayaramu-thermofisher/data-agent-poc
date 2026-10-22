@@ -6,8 +6,10 @@ import {
   useReactTable,
   type ColumnDef,
   type SortingState,
+  type Table as ReactTable,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useMemo, useRef, useState, type RefObject } from 'react';
 import { Copy, Download, Search, Table } from 'lucide-react';
 import {
   ArtifactFrame,
@@ -28,6 +30,137 @@ import {
 } from './table-domain';
 
 export type TableViewState = { sorting: SortingState; globalFilter: string };
+
+type ScrollPosition = { top: number; left: number };
+
+// Rows rendered before the viewport is measured (first paint, jsdom).
+const UNMEASURED_ROW_COUNT = 50;
+
+// Each viewer owns its scroll observer, so the inline and fullscreen tables both virtualize while
+// the parent keeps the shared sort, filter and last scroll position.
+function TableViewport({
+  table,
+  label,
+  numericColumns,
+  scrollPosition,
+}: {
+  table: ReactTable<AnalyticalRow>;
+  label: string;
+  numericColumns: Set<string>;
+  scrollPosition: RefObject<ScrollPosition>;
+}) {
+  const scroll = useRef<HTMLDivElement | null>(null);
+  const rows = table.getRowModel().rows;
+  const columnCount = table.getVisibleLeafColumns().length;
+  const virtual = useVirtualizer<HTMLDivElement, Element>({
+    count: rows.length,
+    getScrollElement: () => scroll.current,
+    estimateSize: () => 32,
+    initialOffset: () => scrollPosition.current.top,
+    overscan: 10,
+  });
+  const virtualRows = virtual.getVirtualItems();
+  const indices = virtualRows.length
+    ? virtualRows.map((row) => row.index)
+    : Array.from({ length: Math.min(UNMEASURED_ROW_COUNT, rows.length) }, (_, index) => index);
+  const before = virtualRows[0]?.start ?? 0;
+  const after = virtualRows.length ? virtual.getTotalSize() - virtualRows.at(-1)!.end : 0;
+  const spacer = (height: number) =>
+    height > 0 && (
+      <tr aria-hidden="true">
+        <td colSpan={columnCount} style={{ height, padding: 0, border: 0 }} />
+      </tr>
+    );
+  return (
+    <div
+      ref={(element) => {
+        scroll.current = element;
+        if (element) {
+          element.scrollTop = scrollPosition.current.top;
+          element.scrollLeft = scrollPosition.current.left;
+        }
+      }}
+      className="analytical-table-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label={`${label} scrollable table`}
+      onScroll={(event) => {
+        scrollPosition.current = {
+          top: event.currentTarget.scrollTop,
+          left: event.currentTarget.scrollLeft,
+        };
+      }}
+    >
+      <table className="analytical-table" aria-label={label} aria-rowcount={rows.length + 1}>
+        <thead>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id} aria-rowindex={1}>
+              {group.headers.map((header) => (
+                <th
+                  key={header.id}
+                  scope="col"
+                  className={numericColumns.has(header.column.id) ? 'numeric-cell' : undefined}
+                  aria-sort={
+                    header.column.getIsSorted() === 'asc'
+                      ? 'ascending'
+                      : header.column.getIsSorted() === 'desc'
+                        ? 'descending'
+                        : 'none'
+                  }
+                >
+                  <button
+                    type="button"
+                    className="analytical-table-sort"
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    <span className="analytical-cell-value">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </span>
+                    <span aria-hidden="true">
+                      {header.column.getIsSorted() === 'asc'
+                        ? '↑'
+                        : header.column.getIsSorted() === 'desc'
+                          ? '↓'
+                          : ''}
+                    </span>
+                  </button>
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {spacer(before)}
+          {indices.map((index) => {
+            const row = rows[index]!;
+            return (
+              <tr
+                key={row.id}
+                data-index={index}
+                ref={(element) => {
+                  if (element) virtual.measureElement(element);
+                }}
+                aria-rowindex={index + 2}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className={numericColumns.has(cell.column.id) ? 'numeric-cell' : undefined}
+                  >
+                    <span className="analytical-cell-value">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+          {spacer(after)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export function AnalyticalTable({
   model,
@@ -56,23 +189,14 @@ export function AnalyticalTable({
   className?: string;
   viewState?: TableViewState;
   onViewStateChange?(state: TableViewState): void;
-  scrollPosition?: RefObject<{ top: number; left: number }>;
+  scrollPosition?: RefObject<ScrollPosition>;
 }) {
   const [localState, setLocalState] = useState<TableViewState>({ sorting: [], globalFilter: '' });
   const state = viewState ?? localState;
   const changeState = onViewStateChange ?? setLocalState;
   const [showSearch, setShowSearch] = useState(false);
-  const localScroll = useRef({ top: 0, left: 0 });
+  const localScroll = useRef<ScrollPosition>({ top: 0, left: 0 });
   const scrollPosition = controlledScroll ?? localScroll;
-  const attachScroll = useCallback(
-    (element: HTMLDivElement | null) => {
-      if (element) {
-        element.scrollTop = scrollPosition.current.top;
-        element.scrollLeft = scrollPosition.current.left;
-      }
-    },
-    [scrollPosition],
-  );
   const columnDefs = useMemo<ColumnDef<AnalyticalRow>[]>(
     () =>
       model.columns.map((column) => ({
@@ -121,75 +245,12 @@ export function AnalyticalTable({
       No rows returned.
     </p>
   ) : (
-    <div
-      ref={attachScroll}
-      className="analytical-table-scroll"
-      tabIndex={0}
-      role="region"
-      aria-label={`${label} scrollable table`}
-      onScroll={(event) => {
-        scrollPosition.current = {
-          top: event.currentTarget.scrollTop,
-          left: event.currentTarget.scrollLeft,
-        };
-      }}
-    >
-      <table className="analytical-table" aria-label={label}>
-        <thead>
-          {table.getHeaderGroups().map((group) => (
-            <tr key={group.id}>
-              {group.headers.map((header) => (
-                <th
-                  key={header.id}
-                  scope="col"
-                  className={numericColumns.has(header.column.id) ? 'numeric-cell' : undefined}
-                  aria-sort={
-                    header.column.getIsSorted() === 'asc'
-                      ? 'ascending'
-                      : header.column.getIsSorted() === 'desc'
-                        ? 'descending'
-                        : 'none'
-                  }
-                >
-                  <button
-                    type="button"
-                    className="analytical-table-sort"
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <span className="analytical-cell-value">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </span>
-                    <span aria-hidden="true">
-                      {header.column.getIsSorted() === 'asc'
-                        ? '↑'
-                        : header.column.getIsSorted() === 'desc'
-                          ? '↓'
-                          : ''}
-                    </span>
-                  </button>
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className={numericColumns.has(cell.column.id) ? 'numeric-cell' : undefined}
-                >
-                  <span className="analytical-cell-value">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </span>
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableViewport
+      table={table}
+      label={label}
+      numericColumns={numericColumns}
+      scrollPosition={scrollPosition}
+    />
   );
   if (hideToolbar) return grid;
   return (
