@@ -13,6 +13,8 @@ export type ClarificationQuestion = {
   required?: boolean;
   options?: ClarificationOption[];
   placeholder?: string | null;
+  /** The optional "Anything else" box the server adds to every card. */
+  is_extra?: boolean;
 };
 export type ClarificationRequest = { reason: string; questions: ClarificationQuestion[] };
 export type ClarificationAnswer = {

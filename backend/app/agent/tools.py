@@ -1178,11 +1178,14 @@ def build_default_tool_registry() -> AgentToolRegistry:
             description=(
                 "Ask the user clarifying questions when an ambiguity would materially change the "
                 "result and cannot be resolved from the schema, knowledge, saved instructions or "
-                f"conversation. Put every question you need in one call (at most {MAX_QUESTIONS}). "
-                "Use 'choice' questions with concrete options (the interface always adds 'Other' "
-                "with a text box) or 'text' questions for free-form details. Call it alone, before "
-                "running large queries. The turn ends after this call and the answers arrive in "
-                "the user's next message."
+                f"conversation. Put every question you need in one call (at most {MAX_QUESTIONS}), "
+                "one decision per question. Use 'choice' questions with concrete fields or values "
+                "from the data (the interface always adds 'Other' with a text box) or 'text' "
+                "questions for free-form details. Questions must be answerable by choosing or "
+                "typing; never ask for files, screenshots, or uploads. The interface also adds an "
+                "optional 'Anything else I should know?' box. Call it alone, before running large "
+                "queries. The turn ends after this call and the answers arrive in the user's next "
+                "message."
             ),
             args_schema=AskUserArgs,
             handler=ask_user,

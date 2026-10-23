@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from app.agent import deep_agent as runtime_module
 from app.agent import tools
 from app.agent.clarification import (
+    EXTRA_QUESTION_ID,
     OTHER_LABEL,
     AskUserArgs,
     ClarificationAnswers,
@@ -56,11 +57,37 @@ def answers(*items: dict[str, object]) -> ClarificationAnswers:
 
 def test_request_always_ends_choice_options_with_one_server_owned_other():
     request = build_request(args())
-    division, regions, exclude = request["questions"]
+    division, regions, exclude, extra = request["questions"]
     assert [option["label"] for option in division["options"]] == ["BID", "LSG", OTHER_LABEL]
     assert division["options"][-1]["is_other"] is True
     assert [option["label"] for option in regions["options"]][-1] == OTHER_LABEL
     assert "options" not in exclude and exclude["required"] is False
+    assert (extra["id"], extra["kind"], extra["required"], extra["is_extra"]) == (
+        EXTRA_QUESTION_ID, "text", False, True,
+    )
+    assert extra["prompt"] == "Anything else I should know?"
+
+
+def test_the_anything_else_box_is_reserved_and_only_reported_when_filled():
+    with pytest.raises(ClarificationError, match="reserved"):
+        build_request(args(questions=[{"id": EXTRA_QUESTION_ID, "kind": "text", "prompt": "Q"}]))
+    request = build_request(
+        args(questions=[{"id": "period", "kind": "text", "prompt": "Which period?"}])
+    )
+    filled = validate_answers(request, answers(
+        {"question_id": "period", "text": "September"},
+        {"question_id": EXTRA_QUESTION_ID, "text": " Missing Stock = Clean Partial Stock "},
+    ))
+    assert answers_text(request, filled).splitlines() == [
+        "Answers to your questions:",
+        "- Which period? September",
+        "- Additional context: Missing Stock = Clean Partial Stock",
+    ]
+    empty = validate_answers(request, answers({"question_id": "period", "text": "September"}))
+    assert answers_text(request, empty).splitlines() == [
+        "Answers to your questions:",
+        "- Which period? September",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -104,6 +131,7 @@ def test_valid_answers_are_normalized_in_question_order():
         {"question_id": "division", "selected": ["BID"], "other_text": None},
         {"question_id": "regions", "selected": ["ANZ", OTHER_LABEL], "other_text": "Korea"},
         {"question_id": "exclude", "text": None},
+        {"question_id": EXTRA_QUESTION_ID, "text": None},
     ]
     assert answers_text(request, result).splitlines() == [
         "Answers to your questions:",
@@ -144,6 +172,7 @@ def test_questions_markdown_lists_every_question_and_option():
     assert text.startswith("# A few questions before I continue")
     assert "1. **Which division?** (choose one: BID, LSG, Other)" in text
     assert "3. **Anything to exclude?** (free text)" in text
+    assert "Anything else I should know?" not in text
 
 
 def context(round_: int = 0) -> AgentToolContext:
@@ -158,7 +187,7 @@ def context(round_: int = 0) -> AgentToolContext:
 async def test_ask_user_tool_returns_the_request_and_respects_the_round_limit(monkeypatch):
     monkeypatch.setattr(tools, "append_agent_event", AsyncMock())
     result = await tools.ask_user(context(), args().model_dump(), uuid.uuid4())
-    assert result["ok"] is True and len(result["clarification"]["questions"]) == 3
+    assert result["ok"] is True and len(result["clarification"]["questions"]) == 4
 
     with pytest.raises(AgentToolError) as limited:
         await tools.ask_user(context(round_=2), args().model_dump(), uuid.uuid4())
@@ -169,6 +198,16 @@ async def test_ask_user_tool_returns_the_request_and_respects_the_round_limit(mo
     with pytest.raises(AgentToolError) as invalid:
         await tools.ask_user(context(), bad, uuid.uuid4())
     assert invalid.value.code == "CLARIFICATION_INVALID"
+
+
+def test_prompt_and_tool_forbid_upload_requests_and_bundled_questions():
+    from app.agent.deep_agent import SYSTEM_PROMPT
+
+    description = tools.build_default_tool_registry().get("ask_user").description
+    assert "Never ask the user to\n  attach, upload, or share files, screenshots" in SYSTEM_PROMPT
+    assert "one decision per question" in SYSTEM_PROMPT.lower()
+    assert "never ask for files, screenshots, or uploads" in description
+    assert "Anything else I should know?" in description
 
 
 def test_ask_user_is_registered_as_a_turn_ending_tool():

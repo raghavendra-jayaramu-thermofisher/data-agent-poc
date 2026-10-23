@@ -84,12 +84,14 @@ export function ClarificationCard({
         {heading}
         {request.reason && <p className="clarification-reason">{request.reason}</p>}
         <dl className="clarification-summary">
-          {request.questions.map((question) => (
-            <div key={question.id}>
-              <dt>{question.prompt}</dt>
-              <dd>{shown ? answerSummary(question, byId.get(question.id)) : 'Not answered'}</dd>
-            </div>
-          ))}
+          {request.questions
+            .filter((question) => !question.is_extra || byId.get(question.id)?.text)
+            .map((question) => (
+              <div key={question.id}>
+                <dt>{question.prompt}</dt>
+                <dd>{shown ? answerSummary(question, byId.get(question.id)) : 'Not answered'}</dd>
+              </div>
+            ))}
         </dl>
       </section>
     );

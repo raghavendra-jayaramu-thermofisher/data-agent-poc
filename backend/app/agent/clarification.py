@@ -19,6 +19,16 @@ MIN_OPTIONS, MAX_OPTIONS = 2, 6
 MAX_ROUNDS = 2
 OTHER_LABEL = "Other"
 ANSWER_TEXT_MAX = 2000
+# Server-added optional box on every card for context the questions did not cover.
+EXTRA_QUESTION_ID = "additional_context"
+EXTRA_QUESTION = {
+    "id": EXTRA_QUESTION_ID,
+    "kind": "text",
+    "prompt": "Anything else I should know?",
+    "required": False,
+    "placeholder": "Definitions, exceptions or context the questions didn't cover",
+    "is_extra": True,
+}
 
 _OTHER_LABELS = {"other", "others", "something else", "other (please specify)"}
 
@@ -70,7 +80,7 @@ class ClarificationAnswer(BaseModel):
 class ClarificationAnswers(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    answers: list[ClarificationAnswer] = Field(max_length=MAX_QUESTIONS)
+    answers: list[ClarificationAnswer] = Field(max_length=MAX_QUESTIONS + 1)
 
     @model_validator(mode="after")
     def unique_questions(self) -> ClarificationAnswers:
@@ -93,6 +103,10 @@ def build_request(args: AskUserArgs) -> dict[str, object]:
     ids = [question.id for question in args.questions]
     if len(ids) != len(set(ids)):
         raise ClarificationError("Question ids must be unique.")
+    if EXTRA_QUESTION_ID in ids:
+        raise ClarificationError(
+            f"'{EXTRA_QUESTION_ID}' is reserved; the interface adds that box automatically."
+        )
     questions: list[dict[str, object]] = []
     for question in args.questions:
         if question.kind == "text":
@@ -117,6 +131,7 @@ def build_request(args: AskUserArgs) -> dict[str, object]:
             {"label": OTHER_LABEL, "description": None, "is_other": True},
         ]
         questions.append(item)
+    questions.append(dict(EXTRA_QUESTION))
     return {"schema_version": 1, "reason": args.reason.strip(), "questions": questions}
 
 
@@ -167,7 +182,8 @@ def validate_answers(
 def questions_markdown(request: dict[str, object]) -> str:
     """Readable form of the questions, kept as the assistant message content and history."""
     lines = ["# A few questions before I continue", "", str(request.get("reason", "")).strip(), ""]
-    for index, question in enumerate(request.get("questions", []), start=1):
+    asked = [item for item in request.get("questions", []) if not item.get("is_extra")]
+    for index, question in enumerate(asked, start=1):
         if question["kind"] == "text":
             lines.append(f"{index}. **{question['prompt']}** (free text)")
         else:
@@ -183,6 +199,10 @@ def answers_text(request: dict[str, object], answers: list[dict[str, object]]) -
     lines = ["Answers to your questions:"]
     for question in request.get("questions", []):
         answer = by_id.get(question["id"], {})
+        if question.get("is_extra"):
+            if answer.get("text"):
+                lines.append(f"- Additional context: {answer['text']}")
+            continue
         if question["kind"] == "text":
             value = answer.get("text") or "(no answer)"
         else:

@@ -93,6 +93,49 @@ describe('ClarificationCard', () => {
     );
   });
 
+  it('always offers the optional "Anything else" box and hides it once answered empty', async () => {
+    const withExtra: ClarificationRequest = {
+      ...request,
+      questions: [
+        request.questions[2]!,
+        {
+          id: 'additional_context',
+          kind: 'text',
+          prompt: 'Anything else I should know?',
+          required: false,
+          is_extra: true,
+        },
+      ],
+    };
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(
+      <ClarificationCard request={withExtra} answered={null} canAnswer onSubmit={onSubmit} />,
+    );
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByRole('textbox', { name: 'Anything else I should know?' }),
+      'Missing Stock means qty 0',
+    );
+    await user.click(screen.getByRole('button', { name: 'Send answers' }));
+    expect(onSubmit).toHaveBeenCalledWith([
+      { question_id: 'exclude' },
+      { question_id: 'additional_context', text: 'Missing Stock means qty 0' },
+    ]);
+
+    rerender(
+      <ClarificationCard
+        request={withExtra}
+        answered={[
+          { question_id: 'exclude', text: 'Samples' },
+          { question_id: 'additional_context', text: null },
+        ]}
+        canAnswer
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Anything else I should know?')).not.toBeInTheDocument();
+  });
+
   it('shows saved answers read-only and closed questions as not answered', () => {
     const { rerender } = render(
       <ClarificationCard
