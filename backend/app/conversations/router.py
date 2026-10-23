@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.clarification import ClarificationAnswers
 from app.auth.dependencies import get_current_organization, get_current_user
 from app.auth.models import User
 from app.conversations.schemas import (
@@ -144,6 +145,34 @@ async def submit_message(
     organization, _ = context
     message, job_id = await ConversationService(session, settings, redis=redis).submit_message(
         conversation_id=conversation_id,
+        organization_id=organization.id,
+        user_id=current_user.id,
+        payload=payload,
+    )
+    return MessageAcceptedResponse(message_id=message.id, job_id=job_id)
+
+
+@router.post(
+    "/{conversation_id}/messages/{message_id}/clarification-answers",
+    response_model=MessageAcceptedResponse,
+    status_code=202,
+)
+async def answer_clarification(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    payload: ClarificationAnswers,
+    current_user: User = Depends(get_current_user),
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    redis: Redis = Depends(get_redis),
+    settings: Settings = Depends(get_settings),
+) -> MessageAcceptedResponse:
+    organization, _ = context
+    message, job_id = await ConversationService(
+        session, settings, redis=redis
+    ).answer_clarification(
+        conversation_id=conversation_id,
+        message_id=message_id,
         organization_id=organization.id,
         user_id=current_user.id,
         payload=payload,

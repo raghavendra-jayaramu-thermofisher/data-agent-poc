@@ -72,3 +72,16 @@ export function saveVerification(message: ConversationMessage, body: S['MessageV
     params: { path: { conversation_id: message.conversation_id, message_id: message.id } }, body,
   }));
 }
+
+export function answerClarification(
+  conversationId: string,
+  messageId: string,
+  body: S['ClarificationAnswers'],
+): Promise<MessageAccepted> {
+  return withAuthRefresh(() =>
+    apiClient.POST(
+      '/api/v1/conversations/{conversation_id}/messages/{message_id}/clarification-answers',
+      { params: { path: { conversation_id: conversationId, message_id: messageId } }, body },
+    ),
+  );
+}

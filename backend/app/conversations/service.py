@@ -7,6 +7,7 @@ from datetime import datetime
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.clarification import ClarificationAnswers, answers_text, validate_answers
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.titles import default_conversation_title
 from app.conversations.repository import ConversationRepository
@@ -168,6 +169,58 @@ class ConversationService:
             has_more=has_more,
         )
 
+    async def answer_clarification(
+        self,
+        *,
+        conversation_id: uuid.UUID,
+        message_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        payload: ClarificationAnswers,
+    ) -> tuple[Message, uuid.UUID]:
+        """Answer the agent's questions; the answers continue the original request."""
+        # The lock serializes concurrent submissions so a question card is answered once.
+        conversation = await self.repo.lock_for_org(conversation_id, organization_id)
+        if conversation is None:
+            raise AppError("CONVERSATION_NOT_FOUND", "Conversation not found.", 404)
+        asked = await self.repo.get_message(message_id, conversation_id)
+        request = (asked.metadata_json or {}).get("clarification") if asked else None
+        if asked is None or asked.role != "assistant" or not isinstance(request, dict):
+            raise AppError("CLARIFICATION_NOT_FOUND", "These questions were not found.", 404)
+        if await self.repo.has_user_message_after(conversation_id, asked):
+            raise AppError(
+                "CLARIFICATION_CLOSED",
+                "These questions were already answered or the conversation has moved on.",
+                409,
+            )
+        answers = validate_answers(request, payload)
+        content = answers_text(request, answers)
+        original = await self.repo.message_for_job(asked.job_id, "user") if asked.job_id else None
+        original_metadata = original.metadata_json if original else {}
+        original_request = str(
+            original_metadata.get("expanded_prompt") or (original.content if original else "")
+        ).strip()
+        extra: dict[str, object] = {
+            "clarification_answers": answers,
+            "answers_message_id": str(asked.id),
+            "clarification_round": int(original_metadata.get("clarification_round") or 0) + 1,
+            "expanded_prompt": f"{original_request}\n\n{content}".strip(),
+        }
+        for key in ("instruction_id", "command", "raw_prompt"):
+            if key in original_metadata:
+                extra[key] = original_metadata[key]
+        profile = (asked.metadata_json or {}).get("model_profile_id")
+        return await self.submit_message(
+            conversation_id=conversation_id,
+            organization_id=organization_id,
+            user_id=user_id,
+            payload=MessageCreate(
+                content=content,
+                model_profile_id=uuid.UUID(str(profile)) if profile else None,
+            ),
+            extra_metadata=extra,
+        )
+
     async def delete(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         item = await self.require_for_org(conversation_id, organization_id)
         await self.session.delete(item)
@@ -220,6 +273,7 @@ class ConversationService:
         organization_id: uuid.UUID,
         user_id: uuid.UUID,
         payload: MessageCreate,
+        extra_metadata: dict[str, object] | None = None,
     ) -> tuple[Message, uuid.UUID]:
         if self.redis is None:
             raise RuntimeError("Redis is required to submit analytical messages")
@@ -273,6 +327,7 @@ class ConversationService:
                     )
                 metadata["expanded_prompt"] = expanded
 
+        metadata.update(extra_metadata or {})
         message = Message(
             conversation_id=conversation.id,
             role="user",

@@ -360,6 +360,70 @@ describe('durable conversation workspace', () => {
     expect(input).toHaveValue('My draft');
   });
 
+  it('answers clarifying questions in one step and keeps the chat box closed until then', async () => {
+    const question = {
+      id: 'q1',
+      conversation_id: 'c1',
+      role: 'user',
+      content: 'Show overdue backlog',
+      job_id: 'j1',
+      metadata: {},
+      created_at: '2026-08-24T12:00:00Z',
+    };
+    const asked = {
+      id: 'a1',
+      conversation_id: 'c1',
+      role: 'assistant',
+      content: '# A few questions before I continue',
+      job_id: 'j1',
+      metadata: {
+        clarification: {
+          schema_version: 1,
+          reason: 'The division changes the totals.',
+          questions: [
+            {
+              id: 'division',
+              kind: 'choice',
+              prompt: 'Which division?',
+              options: [{ label: 'BID' }, { label: 'LSG' }, { label: 'Other', is_other: true }],
+            },
+            { id: 'period', kind: 'text', prompt: 'Which period?' },
+          ],
+        },
+      },
+      created_at: '2026-08-24T12:00:05Z',
+    };
+    let posted: unknown;
+    baseHandlers(() => [question, asked]);
+    server.use(
+      http.post(
+        'http://localhost:12201/api/v1/conversations/c1/messages/a1/clarification-answers',
+        async ({ request }) => {
+          posted = await request.json();
+          return HttpResponse.json({ message_id: 'm2', job_id: 'j2' }, { status: 202 });
+        },
+      ),
+    );
+    renderPage();
+    const user = userEvent.setup();
+
+    const composer = await screen.findByRole('textbox', { name: 'Ask a follow-up' });
+    expect(composer).toBeDisabled();
+    expect(composer).toHaveAttribute('placeholder', 'Answer the questions above to continue');
+
+    await user.click(await screen.findByRole('radio', { name: 'BID' }));
+    await user.type(screen.getByRole('textbox', { name: 'Which period?' }), 'September');
+    await user.click(screen.getByRole('button', { name: 'Send answers' }));
+
+    await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j2'));
+    expect(posted).toEqual({
+      answers: [
+        { question_id: 'division', selected: ['BID'] },
+        { question_id: 'period', text: 'September' },
+      ],
+    });
+  });
+
   it('renames the chat in the header and recent list without submitting an analysis', async () => {
     baseHandlers();
     let saved = { ...conversation };

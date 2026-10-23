@@ -11,6 +11,7 @@ import { MessageAnalysisDetails } from '../../agent/components/MessageAnalysisDe
 import type { JobArtifact } from '../../agent/api/execution-api';
 import { formatMarkdownForCopy } from '../../agent/lib/artifact-directives';
 import { UserAvatar } from '../../components/UserAvatar';
+import { ClarificationCard } from './ClarificationCard';
 
 export const ConversationMessage = memo(function ConversationMessage({
   message,
@@ -20,6 +21,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   onFollowUp,
   showSuggestions = false,
   followUpDisabled = false,
+  clarification,
 }: {
   message: Message;
   senderName?: string;
@@ -28,6 +30,8 @@ export const ConversationMessage = memo(function ConversationMessage({
   onFollowUp?(question: string): Promise<void> | void;
   showSuggestions?: boolean;
   followUpDisabled?: boolean;
+  /** Present when this assistant message asks the user clarifying questions. */
+  clarification?: Parameters<typeof ClarificationCard>[0];
 }) {
   const assistant = message.role === 'assistant';
   const [copied, setCopied] = useState(false);
@@ -142,6 +146,16 @@ export const ConversationMessage = memo(function ConversationMessage({
         <span className="message-avatar"><UserAvatar name={senderName} /></span>
         <div className="user-bubble">{message.content}</div>
         {queued && <span className="queued-question-label">Queued</span>}
+      </div>
+    );
+  }
+
+  if (clarification) {
+    return (
+      <div className="chat-message-row assistant" data-message-id={message.id}>
+        <article className="assistant-card">
+          <ClarificationCard {...clarification} />
+        </article>
       </div>
     );
   }

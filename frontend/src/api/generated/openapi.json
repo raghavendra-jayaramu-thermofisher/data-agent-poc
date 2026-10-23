@@ -139,6 +139,72 @@
         "title": "Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post",
         "type": "object"
       },
+      "ClarificationAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "other_text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Text"
+          },
+          "question_id": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Question Id",
+            "type": "string"
+          },
+          "selected": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "title": "Selected",
+            "type": "array"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "required": [
+          "question_id"
+        ],
+        "title": "ClarificationAnswer",
+        "type": "object"
+      },
+      "ClarificationAnswers": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ClarificationAnswer"
+            },
+            "maxItems": 4,
+            "title": "Answers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "title": "ClarificationAnswers",
+        "type": "object"
+      },
       "ColumnMetadataResponse": {
         "properties": {
           "default": {
@@ -5248,6 +5314,90 @@
           }
         ],
         "summary": "Submit Message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/messages/{message_id}/clarification-answers": {
+      "post": {
+        "operationId": "answer_clarification_api_v1_conversations__conversation_id__messages__message_id__clarification_answers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClarificationAnswers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Answer Clarification",
         "tags": [
           "conversations"
         ]

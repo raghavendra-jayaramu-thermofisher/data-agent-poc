@@ -25,6 +25,7 @@ def test_agent_tool_surface_contains_frontend_chart_tool() -> None:
         "create_chart",
         "create_matrix",
         "create_html_artifact",
+        "ask_user",
         "read_saved_context",
         "save_knowledge",
         "save_skill",

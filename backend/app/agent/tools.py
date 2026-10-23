@@ -12,6 +12,13 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
 
+from app.agent.clarification import (
+    MAX_QUESTIONS,
+    MAX_ROUNDS,
+    AskUserArgs,
+    ClarificationError,
+    build_request,
+)
 from app.agent.html_artifacts import HtmlArtifactStorage, HtmlArtifactValidationError
 from app.agent.matrix import CreateMatrixArgs, MatrixError, build_matrix
 from app.agent.models import JobArtifact, SQLExecution, ToolExecution
@@ -49,6 +56,15 @@ class AgentLimitError(Exception):
         super().__init__(message)
 
 
+class AgentTurnEnded(Exception):  # noqa: N818 - a stop signal, not an error
+    """Raised after a turn-ending tool succeeds, so the agent stops without a final answer."""
+
+    def __init__(self, tool_name: str, result: dict[str, object]) -> None:
+        self.tool_name = tool_name
+        self.result = result
+        super().__init__(tool_name)
+
+
 class AgentToolError(Exception):
     def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
         self.code = code
@@ -68,6 +84,8 @@ class AgentToolContext:
     command_instructions: str | None = None
     command_name: str | None = None
     table_scope: tuple[SourceTableScope, ...] = ()
+    # Clarification rounds already answered for the current request.
+    clarification_round: int = 0
 
     def selected_scope(self, source_id: uuid.UUID) -> SourceTableScope | None:
         return next((item for item in self.table_scope
@@ -85,6 +103,8 @@ class AgentToolDefinition:
     description: str
     args_schema: type[BaseModel]
     handler: ToolHandler
+    # The agent stops after this tool succeeds; the turn ends without a final answer.
+    ends_turn: bool = False
 
 
 class AgentToolRegistry:
@@ -1152,6 +1172,23 @@ def build_default_tool_registry() -> AgentToolRegistry:
             handler=create_html_artifact,
         )
     )
+    registry.register(
+        AgentToolDefinition(
+            name="ask_user",
+            description=(
+                "Ask the user clarifying questions when an ambiguity would materially change the "
+                "result and cannot be resolved from the schema, knowledge, saved instructions or "
+                f"conversation. Put every question you need in one call (at most {MAX_QUESTIONS}). "
+                "Use 'choice' questions with concrete options (the interface always adds 'Other' "
+                "with a text box) or 'text' questions for free-form details. Call it alone, before "
+                "running large queries. The turn ends after this call and the answers arrive in "
+                "the user's next message."
+            ),
+            args_schema=AskUserArgs,
+            handler=ask_user,
+            ends_turn=True,
+        )
+    )
     from app.agent.management_tools import (
         edit_skill,
         read_saved_context,
@@ -1197,6 +1234,29 @@ def build_default_tool_registry() -> AgentToolRegistry:
             )
         )
     return registry
+
+
+async def ask_user(
+    context: AgentToolContext,
+    arguments: dict[str, object],
+    tool_execution_id: uuid.UUID,
+) -> dict[str, object]:
+    if context.clarification_round >= MAX_ROUNDS:
+        raise AgentToolError(
+            "CLARIFICATION_LIMIT_REACHED",
+            "The user already answered clarifying questions for this request. Continue with "
+            "the best interpretation and state your assumptions in the answer.",
+        )
+    try:
+        request = build_request(AskUserArgs.model_validate(arguments))
+    except ClarificationError as exc:
+        raise AgentToolError("CLARIFICATION_INVALID", str(exc)) from exc
+    await append_agent_event(
+        context.job_id,
+        "clarification.requested",
+        {"question_count": len(request["questions"])},
+    )
+    return {"ok": True, "clarification": request}
 
 
 def tool_result_json(payload: dict[str, object]) -> str:
@@ -1385,6 +1445,8 @@ class AuditedToolExecutor:
             "tool.completed",
             {"tool_execution_id": str(tool_execution_id), "tool_name": name},
         )
+        if definition.ends_turn:
+            raise AgentTurnEnded(name, result)
         return tool_result_json(result)
 
     async def _finish_tool(

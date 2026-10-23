@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/messages/{message_id}/clarification-answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer Clarification */
+        post: operations["answer_clarification_api_v1_conversations__conversation_id__messages__message_id__clarification_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/messages/{message_id}/verification": {
         parameters: {
             query?: never;
@@ -1101,6 +1118,22 @@ export interface components {
         Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post: {
             /** File */
             file: string;
+        };
+        /** ClarificationAnswer */
+        ClarificationAnswer: {
+            /** Other Text */
+            other_text?: string | null;
+            /** Question Id */
+            question_id: string;
+            /** Selected */
+            selected?: string[];
+            /** Text */
+            text?: string | null;
+        };
+        /** ClarificationAnswers */
+        ClarificationAnswers: {
+            /** Answers */
+            answers: components["schemas"]["ClarificationAnswer"][];
         };
         /** ColumnMetadataResponse */
         ColumnMetadataResponse: {
@@ -3195,6 +3228,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_clarification_api_v1_conversations__conversation_id__messages__message_id__clarification_answers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClarificationAnswers"];
             };
         };
         responses: {

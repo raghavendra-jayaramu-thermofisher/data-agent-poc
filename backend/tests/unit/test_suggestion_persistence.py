@@ -79,7 +79,9 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         "get_runtime_configuration",
         AsyncMock(return_value=SimpleNamespace()),
     )
-    analysis = AsyncMock(return_value=SimpleNamespace(notes="Verified orders", messages=[]))
+    analysis = AsyncMock(
+        return_value=SimpleNamespace(notes="Verified orders", messages=[], clarification=None)
+    )
     monkeypatch.setattr(jobs.DeepAgentRuntime, "run", analysis)
     monkeypatch.setattr(jobs, "_load_evidence", AsyncMock(return_value=SimpleNamespace()))
     monkeypatch.setattr(jobs, "validate_evidence", lambda _evidence: [])

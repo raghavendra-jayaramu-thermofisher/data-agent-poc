@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation, ConversationDataSource, Message
@@ -160,6 +160,28 @@ class ConversationRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def get_message(
+        self, message_id: uuid.UUID, conversation_id: uuid.UUID
+    ) -> Message | None:
+        result = await self.session.execute(
+            select(Message).where(
+                Message.id == message_id, Message.conversation_id == conversation_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def has_user_message_after(self, conversation_id: uuid.UUID, message: Message) -> bool:
+        result = await self.session.execute(
+            select(Message.id)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.role == "user",
+                tuple_(Message.created_at, Message.id) > tuple_(message.created_at, message.id),
+            )
+            .limit(1)
+        )
+        return result.first() is not None
 
     async def message_for_job(self, job_id: uuid.UUID, role: str) -> Message | None:
         result = await self.session.execute(

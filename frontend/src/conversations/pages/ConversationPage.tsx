@@ -17,6 +17,11 @@ import { ConversationMessage } from '../components/ConversationMessage';
 import { FollowUpChatComposer } from '../components/FollowUpChatComposer';
 import { ConversationActions } from '../components/ConversationActions';
 import { orderConversationTurns } from '../components/conversation-turns';
+import {
+  clarificationAnswers,
+  clarificationRequest,
+  type ClarificationAnswer,
+} from '../clarification';
 import { LoadMoreSentinel } from '../../components/LoadMoreSentinel';
 import {
   appendMessage,
@@ -114,6 +119,24 @@ export function ConversationPage() {
       }
     },
     [appendOptimisticMessage, conversationId, jobManager, orgId, queryClient],
+  );
+
+  const submitClarification = useCallback(
+    async (messageId: string, answers: ClarificationAnswer[]) => {
+      if (!conversationId) throw new Error('Conversation ID is missing.');
+      setIsSubmitting(true);
+      try {
+        const accepted = await api.answerClarification(conversationId, messageId, { answers });
+        await jobManager.registerJob(accepted.job_id);
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.conversations.messages(orgId, conversationId),
+        });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.lists(orgId) });
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [conversationId, jobManager, orgId, queryClient],
   );
 
   const submitFollowUp = useCallback(
@@ -233,6 +256,13 @@ export function ConversationPage() {
       (entry) => entry.job.status === 'queued' && !assistantJobIds.has(entry.job.id),
     );
   const insertedJobs = new Set<string>();
+  const lastMessage = durableMessages.at(-1);
+  // The newest questions can be answered until the conversation moves on.
+  const awaitingAnswers =
+    !progressJob &&
+    lastMessage !== undefined &&
+    clarificationRequest(lastMessage) !== null &&
+    clarificationAnswers(durableMessages, lastMessage.id) === null;
 
   const messageTimeline = durableMessages.flatMap((message, index) => {
     const question =
@@ -259,6 +289,18 @@ export function ConversationPage() {
         onFollowUp={submitFollowUp}
         showSuggestions={message.id === latestAssistantId}
         followUpDisabled={isSubmitting}
+        clarification={(() => {
+          const request = clarificationRequest(message);
+          return request
+            ? {
+                request,
+                answered: clarificationAnswers(durableMessages, message.id),
+                canAnswer: awaitingAnswers && message.id === lastMessage?.id,
+                onSubmit: (answers: ClarificationAnswer[]) =>
+                  submitClarification(message.id, answers),
+              }
+            : undefined;
+        })()}
       />,
     ];
     if (message.role !== 'user' || !message.job_id || assistantJobIds.has(message.job_id))
@@ -386,7 +428,12 @@ export function ConversationPage() {
         selectedProfileId={selectedProfileId}
         onProfileIdChange={setSelectedProfileId}
         isSubmitting={isSubmitting}
-        placeholder="Ask a follow-up about this analysis…"
+        disabled={awaitingAnswers}
+        placeholder={
+          awaitingAnswers
+            ? 'Answer the questions above to continue'
+            : 'Ask a follow-up about this analysis…'
+        }
         inputLabel="Ask a follow-up"
         dataSourceSelection="hidden"
       />

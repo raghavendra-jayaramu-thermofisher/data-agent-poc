@@ -4,6 +4,7 @@ import json
 import uuid
 
 from app.agent.artifact_directives import replace_artifact_directives
+from app.agent.clarification import questions_markdown
 from app.agent.deep_agent import AnalysisRunResult, DeepAgentDependencyError, DeepAgentRuntime
 from app.agent.evidence import (
     EvidenceBundle,
@@ -54,6 +55,45 @@ async def _model_history(
             content = str(item.metadata_json["expanded_prompt"])
         history.append({"role": item.role, "content": content})
     return history
+
+
+async def _save_clarification(
+    *,
+    job_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    request: dict[str, object],
+) -> dict[str, object]:
+    """End the turn with the agent's questions; the answers start the next turn."""
+    async with get_session_factory()() as session:
+        repo = ConversationRepository(session)
+        content = questions_markdown(request)
+        metadata: dict[str, object] = {
+            "runtime": "deepagents",
+            "clarification": request,
+            "model_profile_id": str(profile_id),
+        }
+        message = await repo.message_for_job(job_id, "assistant")
+        if message is None:
+            message = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=content,
+                job_id=job_id,
+                metadata_json=metadata,
+                created_at=utc_now(),
+            )
+            repo.add_message(message)
+        else:
+            message.content = content
+            message.metadata_json = metadata
+        await session.commit()
+    return {
+        "conversation_id": str(conversation_id),
+        "assistant_message_id": str(message.id),
+        "clarification_requested": True,
+        "question_count": len(request.get("questions", [])),
+    }
 
 
 async def _load_evidence(
@@ -128,7 +168,10 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
 
         command_instructions = None
         command_name = None
+        clarification_round = 0
         if user_message and user_message.metadata_json:
+            raw_round = user_message.metadata_json.get("clarification_round", 0)
+            clarification_round = raw_round if isinstance(raw_round, int) else 0
             cmd_instruction_id = user_message.metadata_json.get("instruction_id")
             if cmd_instruction_id:
                 try:
@@ -165,6 +208,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         default_instructions=default_instructions,
         command_instructions=command_instructions,
         command_name=command_name,
+        clarification_round=clarification_round,
     )
     try:
         analysis_runtime = DeepAgentRuntime()
@@ -173,6 +217,13 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             model=runtime_model,
             history=history,
         )
+        if analysis.clarification is not None:
+            return await _save_clarification(
+                job_id=job_id,
+                conversation_id=conversation_id,
+                profile_id=profile_id,
+                request=analysis.clarification,
+            )
         evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
         evidence_issues = validate_evidence(evidence)
 
@@ -185,6 +236,13 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                 model=runtime_model,
                 history=[*analysis.messages, {"role": "user", "content": correction}],
             )
+            if analysis.clarification is not None:
+                return await _save_clarification(
+                    job_id=job_id,
+                    conversation_id=conversation_id,
+                    profile_id=profile_id,
+                    request=analysis.clarification,
+                )
             evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
             evidence_issues = validate_evidence(evidence)
 

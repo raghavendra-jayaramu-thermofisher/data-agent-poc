@@ -2770,3 +2770,139 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Clarifying questions from the agent */
+.clarification-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clarification-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--db-primary);
+}
+
+.clarification-card-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--db-text-primary);
+}
+
+.clarification-reason {
+  margin: 0;
+  color: var(--db-text-secondary);
+  font-size: 14px;
+}
+
+.clarification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.clarification-question {
+  border: 1px solid var(--db-border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.clarification-question[aria-invalid='true'] {
+  border-color: var(--db-danger);
+}
+
+.clarification-question legend {
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--db-text-primary);
+}
+
+.clarification-number,
+.clarification-optional {
+  color: var(--db-text-muted);
+  font-weight: 400;
+}
+
+.clarification-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clarification-option label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.clarification-option input[type='radio'],
+.clarification-option input[type='checkbox'] {
+  margin-top: 3px;
+  accent-color: var(--db-primary);
+}
+
+.clarification-option-description {
+  display: block;
+  color: var(--db-text-muted);
+  font-size: 12.5px;
+}
+
+.clarification-question textarea,
+.clarification-other {
+  width: 100%;
+  border: 1px solid var(--db-border-default);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--db-surface);
+  color: var(--db-text-primary);
+}
+
+.clarification-other {
+  margin: 6px 0 0 24px;
+  width: calc(100% - 24px);
+}
+
+.clarification-question textarea:focus-visible,
+.clarification-other:focus-visible {
+  outline: 2px solid var(--db-focus-ring);
+  outline-offset: 1px;
+}
+
+.clarification-error {
+  margin: 6px 0 0;
+  color: var(--db-danger);
+  font-size: 13px;
+}
+
+.clarification-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.clarification-summary {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.clarification-summary dt {
+  font-size: 13px;
+  color: var(--db-text-secondary);
+}
+
+.clarification-summary dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--db-text-primary);
+}

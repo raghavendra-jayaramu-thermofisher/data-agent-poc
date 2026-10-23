@@ -16,6 +16,7 @@ from app.agent.tools import (
     AgentToolContext,
     AgentToolDefinition,
     AgentToolRegistry,
+    AgentTurnEnded,
     AuditedToolExecutor,
     append_agent_event,
     build_default_tool_registry,
@@ -105,6 +106,15 @@ Watch for:
 If SQL fails, inspect the error and verified schema, correct it, and retry.
 
 If the available data cannot reliably answer the question, clearly state what cannot be determined rather than inventing an answer.
+
+## Clarifying questions
+
+Use `ask_user` only when an ambiguity would materially change the result (population, time range,
+metric definition, grain, filters) and cannot be resolved from the schema, knowledge, saved
+default instructions, or the conversation. Otherwise choose the most reasonable interpretation and
+state the assumption in your notes. When you do ask, gather every question you need into one call,
+offer concrete options taken from the data where possible, call it alone, and ask before running
+large queries. After the user answers, do not ask again about the same points.
 
 # 5. Choose One Owner for Each Result Set
 
@@ -466,6 +476,8 @@ class AgentAuditContext:
 class AnalysisRunResult:
     notes: str
     messages: list[object]
+    # Set when the agent asked the user clarifying questions instead of finishing the analysis.
+    clarification: dict[str, object] | None = None
 
 
 class DeepAgentRunnable(Protocol):
@@ -688,6 +700,11 @@ class DeepAgentRuntime:
             raise AgentLimitError(
                 "AGENT_JOB_TIMEOUT", "The analytical job exceeded its maximum duration."
             ) from exc
+        except AgentTurnEnded as ended:
+            clarification = ended.result.get("clarification")
+            if ended.tool_name != "ask_user" or not isinstance(clarification, dict):
+                raise
+            return AnalysisRunResult(notes="", messages=[], clarification=clarification)
         finally:
             if audit is not None:
                 flush = getattr(audit, "flush", None)
