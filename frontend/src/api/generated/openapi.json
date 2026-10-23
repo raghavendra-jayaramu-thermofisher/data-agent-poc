@@ -247,6 +247,31 @@
         "title": "ColumnMetadataResponse",
         "type": "object"
       },
+      "CompactSchemaResponse": {
+        "description": "Every table and view of the current knowledge version, one compact line each.",
+        "properties": {
+          "knowledge_version_id": {
+            "format": "uuid",
+            "title": "Knowledge Version Id",
+            "type": "string"
+          },
+          "table_count": {
+            "title": "Table Count",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "knowledge_version_id",
+          "table_count",
+          "text"
+        ],
+        "title": "CompactSchemaResponse",
+        "type": "object"
+      },
       "ConnectionDiagnostics": {
         "properties": {
           "category": {
@@ -8610,6 +8635,70 @@
           }
         ],
         "summary": "Get Index",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/data-sources/{data_source_id}/schema-compact": {
+      "get": {
+        "operationId": "get_compact_schema_api_v1_knowledge_data_sources__data_source_id__schema_compact_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "data_source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Data Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompactSchemaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Compact Schema",
         "tags": [
           "knowledge"
         ]

@@ -14,7 +14,9 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
 from app.core.errors import AppError
 from app.core.redis import get_redis
+from app.knowledge.compact import compact_schema
 from app.knowledge.schemas import (
+    CompactSchemaResponse,
     KnowledgeAnnotationCreate,
     KnowledgeAnnotationResponse,
     KnowledgeAnnotationUpdate,
@@ -26,6 +28,9 @@ from app.knowledge.schemas import (
 )
 from app.knowledge.service import KnowledgeService
 from app.organizations.models import Organization, OrganizationMembership
+
+# Upper bound on the objects included in one compact schema response.
+MAX_COMPACT_TABLES = 10000
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -168,6 +173,25 @@ async def get_document(
     if item.knowledge_version_id != base.current_version_id:
         raise AppError("KNOWLEDGE_DOCUMENT_NOT_FOUND", "Knowledge document not found.", 404)
     return KnowledgeDocumentResponse.model_validate(item)
+
+
+@router.get("/data-sources/{data_source_id}/schema-compact", response_model=CompactSchemaResponse)
+async def get_compact_schema(
+    data_source_id: uuid.UUID,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> CompactSchemaResponse:
+    organization, _ = context
+    service = KnowledgeService(session, settings)
+    source = await service.require_source(data_source_id, organization.id)
+    base = await service.require_base(data_source_id, organization.id)
+    version = await service.require_current_version(base)
+    documents = await service.repo.list_documents(
+        version.id, document_type="table_schema", limit=MAX_COMPACT_TABLES
+    )
+    text, count = compact_schema(source.name, documents)
+    return CompactSchemaResponse(knowledge_version_id=version.id, table_count=count, text=text)
 
 
 @router.get("/data-sources/{data_source_id}/table", response_model=KnowledgeDocumentResponse)

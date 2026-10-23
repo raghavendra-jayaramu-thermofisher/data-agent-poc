@@ -30,6 +30,14 @@ class KnowledgeVersionResponse(BaseModel):
     created_at: datetime
 
 
+class CompactSchemaResponse(BaseModel):
+    """Every table and view of the current knowledge version, one compact line each."""
+
+    knowledge_version_id: uuid.UUID
+    table_count: int
+    text: str
+
+
 class KnowledgeDocumentSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

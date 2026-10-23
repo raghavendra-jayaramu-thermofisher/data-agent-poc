@@ -787,6 +787,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/data-sources/{data_source_id}/schema-compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Compact Schema */
+        get: operations["get_compact_schema_api_v1_knowledge_data_sources__data_source_id__schema_compact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge/data-sources/{data_source_id}/table": {
         parameters: {
             query?: never;
@@ -1145,6 +1162,21 @@ export interface components {
             native_type: string;
             /** Nullable */
             nullable: boolean | null;
+        };
+        /**
+         * CompactSchemaResponse
+         * @description Every table and view of the current knowledge version, one compact line each.
+         */
+        CompactSchemaResponse: {
+            /**
+             * Knowledge Version Id
+             * Format: uuid
+             */
+            knowledge_version_id: string;
+            /** Table Count */
+            table_count: number;
+            /** Text */
+            text: string;
         };
         /** ConnectionDiagnostics */
         ConnectionDiagnostics: {
@@ -4824,6 +4856,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_compact_schema_api_v1_knowledge_data_sources__data_source_id__schema_compact_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompactSchemaResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,6 @@
 import { Button, Tabs } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { AppError } from '../../api/errors';
@@ -71,6 +71,19 @@ export function KnowledgeDetailPage() {
       notifications.info('Schema refresh started.');
     },
   });
+  // One compact line per table or view, ready to paste into another tool.
+  const copySchemas = useMutation({
+    mutationFn: async () => {
+      const schema = await api.getCompactSchema(dataSourceId);
+      await navigator.clipboard.writeText(schema.text);
+      return schema;
+    },
+    onSuccess: (schema) =>
+      notifications.success(
+        `Copied ${schema.table_count.toLocaleString()} table schemas (about ${Math.round(schema.text.length / 4000).toLocaleString()}k tokens)`,
+      ),
+    onError: () => notifications.error('Unable to copy the table schemas. Try again.'),
+  });
   const updating = generate.isPending || activeGeneration || status.data?.status === 'generating';
   const filteredDocuments = useMemo(
     () =>
@@ -124,17 +137,30 @@ export function KnowledgeDetailPage() {
           <h1 id="knowledge-source-title">{source.data.name}</h1>
           <KnowledgeStatus status={updating ? 'generating' : (status.data?.status ?? 'empty')} />
         </div>
-        {canManage && (
-          <Button
-            variant={hasSchema ? 'secondary' : 'primary'}
-            isPending={Boolean(updating)}
-            isDisabled={Boolean(updating)}
-            onPress={() => generate.mutate()}
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            {updating ? 'Updating…' : hasSchema ? 'Refresh schema' : 'Generate schema'}
-          </Button>
-        )}
+        <div className="knowledge-header-actions">
+          {hasSchema && (
+            <Button
+              variant="secondary"
+              isPending={copySchemas.isPending}
+              isDisabled={Boolean(updating)}
+              onPress={() => copySchemas.mutate()}
+            >
+              <Copy size={14} aria-hidden="true" />
+              Copy all schemas
+            </Button>
+          )}
+          {canManage && (
+            <Button
+              variant={hasSchema ? 'secondary' : 'primary'}
+              isPending={Boolean(updating)}
+              isDisabled={Boolean(updating)}
+              onPress={() => generate.mutate()}
+            >
+              <RefreshCw size={14} aria-hidden="true" />
+              {updating ? 'Updating…' : hasSchema ? 'Refresh schema' : 'Generate schema'}
+            </Button>
+          )}
+        </div>
       </header>
       {generate.isError && (
         <p role="alert" className="knowledge-inline-error">

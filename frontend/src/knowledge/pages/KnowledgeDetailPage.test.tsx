@@ -63,6 +63,23 @@ describe('Knowledge detail', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Instructions' })).toBeInTheDocument();
   });
+  it('copies every table schema in compact form, for members too', async () => {
+    state.role = 'member';
+    const compact = '-- Warehouse: 2 tables and views\ndbo.orders (table): id INT NOT NULL\n';
+    vi.mocked(api.getCompactSchema).mockResolvedValue({
+      knowledge_version_id: 'v1',
+      table_count: 2,
+      text: compact,
+    });
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Copy all schemas' }));
+    expect(api.getCompactSchema).toHaveBeenCalledWith('ds-1');
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(compact));
+    expect(screen.queryByRole('button', { name: /Refresh schema/ })).not.toBeInTheDocument();
+  });
   it('starts schema refresh through the existing job system', async () => {
     vi.mocked(api.generate).mockResolvedValue({ job_id: 'job-1', knowledge_base_id: 'kb-1' });
     const user = userEvent.setup();
