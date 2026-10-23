@@ -194,7 +194,7 @@
             "items": {
               "$ref": "#/components/schemas/ClarificationAnswer"
             },
-            "maxItems": 4,
+            "maxItems": 5,
             "title": "Answers",
             "type": "array"
           }

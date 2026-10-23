@@ -487,6 +487,15 @@ class AnalysisRunResult:
     messages: list[object]
     # Set when the agent asked the user clarifying questions instead of finishing the analysis.
     clarification: dict[str, object] | None = None
+    # True when the run is checkpointed and can resume with the answers; otherwise it ended.
+    paused: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _FinishedState:
+    """A resumed thread that had already finished before its worker stopped."""
+
+    values: dict[str, object]
 
 
 class DeepAgentRunnable(Protocol):
@@ -505,6 +514,7 @@ class DeepAgentFactory(Protocol):
         tools: list[ToolBinding],
         system_prompt: str,
         timeout_seconds: float,
+        checkpointer: object | None = None,
     ) -> DeepAgentRunnable: ...
 
 
@@ -522,6 +532,7 @@ class ProductionDeepAgentFactory:
         tools: list[ToolBinding],
         system_prompt: str,
         timeout_seconds: float,
+        checkpointer: object | None = None,
     ) -> DeepAgentRunnable:
         try:
             from langchain_core.tools import StructuredTool
@@ -545,6 +556,7 @@ class ProductionDeepAgentFactory:
             model=chat_model,
             tools=langchain_tools,
             prompt=system_prompt,
+            checkpointer=checkpointer,
         )
 
 
@@ -632,7 +644,11 @@ class DeepAgentRuntime:
         context: AgentToolContext,
         model: ModelRuntimeConfiguration,
         history: list[object],
+        checkpointer: object | None = None,
+        thread: str | None = None,
+        resume: dict[str, object] | None = None,
     ) -> AnalysisRunResult:
+        """Run the analysis, or with `resume` continue a paused thread with the user's answers."""
         executor = self.tool_executor_factory(context, self.registry)
         bindings = [self._binding(definition, executor) for definition in self.registry.all()]
         authorized = "\n".join(
@@ -674,6 +690,7 @@ class DeepAgentRuntime:
             tools=bindings,
             system_prompt=runtime_prompt,
             timeout_seconds=float(context.settings.model_provider_timeout_seconds),
+            **({"checkpointer": checkpointer} if checkpointer is not None else {}),
         )
         audit = build_model_audit_callback(
             AgentAuditContext(
@@ -685,25 +702,32 @@ class DeepAgentRuntime:
         )
         await append_agent_event(
             context.job_id,
-            "agent.started",
+            "agent.resumed" if resume is not None else "agent.started",
             {
                 "runtime": "deepagents",
                 "model_profile_id": model.profile_id,
                 "tool_names": [item.name for item in bindings],
             },
         )
-        invoke = runnable.ainvoke(
-            {"messages": history},
-            config={
-                "callbacks": [audit] if audit is not None else [],
-                "recursion_limit": max(25, context.settings.agent_max_tool_calls * 5),
-            },
-        )
+        config: dict[str, object] = {
+            "callbacks": [audit] if audit is not None else [],
+            "recursion_limit": max(25, context.settings.agent_max_tool_calls * 5),
+        }
+        if checkpointer is not None and thread is not None:
+            config["configurable"] = {"thread_id": thread}
         try:
-            raw = await run_cancellable(
-                context.job_id,
-                invoke,
-                timeout_seconds=float(context.settings.agent_job_timeout_seconds),
+            if resume is None:
+                graph_input: object = {"messages": history}
+            else:
+                graph_input = await self._resume_input(runnable, config, resume)
+            raw = (
+                await run_cancellable(
+                    context.job_id,
+                    runnable.ainvoke(graph_input, config=config),  # type: ignore[arg-type]
+                    timeout_seconds=float(context.settings.agent_job_timeout_seconds),
+                )
+                if not isinstance(graph_input, _FinishedState)
+                else graph_input.values
             )
         except TimeoutError as exc:
             raise AgentLimitError(
@@ -719,6 +743,14 @@ class DeepAgentRuntime:
                 flush = getattr(audit, "flush", None)
                 if callable(flush):
                     await flush()
+        interrupts = raw.get("__interrupt__") if isinstance(raw, dict) else None
+        if interrupts:
+            request = getattr(interrupts[0], "value", None)
+            if not isinstance(request, dict):
+                raise AgentLimitError(
+                    "AGENT_PAUSE_INVALID", "The analysis paused without valid questions."
+                )
+            return AnalysisRunResult(notes="", messages=[], clarification=request, paused=True)
         notes = extract_final_answer(raw)
         messages = extract_state_messages(raw)
         if not notes:
@@ -727,6 +759,24 @@ class DeepAgentRuntime:
             )
         await append_agent_event(context.job_id, "analysis.completed", {})
         return AnalysisRunResult(notes=notes, messages=messages)
+
+    @staticmethod
+    async def _resume_input(
+        runnable: DeepAgentRunnable, config: dict[str, object], resume: dict[str, object]
+    ) -> object:
+        """Answer the pending questions, or continue a resume a worker crash interrupted."""
+        from langgraph.types import Command
+
+        state = await runnable.aget_state(config)  # type: ignore[attr-defined]
+        if any(task.interrupts for task in state.tasks):
+            return Command(resume=resume)
+        if state.next:
+            return None
+        if state.values:
+            return _FinishedState(state.values)
+        raise AgentLimitError(
+            "AGENT_RESUME_UNAVAILABLE", "The paused analysis can no longer be resumed."
+        )
 
     @staticmethod
     def _binding(definition: AgentToolDefinition, executor: ToolExecutor) -> ToolBinding:

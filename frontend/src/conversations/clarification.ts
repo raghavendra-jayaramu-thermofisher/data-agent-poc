@@ -46,6 +46,11 @@ export function clarificationRequest(message: ConversationMessage): Clarificatio
     : null;
 }
 
+/** Questions whose analysis is paused and continues when they are answered. */
+export function resumesPausedAnalysis(message: ConversationMessage): boolean {
+  return message.metadata?.resumable === true;
+}
+
 /** Answers recorded on the user message that answered `questionMessageId`. */
 export function clarificationAnswers(
   messages: ConversationMessage[],

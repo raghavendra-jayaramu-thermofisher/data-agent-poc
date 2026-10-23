@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import sys
 
 from app.agent import models as agent_models  # noqa: F401
+from app.agent.checkpoints import close_checkpointer, open_checkpointer
 from app.agent.jobs import register_agent_handlers
 from app.auth import models as auth_models  # noqa: F401
 from app.audit import models as audit_models  # noqa: F401
@@ -31,13 +34,22 @@ async def main() -> None:
     register_knowledge_handlers(registry)
     register_agent_handlers(registry)
     register_reporting_handlers(registry)
+    try:
+        await open_checkpointer(settings)
+    except Exception:
+        # Analyses still run; clarifying questions then end the turn instead of pausing it.
+        logging.getLogger(__name__).exception("checkpointer_unavailable")
     worker = Worker(settings, registry)
     try:
         await worker.run()
     finally:
+        await close_checkpointer()
         await close_redis()
         await close_database()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # psycopg's async driver (used by the LangGraph checkpointer) needs a selector event loop;
+    # Windows defaults to the proactor loop. Nothing in the worker needs asyncio subprocesses.
+    loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+    asyncio.run(main(), loop_factory=loop_factory)

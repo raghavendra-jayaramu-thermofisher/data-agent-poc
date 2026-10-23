@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     final_answer_streaming_enabled: bool = True
     final_answer_stream_flush_ms: int = Field(default=200, ge=50, le=1000)
     analysis_evidence_retries: int = Field(default=2, ge=0, le=5)
+    # Unanswered clarifying questions expire and their paused analysis ends.
+    clarification_expiry_hours: int = Field(default=24, ge=1, le=720)
 
     # Task 6 retention/maintenance controls. Durable audit/history is never auto-deleted.
     auth_expired_retention_days: int = Field(default=30, ge=0, le=3650)

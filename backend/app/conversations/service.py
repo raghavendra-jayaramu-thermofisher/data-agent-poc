@@ -7,6 +7,7 @@ from datetime import datetime
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.checkpoints import delete_job_checkpoints
 from app.agent.clarification import ClarificationAnswers, answers_text, validate_answers
 from app.conversations.models import Conversation, ConversationDataSource, Message
 from app.conversations.titles import default_conversation_title
@@ -29,7 +30,9 @@ from app.core.pagination import CursorCodec, split_page
 from app.core.time import utc_now
 from app.data_sources.service import DataSourceService
 from app.instructions.repository import InstructionRepository
+from app.jobs.repository import JobRepository
 from app.jobs.service import JobService
+from app.jobs.state import WAITING_STATUS
 from app.models.service import ModelConfigurationService
 
 
@@ -195,6 +198,8 @@ class ConversationService:
             )
         answers = validate_answers(request, payload)
         content = answers_text(request, answers)
+        if (asked.metadata_json or {}).get("resumable"):
+            return await self._resume_paused_job(asked, organization_id, answers, content)
         original = await self.repo.message_for_job(asked.job_id, "user") if asked.job_id else None
         original_metadata = original.metadata_json if original else {}
         original_request = str(
@@ -220,6 +225,79 @@ class ConversationService:
             ),
             extra_metadata=extra,
         )
+
+    async def _resume_paused_job(
+        self,
+        asked: Message,
+        organization_id: uuid.UUID,
+        answers: list[dict[str, object]],
+        content: str,
+    ) -> tuple[Message, uuid.UUID]:
+        """Record the answers on the paused job and queue it to continue where it stopped."""
+        jobs = JobService(self.session, self.redis, self.settings)
+        job = (
+            await JobRepository(self.session).lock_for_organization(asked.job_id, organization_id)
+            if asked.job_id
+            else None
+        )
+        pause = job.input.get("pause") if job is not None else None
+        if (
+            job is None
+            or job.status != WAITING_STATUS
+            or not isinstance(pause, dict)
+            or pause.get("question_message_id") != str(asked.id)
+        ):
+            raise AppError(
+                "CLARIFICATION_CLOSED", "These questions are no longer waiting for answers.", 409
+            )
+        if jobs.pause_expired(job):
+            await jobs.expire_waiting(job)
+            await delete_job_checkpoints(self.session, [job.id])
+            raise AppError(
+                "CLARIFICATION_EXPIRED",
+                "These questions expired. Ask your question again to start a new analysis.",
+                409,
+            )
+        original = await self.repo.message_for_job(job.id, "user")
+        original_metadata = original.metadata_json if original else {}
+        original_request = str(
+            original_metadata.get("expanded_prompt") or (original.content if original else "")
+        ).strip()
+        message = Message(
+            conversation_id=asked.conversation_id,
+            role="user",
+            content=content,
+            job_id=job.id,
+            metadata_json={"clarification_answers": answers, "answers_message_id": str(asked.id)},
+            created_at=utc_now(),
+        )
+        self.repo.add_message(message)
+        await self.session.flush()
+        await jobs.resume_with_answers(job, {
+            "answers": answers,
+            "text": content,
+            "answer_message_id": str(message.id),
+            "expanded_prompt": f"{original_request}\n\n{content}".strip(),
+        })
+        return message, job.id
+
+    async def _ensure_no_pending_questions(self, conversation_id: uuid.UUID) -> None:
+        """A paused analysis waits for its answers; new questions would queue behind it."""
+        repo = JobRepository(self.session)
+        waiting = await repo.waiting_chat_for_conversation(conversation_id)
+        if waiting is None:
+            return
+        jobs = JobService(self.session, self.redis, self.settings)
+        if not jobs.pause_expired(waiting):
+            raise AppError(
+                "CLARIFICATION_PENDING",
+                "Answer or cancel the questions above before asking something new.",
+                409,
+            )
+        locked = await repo.lock(waiting.id)
+        if locked is not None and jobs.pause_expired(locked):
+            await jobs.expire_waiting(locked)
+            await delete_job_checkpoints(self.session, [locked.id])
 
     async def delete(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         item = await self.require_for_org(conversation_id, organization_id)
@@ -278,6 +356,7 @@ class ConversationService:
         if self.redis is None:
             raise RuntimeError("Redis is required to submit analytical messages")
         conversation = await self.require_for_org(conversation_id, organization_id)
+        await self._ensure_no_pending_questions(conversation.id)
         source_ids = await self.repo.source_ids(conversation.id)
         if not source_ids:
             raise AppError(

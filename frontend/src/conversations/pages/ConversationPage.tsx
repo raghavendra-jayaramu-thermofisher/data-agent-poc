@@ -6,7 +6,7 @@ import { PageError, PageLoading, PageState } from '../../components/PageState';
 import { listDataSources } from '../../data-sources/api/data-source-api';
 import { listProfiles } from '../../models/api/models-api';
 import { useJobManager } from '../../jobs/JobManagerProvider';
-import { isTerminalJobStatus } from '../../jobs/types';
+import { isTerminalJobStatus, isWaitingJobStatus } from '../../jobs/types';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import * as api from '../api/conversation-api';
@@ -20,6 +20,7 @@ import { orderConversationTurns } from '../components/conversation-turns';
 import {
   clarificationAnswers,
   clarificationRequest,
+  resumesPausedAnalysis,
   type ClarificationAnswer,
 } from '../clarification';
 import { LoadMoreSentinel } from '../../components/LoadMoreSentinel';
@@ -242,10 +243,20 @@ export function ConversationPage() {
 
   const durableMessages = orderConversationTurns(messages.messages);
   const latestAssistantId = durableMessages.findLast((message) => message.role === 'assistant')?.id;
+  // Questions from a paused analysis are not its answer; the job continues after them.
   const assistantJobIds = new Set(
     durableMessages
-      .filter((message) => message.role === 'assistant' && message.job_id)
+      .filter(
+        (message) =>
+          message.role === 'assistant' && message.job_id && !clarificationRequest(message),
+      )
       .map((message) => message.job_id),
+  );
+  // A resumed job has two user messages (question, then answers); progress follows the latest.
+  const latestUserMessageByJob = new Map(
+    durableMessages
+      .filter((message) => message.role === 'user' && message.job_id)
+      .map((message) => [message.job_id, message.id]),
   );
   const jobsById = new Map(conversationJobs.map((entry) => [entry.job.id, entry]));
   const progressJob =
@@ -257,12 +268,19 @@ export function ConversationPage() {
     );
   const insertedJobs = new Set<string>();
   const lastMessage = durableMessages.at(-1);
+  // Questions from a paused analysis close once it is cancelled or expires; a status not loaded
+  // yet falls back to message order.
+  const stillWaiting = (message: api.ConversationMessage) => {
+    const job = message.job_id ? jobsById.get(message.job_id)?.job : undefined;
+    return !resumesPausedAnalysis(message) || !job || isWaitingJobStatus(job.status);
+  };
   // The newest questions can be answered until the conversation moves on.
   const awaitingAnswers =
     !progressJob &&
     lastMessage !== undefined &&
     clarificationRequest(lastMessage) !== null &&
-    clarificationAnswers(durableMessages, lastMessage.id) === null;
+    clarificationAnswers(durableMessages, lastMessage.id) === null &&
+    stillWaiting(lastMessage);
 
   const messageTimeline = durableMessages.flatMap((message, index) => {
     const question =
@@ -282,6 +300,7 @@ export function ConversationPage() {
         question={question ?? undefined}
         queued={Boolean(
           message.job_id &&
+          latestUserMessageByJob.get(message.job_id) === message.id &&
           message.job_id !== progressJob?.job.id &&
           jobsById.get(message.job_id)?.job.status === 'queued',
         )}
@@ -291,19 +310,28 @@ export function ConversationPage() {
         followUpDisabled={isSubmitting}
         clarification={(() => {
           const request = clarificationRequest(message);
-          return request
-            ? {
-                request,
-                answered: clarificationAnswers(durableMessages, message.id),
-                canAnswer: awaitingAnswers && message.id === lastMessage?.id,
-                onSubmit: (answers: ClarificationAnswer[]) =>
-                  submitClarification(message.id, answers),
-              }
-            : undefined;
+          if (!request) return undefined;
+          const pausedJob = message.job_id ? jobsById.get(message.job_id)?.job : undefined;
+          const paused = resumesPausedAnalysis(message);
+          return {
+            request,
+            answered: clarificationAnswers(durableMessages, message.id),
+            canAnswer: awaitingAnswers && message.id === lastMessage?.id,
+            onSubmit: (answers: ClarificationAnswer[]) => submitClarification(message.id, answers),
+            onCancel:
+              paused && pausedJob && isWaitingJobStatus(pausedJob.status)
+                ? () => jobManager.cancel(pausedJob.id)
+                : undefined,
+          };
         })()}
       />,
     ];
-    if (message.role !== 'user' || !message.job_id || assistantJobIds.has(message.job_id))
+    if (
+      message.role !== 'user' ||
+      !message.job_id ||
+      assistantJobIds.has(message.job_id) ||
+      latestUserMessageByJob.get(message.job_id) !== message.id
+    )
       return items;
     const entry = jobsById.get(message.job_id);
     if (!entry) return items;

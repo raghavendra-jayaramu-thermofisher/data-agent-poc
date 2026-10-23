@@ -32,6 +32,9 @@ dependencies = [
   "sqlglot>=26,<30",
   "deepagents>=0.7.3,<0.8",
   "langchain-openai>=1.3.5,<2",
+  # Pauses analyses for clarifying answers; migration 0020 matches this saver's schema.
+  "langgraph-checkpoint-postgres>=3.1.0,<3.2",
+  "psycopg[binary]>=3.2,<4",
 ]
 
 [project.optional-dependencies]

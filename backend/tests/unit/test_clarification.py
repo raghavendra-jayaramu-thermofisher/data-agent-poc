@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
@@ -183,9 +184,23 @@ def context(round_: int = 0) -> AgentToolContext:
     )
 
 
+def no_answered_rounds(monkeypatch, answered: int = 0) -> None:
+    """ask_user counts rounds answered earlier in its job; keep the tests off the database."""
+
+    @asynccontextmanager
+    async def session():
+        yield object()
+
+    monkeypatch.setattr(tools, "get_session_factory", lambda: session)
+    monkeypatch.setattr(
+        tools.AgentExecutionRepository, "count_tools", AsyncMock(return_value=answered)
+    )
+
+
 @pytest.mark.asyncio
 async def test_ask_user_tool_returns_the_request_and_respects_the_round_limit(monkeypatch):
     monkeypatch.setattr(tools, "append_agent_event", AsyncMock())
+    no_answered_rounds(monkeypatch)
     result = await tools.ask_user(context(), args().model_dump(), uuid.uuid4())
     assert result["ok"] is True and len(result["clarification"]["questions"]) == 4
 

@@ -19,6 +19,7 @@ export function jobStatusLabel(status: string) {
       {
         queued: 'Queued',
         running: 'In progress',
+        waiting_for_input: 'Waiting for your answer',
         succeeded: 'Completed',
         failed: 'Failed',
         cancelled: 'Cancelled',

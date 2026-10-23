@@ -21,7 +21,7 @@ class JobRepository:
             select(Job.id).where(
                 Job.conversation_id == job.conversation_id,
                 Job.job_type == "chat_query",
-                Job.status.in_(("queued", "running")),
+                Job.status.in_(("queued", "running", "waiting_for_input")),
                 or_(Job.created_at < job.created_at,
                     and_(Job.created_at == job.created_at, Job.id < job.id)),
             ).limit(1)
@@ -132,6 +132,27 @@ class JobRepository:
             .order_by(JobEvent.sequence.asc())
         )
         return list(result.scalars().all())
+
+    async def list_waiting(self, limit: int = 100) -> list[Job]:
+        result = await self.session.execute(
+            select(Job)
+            .where(Job.status == "waiting_for_input")
+            .order_by(Job.created_at.asc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def waiting_chat_for_conversation(self, conversation_id: uuid.UUID) -> Job | None:
+        result = await self.session.execute(
+            select(Job)
+            .where(
+                Job.conversation_id == conversation_id,
+                Job.job_type == "chat_query",
+                Job.status == "waiting_for_input",
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def list_stale_running(self, before: datetime, limit: int = 100) -> list[Job]:
         result = await self.session.execute(

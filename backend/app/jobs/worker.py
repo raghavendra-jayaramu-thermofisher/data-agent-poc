@@ -6,6 +6,7 @@ import os
 import socket
 import uuid
 
+from app.agent.checkpoints import delete_job_checkpoints
 from app.core.config import Settings
 from app.core.database import get_session_factory
 from app.core.redis import get_redis
@@ -18,6 +19,14 @@ logger = logging.getLogger(__name__)
 
 class RetryableJobError(Exception):
     """A handler may raise this only for transient infrastructure failures."""
+
+
+class JobWaitingForInput(Exception):  # noqa: N818 - a pause signal, not an error
+    """A handler paused for the user's answers; the worker releases the job until then."""
+
+    def __init__(self, pause: dict[str, object]) -> None:
+        self.pause = pause
+        super().__init__("waiting for input")
 
 
 class JobFailureError(Exception):
@@ -139,15 +148,24 @@ class Worker:
             result = await handler(job.id)
             async with session_factory() as session:
                 await JobService(session, self.redis, self.settings).complete(job.id, result)
+            await self._release_checkpoints(job.id)
+            await self.queue.ack(message.message_id)
+        except JobWaitingForInput as exc:
+            async with session_factory() as session:
+                await JobService(session, self.redis, self.settings).wait_for_input(
+                    job.id, exc.pause
+                )
             await self.queue.ack(message.message_id)
         except JobFailureError as exc:
             async with session_factory() as session:
-                await JobService(session, self.redis, self.settings).fail(
+                retried = await JobService(session, self.redis, self.settings).fail(
                     job.id,
                     code=exc.code,
                     message=exc.public_message,
                     retryable=exc.retryable,
                 )
+            if not retried:
+                await self._release_checkpoints(job.id)
             await self.queue.ack(message.message_id)
         except RetryableJobError as exc:
             async with session_factory() as session:
@@ -173,6 +191,14 @@ class Worker:
         finally:
             heartbeat_task.cancel()
             await asyncio.gather(heartbeat_task, return_exceptions=True)
+
+    async def _release_checkpoints(self, job_id: uuid.UUID) -> None:
+        """A finished job never resumes, so its paused-analysis state is no longer needed."""
+        try:
+            async with get_session_factory()() as session:
+                await delete_job_checkpoints(session, [job_id])
+        except Exception:
+            logger.exception("checkpoint_cleanup_failed", extra={"job_id": str(job_id)})
 
     async def _heartbeat(self, job_id: uuid.UUID) -> None:
         session_factory = get_session_factory()

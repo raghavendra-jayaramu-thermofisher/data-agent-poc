@@ -23,6 +23,7 @@ export function ClarificationCard({
   answered,
   canAnswer,
   onSubmit,
+  onCancel,
 }: {
   request: ClarificationRequest;
   /** Answers already submitted for these questions, shown read-only. */
@@ -30,6 +31,8 @@ export function ClarificationCard({
   /** False once the conversation has moved on or an analysis is running. */
   canAnswer: boolean;
   onSubmit(answers: ClarificationAnswer[]): Promise<void>;
+  /** Present while a paused analysis waits for these answers. */
+  onCancel?(): Promise<void>;
 }) {
   const formId = useId();
   const [answers, setAnswers] = useState<Record<string, ClarificationAnswer>>({});
@@ -196,6 +199,18 @@ export function ClarificationCard({
           </p>
         )}
         <div className="clarification-actions">
+          {onCancel && (
+            <Button
+              variant="secondary"
+              isDisabled={busy}
+              onPress={() => {
+                setBusy(true);
+                void onCancel().finally(() => setBusy(false));
+              }}
+            >
+              Cancel analysis
+            </Button>
+          )}
           <Button variant="primary" type="submit" form={formId} isPending={busy}>
             Send answers
           </Button>

@@ -9,7 +9,7 @@ import { appendJobEvent, getSafeJobEventLabel } from './sse/job-events';
 import { streamJobEvents } from './sse/job-stream';
 import { applyAnswerStreamEvent, isAnswerStreamEvent } from './sse/answer-stream';
 import type { JobEvent, ManagedJob } from './types';
-import { isActiveJobStatus, isTerminalJobStatus } from './types';
+import { isActiveJobStatus, isTerminalJobStatus, isWaitingJobStatus } from './types';
 type JobManagerValue = {
     jobs: ManagedJob[];
     activeJobs: ManagedJob[];
@@ -53,13 +53,14 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
         queryKey: queryKeys.jobs.list(orgId, 'recent'),
         enabled: Boolean(orgId),
         queryFn: async () => {
-            const [queued, running, recent] = await Promise.all([
+            const [queued, running, waiting, recent] = await Promise.all([
                 jobsApi.listJobs('queued', 50),
                 jobsApi.listJobs('running', 50),
+                jobsApi.listJobs('waiting_for_input', 50),
                 jobsApi.listJobs(undefined, 30),
             ]);
             const byId = new Map<string, Job>();
-            [...recent, ...queued, ...running].forEach((job) => byId.set(job.id, job));
+            [...recent, ...queued, ...running, ...waiting].forEach((job) => byId.set(job.id, job));
             return [...byId.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
         },
         retry: 1,
@@ -67,6 +68,14 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
     const reconcileJob = useCallback(async (jobId: string) => {
         const job = await jobsApi.getJob(jobId);
         setManaged((current) => ({ ...current, [jobId]: toManaged(job, current[jobId]) }));
+        // A paused job sends no events until answered; its questions arrive as a message.
+        if (isWaitingJobStatus(job.status)) {
+            streams.current.get(jobId)?.abort();
+            streams.current.delete(jobId);
+            if (job.conversation_id) {
+                await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(orgId, job.conversation_id) });
+            }
+        }
         if (isTerminalJobStatus(job.status)) {
             streams.current.get(jobId)?.abort();
             streams.current.delete(jobId);
@@ -140,6 +149,9 @@ export function JobManagerProvider({ children }: PropsWithChildren) {
                         },
                     };
                 });
+                if (event.event_type === 'job.waiting_for_input') {
+                    void reconcileJob(jobId);
+                }
                 if (event.event_type === 'job.completed' ||
                     event.event_type === 'job.failed' ||
                     event.event_type === 'job.cancelled') {

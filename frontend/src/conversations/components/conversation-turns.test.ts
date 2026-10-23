@@ -30,4 +30,29 @@ describe('conversation turn ordering', () => {
     ]);
     expect(messages.map((item) => item.id)).toEqual(['q1', 'q2', 'a1', 'a2', 'legacy']);
   });
+
+  it('places a resumed analysis as question, questions card, answers, then final answer', () => {
+    const message = (id: string, role: string, second: number) =>
+      ({
+        id,
+        role,
+        job_id: 'j1',
+        content: id,
+        conversation_id: 'c1',
+        metadata: {},
+        created_at: new Date(1700000000000 + second * 1000).toISOString(),
+      }) as ConversationMessage;
+    const messages = [
+      message('final', 'assistant', 30),
+      message('answers', 'user', 20),
+      message('card', 'assistant', 10),
+      message('question', 'user', 0),
+    ];
+    expect(orderConversationTurns(messages).map((item) => item.id)).toEqual([
+      'question',
+      'card',
+      'answers',
+      'final',
+    ]);
+  });
 });

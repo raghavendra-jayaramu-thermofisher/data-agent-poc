@@ -184,7 +184,22 @@ class ConversationRepository:
         return result.first() is not None
 
     async def message_for_job(self, job_id: uuid.UUID, role: str) -> Message | None:
+        """The first message of a role for a job: its question, or its first reply."""
         result = await self.session.execute(
-            select(Message).where(Message.job_id == job_id, Message.role == role)
+            select(Message)
+            .where(Message.job_id == job_id, Message.role == role)
+            .order_by(Message.created_at.asc(), Message.id.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def answer_message_for_job(self, job_id: uuid.UUID) -> Message | None:
+        """The job's final answer; clarifying questions are separate assistant messages."""
+        result = await self.session.execute(
+            select(Message).where(
+                Message.job_id == job_id,
+                Message.role == "assistant",
+                ~Message.metadata_json.has_key("clarification"),
+            ).limit(1)
         )
         return result.scalar_one_or_none()

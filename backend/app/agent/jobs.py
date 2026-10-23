@@ -4,6 +4,7 @@ import json
 import uuid
 
 from app.agent.artifact_directives import replace_artifact_directives
+from app.agent.checkpoints import current_checkpointer, thread_id
 from app.agent.clarification import questions_markdown
 from app.agent.deep_agent import AnalysisRunResult, DeepAgentDependencyError, DeepAgentRuntime
 from app.agent.evidence import (
@@ -33,7 +34,7 @@ from app.core.time import utc_now
 from app.instructions.repository import InstructionRepository
 from app.jobs.handlers import JobHandlerRegistry
 from app.jobs.repository import JobRepository
-from app.jobs.worker import JobFailureError
+from app.jobs.worker import JobFailureError, JobWaitingForInput
 from app.models.service import ModelConfigurationService
 
 
@@ -63,31 +64,33 @@ async def _save_clarification(
     conversation_id: uuid.UUID,
     profile_id: uuid.UUID,
     request: dict[str, object],
+    pause: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    """End the turn with the agent's questions; the answers start the next turn."""
+    """Show the agent's questions. A paused job then waits; otherwise the turn ends."""
     async with get_session_factory()() as session:
         repo = ConversationRepository(session)
-        content = questions_markdown(request)
         metadata: dict[str, object] = {
             "runtime": "deepagents",
             "clarification": request,
             "model_profile_id": str(profile_id),
+            "resumable": pause is not None,
         }
-        message = await repo.message_for_job(job_id, "assistant")
-        if message is None:
-            message = Message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=content,
-                job_id=job_id,
-                metadata_json=metadata,
-                created_at=utc_now(),
-            )
-            repo.add_message(message)
-        else:
-            message.content = content
-            message.metadata_json = metadata
+        message = Message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=questions_markdown(request),
+            job_id=job_id,
+            metadata_json=metadata,
+            created_at=utc_now(),
+        )
+        repo.add_message(message)
         await session.commit()
+    if pause is not None:
+        raise JobWaitingForInput({
+            **pause,
+            "question_message_id": str(message.id),
+            "asked_at": message.created_at.isoformat(),
+        })
     return {
         "conversation_id": str(conversation_id),
         "assistant_message_id": str(message.id),
@@ -159,6 +162,11 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             if user_message
             else ""
         ).strip()
+        pause = job.input.get("pause")
+        resume = job.input.get("resume")
+        resuming = isinstance(pause, dict) and isinstance(resume, dict)
+        if resuming:
+            question = str(resume.get("expanded_prompt") or question).strip()
         if not question:
             raise JobFailureError("JOB_INPUT_INVALID", "The analytical question is unavailable.")
 
@@ -197,6 +205,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                 "The selected analysis model profile is unavailable or disabled.",
             ) from exc
         organization_id = job.organization_id
+    checkpointer = current_checkpointer()
 
     context = AgentToolContext(
         job_id=job_id,
@@ -209,13 +218,27 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         command_instructions=command_instructions,
         command_name=command_name,
         clarification_round=clarification_round,
+        pausable=checkpointer is not None,
     )
+    run = int(pause.get("run", 1)) if resuming else 1
     try:
+        if resuming and checkpointer is None:
+            raise JobFailureError(
+                "AGENT_RESUME_UNAVAILABLE",
+                "The paused analysis cannot resume because its saved state is unavailable.",
+            )
         analysis_runtime = DeepAgentRuntime()
         analysis = await analysis_runtime.run(
             context=context,
             model=runtime_model,
-            history=history,
+            history=[] if resuming else history,
+            checkpointer=checkpointer,
+            thread=thread_id(job_id, run),
+            resume=(
+                {"answers": resume.get("answers"), "text": resume.get("text")}
+                if resuming
+                else None
+            ),
         )
         if analysis.clarification is not None:
             return await _save_clarification(
@@ -223,6 +246,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                 conversation_id=conversation_id,
                 profile_id=profile_id,
                 request=analysis.clarification,
+                pause={"run": run} if analysis.paused else None,
             )
         evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
         evidence_issues = validate_evidence(evidence)
@@ -230,11 +254,14 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         retries = 0
         while evidence_issues and retries < settings.analysis_evidence_retries:
             retries += 1
+            run += 1
             correction = build_evidence_correction(evidence_issues)
             analysis = await analysis_runtime.run(
                 context=context,
                 model=runtime_model,
                 history=[*analysis.messages, {"role": "user", "content": correction}],
+                checkpointer=checkpointer,
+                thread=thread_id(job_id, run),
             )
             if analysis.clarification is not None:
                 return await _save_clarification(
@@ -242,6 +269,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
                     conversation_id=conversation_id,
                     profile_id=profile_id,
                     request=analysis.clarification,
+                    pause={"run": run} if analysis.paused else None,
                 )
             evidence = await _load_evidence(job_id=job_id, question=question, analysis=analysis)
             evidence_issues = validate_evidence(evidence)
@@ -289,7 +317,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             "AGENT_RUNTIME_UNAVAILABLE",
             "The Deep Agents runtime is unavailable on this server.",
         ) from exc
-    except JobFailureError:
+    except (JobFailureError, JobWaitingForInput):
         raise
     except Exception as exc:
         # Never leak provider/LangGraph internals to API-visible job errors.
@@ -300,7 +328,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
 
     async with get_session_factory()() as session:
         repo = ConversationRepository(session)
-        existing = await repo.message_for_job(job_id, "assistant")
+        existing = await repo.answer_message_for_job(job_id)
         title = answer_title(answer)
         metadata: dict[str, object] = {
             "runtime": "deepagents+finalizer",

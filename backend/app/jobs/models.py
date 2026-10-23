@@ -14,7 +14,7 @@ class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('queued','running','succeeded','failed','cancelled')",
+            "status IN ('queued','running','waiting_for_input','succeeded','failed','cancelled')",
             name="valid_status",
         ),
         CheckConstraint("attempt_count >= 0", name="nonnegative_attempt_count"),

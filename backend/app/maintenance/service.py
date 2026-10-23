@@ -9,6 +9,7 @@ from redis.asyncio import Redis
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.checkpoints import delete_job_checkpoints
 from app.auth.models import AuthActionToken, AuthSession
 from app.core.config import Settings
 from app.core.time import utc_now
@@ -28,10 +29,12 @@ class MaintenanceService:
     async def run_once(self) -> dict[str, int]:
         auth_rows = await self.cleanup_expired_auth()
         stale_jobs = await self.requeue_abandoned_jobs()
+        expired = await self.expire_unanswered_questions()
         temp_files = self.cleanup_temporary_files()
         return {
             "expired_auth_rows_deleted": auth_rows,
             "abandoned_jobs_requeued": stale_jobs,
+            "unanswered_questions_expired": expired,
             "temporary_files_deleted": temp_files,
         }
 
@@ -51,6 +54,11 @@ class MaintenanceService:
         return await JobService(self.session, self.redis, self.settings).recover_abandoned_jobs(
             before=before, limit=100
         )
+
+    async def expire_unanswered_questions(self) -> int:
+        expired = await JobService(self.session, self.redis, self.settings).expire_waiting_jobs()
+        await delete_job_checkpoints(self.session, expired)
+        return len(expired)
 
     def cleanup_temporary_files(self) -> int:
         root = self.settings.data_directory.expanduser().resolve()

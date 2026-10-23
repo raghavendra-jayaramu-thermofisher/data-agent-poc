@@ -163,6 +163,15 @@ Set-Location C:\Projects\data-agent\space\poc\backend
 
 Then start the API and worker again. Starting the existing application does not require recreating its database or reinstalling dependencies.
 
+When an update adds Python dependencies to `backend/pyproject.toml`, install them before starting the processes:
+
+```powershell
+Set-Location C:\Projects\data-agent\space\poc\backend
+.\.venv\Scripts\python.exe -m pip install -e .
+```
+
+Analyses that pause for clarifying answers keep their state in LangGraph checkpoint tables created by migration `0020`. The worker logs `checkpointer_unavailable` and lets questions end the turn instead of pausing when those tables are missing.
+
 ## Restart after a code change
 
 Restart only the processes whose code changed. PostgreSQL and Redis keep running.

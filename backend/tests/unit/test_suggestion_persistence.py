@@ -110,7 +110,7 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
         else None
     )
     monkeypatch.setattr(
-        jobs.ConversationRepository, "message_for_job", AsyncMock(return_value=existing)
+        jobs.ConversationRepository, "answer_message_for_job", AsyncMock(return_value=existing)
     )
     saved_messages = []
     monkeypatch.setattr(

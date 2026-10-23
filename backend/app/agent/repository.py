@@ -67,12 +67,30 @@ class AgentExecutionRepository:
         )
         return int(value or 0) + 1
 
-    async def count_tools(self, job_id: uuid.UUID, *, tool_name: str | None = None) -> int:
+    async def count_tools(
+        self, job_id: uuid.UUID, *, tool_name: str | None = None, status: str | None = None
+    ) -> int:
         statement = select(func.count(ToolExecution.id)).where(ToolExecution.job_id == job_id)
         if tool_name is not None:
             statement = statement.where(ToolExecution.tool_name == tool_name)
+        if status is not None:
+            statement = statement.where(ToolExecution.status == status)
         value = await self.session.scalar(statement)
         return int(value or 0)
+
+    async def started_tool(self, job_id: uuid.UUID, tool_name: str) -> ToolExecution | None:
+        """The unfinished call of a tool, such as questions awaiting the user's answers."""
+        result = await self.session.execute(
+            select(ToolExecution)
+            .where(
+                ToolExecution.job_id == job_id,
+                ToolExecution.tool_name == tool_name,
+                ToolExecution.status == "started",
+            )
+            .order_by(ToolExecution.sequence.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def get_sql_for_job(
         self, sql_execution_id: uuid.UUID, job_id: uuid.UUID

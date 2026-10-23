@@ -84,6 +84,9 @@ for (const viewport of [
         const path = new URL(route.request().url()).pathname;
         const method = route.request().method();
         let json: unknown = [];
+        // The chat sidebar reads paged conversations.
+        if (new URL(route.request().url()).pathname.endsWith('/conversations'))
+          json = { items: [], next_cursor: null, has_more: false };
         if (path.endsWith('/auth/me'))
           json = {
             id: 'u1',
@@ -146,9 +149,13 @@ for (const viewport of [
         name: 'Template instructions: Backlog drivers and concentration',
         exact: true,
       });
-      await expect(viewer.getByRole('region', { name: 'How to use' })).toContainText('your request');
+      await expect(viewer.getByRole('region', { name: 'How to use' })).toContainText(
+        'your request',
+      );
       await expect(viewer.locator('.template-viewer-section')).toHaveCount(3);
-      await expect(viewer.getByRole('heading', { level: 4, name: 'Drivers', exact: true })).toBeVisible();
+      await expect(
+        viewer.getByRole('heading', { level: 4, name: 'Drivers', exact: true }),
+      ).toBeVisible();
       await expect
         .poll(() =>
           page

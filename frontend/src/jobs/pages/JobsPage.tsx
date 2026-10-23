@@ -21,7 +21,15 @@ import { formatJobDuration, jobContext, jobStatusLabel, jobTypeLabel } from '../
 import { isActiveJobStatus, type JobStatus } from '../types';
 import '../jobs.css';
 
-const filters = ['all', 'queued', 'running', 'succeeded', 'failed', 'cancelled'] as const;
+const filters = [
+  'all',
+  'queued',
+  'running',
+  'waiting_for_input',
+  'succeeded',
+  'failed',
+  'cancelled',
+] as const;
 type JobFilter = (typeof filters)[number];
 function isJobFilter(value: string | null): value is JobFilter {
   return Boolean(value && filters.includes(value as JobFilter));

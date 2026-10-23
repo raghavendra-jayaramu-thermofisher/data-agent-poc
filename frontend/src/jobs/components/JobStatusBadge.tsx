@@ -11,7 +11,9 @@ export function JobStatusBadge({ status }: { status: string }) {
             ? 'danger'
             : status === 'running' || status === 'queued'
               ? 'accent'
-              : 'neutral'
+              : status === 'waiting_for_input'
+                ? 'warning'
+                : 'neutral'
       }
     >
       {jobStatusLabel(status)}

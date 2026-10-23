@@ -83,6 +83,9 @@ for (const width of [1280, 390]) {
             ],
           },
         });
+      // The chat sidebar reads paged conversations.
+      if (new URL(route.request().url()).pathname.endsWith('/conversations'))
+        return route.fulfill({ json: { items: [], next_cursor: null, has_more: false } });
       return route.fulfill({ json: [] });
     });
     await page.goto('/ask');

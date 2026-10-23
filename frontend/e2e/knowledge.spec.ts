@@ -121,6 +121,9 @@ for (const viewport of [
         const path = new URL(route.request().url()).pathname;
         const method = route.request().method();
         let json: unknown = [];
+        // The chat sidebar reads paged conversations.
+        if (new URL(route.request().url()).pathname.endsWith('/conversations'))
+          json = { items: [], next_cursor: null, has_more: false };
         if (path.endsWith('/auth/me'))
           json = {
             id: 'u1',

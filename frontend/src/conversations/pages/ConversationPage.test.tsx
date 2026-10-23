@@ -424,6 +424,145 @@ describe('durable conversation workspace', () => {
     });
   });
 
+  it('answers a paused analysis on the same job, can cancel it, and closes once it ends', async () => {
+    const created = '2026-08-24T12:00:00Z';
+    const question = {
+      id: 'q1',
+      conversation_id: 'c1',
+      role: 'user',
+      content: 'Show overdue backlog',
+      job_id: 'j1',
+      metadata: {},
+      created_at: created,
+    };
+    const asked = {
+      id: 'a1',
+      conversation_id: 'c1',
+      role: 'assistant',
+      content: '# A few questions before I continue',
+      job_id: 'j1',
+      metadata: {
+        resumable: true,
+        clarification: {
+          reason: 'The division changes the totals.',
+          questions: [
+            {
+              id: 'division',
+              kind: 'choice',
+              prompt: 'Which division?',
+              options: [{ label: 'BID' }, { label: 'Other', is_other: true }],
+            },
+          ],
+        },
+      },
+      created_at: '2026-08-24T12:00:05Z',
+    };
+    const pausedJob = (status: string) => ({
+      job: {
+        id: 'j1',
+        organization_id: 'org-1',
+        conversation_id: 'c1',
+        job_type: 'chat_query',
+        status,
+        input: {},
+        result: null,
+        requested_by: 'u1',
+        attempt_count: 1,
+        max_attempts: 3,
+        cancel_requested_at: null,
+        error_code: null,
+        error_message: null,
+        created_at: created,
+        started_at: created,
+        finished_at: null,
+      },
+      events: [],
+      lastSeenSequence: 3,
+      connectionState: 'closed',
+    }) as ManagedJob;
+    let posted: unknown;
+    baseHandlers(() => [question, asked]);
+    server.use(
+      http.post(
+        'http://localhost:12201/api/v1/conversations/c1/messages/a1/clarification-answers',
+        async ({ request }) => {
+          posted = await request.json();
+          return HttpResponse.json({ message_id: 'm2', job_id: 'j1' }, { status: 202 });
+        },
+      ),
+    );
+    manager.jobs = [pausedJob('waiting_for_input')];
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel analysis' }));
+    expect(manager.cancel).toHaveBeenCalledWith('j1');
+
+    await user.click(screen.getByRole('radio', { name: 'BID' }));
+    await user.click(screen.getByRole('button', { name: 'Send answers' }));
+    await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j1'));
+    expect(posted).toEqual({ answers: [{ question_id: 'division', selected: ['BID'] }] });
+  });
+
+  it('closes the questions of a paused analysis that was cancelled', async () => {
+    const created = '2026-08-24T12:00:00Z';
+    baseHandlers(() => [
+      {
+        id: 'q1',
+        conversation_id: 'c1',
+        role: 'user',
+        content: 'Show overdue backlog',
+        job_id: 'j1',
+        metadata: {},
+        created_at: created,
+      },
+      {
+        id: 'a1',
+        conversation_id: 'c1',
+        role: 'assistant',
+        content: '# A few questions before I continue',
+        job_id: 'j1',
+        metadata: {
+          resumable: true,
+          clarification: {
+            reason: 'Why',
+            questions: [{ id: 'period', kind: 'text', prompt: 'Which period?' }],
+          },
+        },
+        created_at: '2026-08-24T12:00:05Z',
+      },
+    ]);
+    manager.jobs = [
+      {
+        job: {
+          id: 'j1',
+          organization_id: 'org-1',
+          conversation_id: 'c1',
+          job_type: 'chat_query',
+          status: 'cancelled',
+          input: {},
+          result: null,
+          requested_by: 'u1',
+          attempt_count: 1,
+          max_attempts: 3,
+          cancel_requested_at: created,
+          error_code: null,
+          error_message: null,
+          created_at: created,
+          started_at: created,
+          finished_at: created,
+        },
+        events: [],
+        lastSeenSequence: 3,
+        connectionState: 'closed',
+      } as ManagedJob,
+    ];
+    renderPage();
+    expect(await screen.findByText('Not answered')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send answers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Ask a follow-up' })).toBeEnabled();
+  });
+
   it('renames the chat in the header and recent list without submitting an analysis', async () => {
     baseHandlers();
     let saved = { ...conversation };

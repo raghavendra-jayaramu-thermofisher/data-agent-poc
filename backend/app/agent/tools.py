@@ -9,6 +9,8 @@ from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from langgraph.errors import GraphBubbleUp
+from langgraph.types import interrupt
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
 
@@ -84,8 +86,10 @@ class AgentToolContext:
     command_instructions: str | None = None
     command_name: str | None = None
     table_scope: tuple[SourceTableScope, ...] = ()
-    # Clarification rounds already answered for the current request.
+    # Clarification rounds already answered for the current request in earlier turns.
     clarification_round: int = 0
+    # True when a checkpointer can pause this run for the user's answers and resume it later.
+    pausable: bool = False
 
     def selected_scope(self, source_id: uuid.UUID) -> SourceTableScope | None:
         return next((item for item in self.table_scope
@@ -1244,7 +1248,12 @@ async def ask_user(
     arguments: dict[str, object],
     tool_execution_id: uuid.UUID,
 ) -> dict[str, object]:
-    if context.clarification_round >= MAX_ROUNDS:
+    async with get_session_factory()() as session:
+        # Rounds already answered in this paused-and-resumed job; the waiting call is unfinished.
+        answered = await AgentExecutionRepository(session).count_tools(
+            context.job_id, tool_name="ask_user", status="succeeded"
+        )
+    if context.clarification_round + answered >= MAX_ROUNDS:
         raise AgentToolError(
             "CLARIFICATION_LIMIT_REACHED",
             "The user already answered clarifying questions for this request. Continue with "
@@ -1254,12 +1263,24 @@ async def ask_user(
         request = build_request(AskUserArgs.model_validate(arguments))
     except ClarificationError as exc:
         raise AgentToolError("CLARIFICATION_INVALID", str(exc)) from exc
-    await append_agent_event(
-        context.job_id,
-        "clarification.requested",
-        {"question_count": len(request["questions"])},
-    )
-    return {"ok": True, "clarification": request}
+    if not context.pausable:
+        await append_agent_event(
+            context.job_id,
+            "clarification.requested",
+            {"question_count": len(request["questions"])},
+        )
+        return {"ok": True, "clarification": request}
+    # Pauses the run until the user answers; on resume the same call returns their answers.
+    reply = interrupt(request)
+    if not isinstance(reply, dict):
+        raise AgentToolError("CLARIFICATION_ANSWERS_INVALID", "The answers could not be read.")
+    return {
+        "ok": True,
+        "user_answers": reply.get("text"),
+        "answers": reply.get("answers"),
+        "guidance": "Continue the original request using these answers. Do not ask again about "
+        "the same points.",
+    }
 
 
 def tool_result_json(payload: dict[str, object]) -> str:
@@ -1324,8 +1345,14 @@ class AuditedToolExecutor:
         async with self._sequence_lock:
             async with get_session_factory()() as session:
                 repo = AgentExecutionRepository(session)
+                # A resumed run repeats the paused call; continue its audit record.
+                paused = (
+                    await repo.started_tool(self.context.job_id, name)
+                    if definition.ends_turn and self.context.pausable
+                    else None
+                )
                 total_calls = await repo.count_tools(self.context.job_id)
-                if total_calls >= self.context.settings.agent_max_tool_calls:
+                if paused is None and total_calls >= self.context.settings.agent_max_tool_calls:
                     raise AgentLimitError(
                         "AGENT_TOOL_LIMIT_EXCEEDED",
                         "The analytical job exceeded its maximum tool-call limit.",
@@ -1339,18 +1366,21 @@ class AuditedToolExecutor:
                             "AGENT_SQL_ATTEMPT_LIMIT_EXCEEDED",
                             "The analytical job exceeded its maximum SQL-attempt limit.",
                         )
-                sequence = await repo.next_tool_sequence(self.context.job_id)
-                item = ToolExecution(
-                    job_id=self.context.job_id,
-                    sequence=sequence,
-                    tool_name=name,
-                    status="started",
-                    input_summary=_safe_tool_input(name, safe_arguments),
-                    started_at=utc_now(),
-                )
-                repo.add_tool(item)
-                await session.commit()
-                tool_execution_id = item.id
+                if paused is not None:
+                    tool_execution_id = paused.id
+                else:
+                    sequence = await repo.next_tool_sequence(self.context.job_id)
+                    item = ToolExecution(
+                        job_id=self.context.job_id,
+                        sequence=sequence,
+                        tool_name=name,
+                        status="started",
+                        input_summary=_safe_tool_input(name, safe_arguments),
+                        started_at=utc_now(),
+                    )
+                    repo.add_tool(item)
+                    await session.commit()
+                    tool_execution_id = item.id
 
         await append_agent_event(
             self.context.job_id,
@@ -1367,6 +1397,9 @@ class AuditedToolExecutor:
             result = await definition.handler(self.context, safe_arguments, tool_execution_id)
             if name == "read_knowledge_index" and bool(result.get("data_source_id")):
                 self._loaded_knowledge_indexes.add(uuid.UUID(str(result["data_source_id"])))
+        except GraphBubbleUp:
+            # A LangGraph interrupt pauses the run; the call stays "started" until it resumes.
+            raise
         except AgentCancelledError:
             await self._finish_tool(
                 tool_execution_id,
@@ -1448,7 +1481,7 @@ class AuditedToolExecutor:
             "tool.completed",
             {"tool_execution_id": str(tool_execution_id), "tool_name": name},
         )
-        if definition.ends_turn:
+        if definition.ends_turn and "clarification" in result:
             raise AgentTurnEnded(name, result)
         return tool_result_json(result)
 

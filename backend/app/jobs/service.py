@@ -16,7 +16,7 @@ from app.jobs.events import LiveJobEvent, RedisJobEventBus
 from app.jobs.models import Job, JobEvent
 from app.jobs.queue import RedisJobQueue
 from app.jobs.repository import JobRepository
-from app.jobs.state import TERMINAL_STATUSES, assert_transition
+from app.jobs.state import TERMINAL_STATUSES, WAITING_STATUS, assert_transition
 from app.organizations.models import Organization
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class JobService:
         self, organization_id: uuid.UUID, *, status: str | None = None, limit: int = 50
     ) -> list[tuple[Job, datetime | None, datetime | None]]:
         if status is not None and status not in {
-            "queued", "running", "succeeded", "failed", "cancelled"
+            "queued", "running", WAITING_STATUS, "succeeded", "failed", "cancelled"
         }:
             raise AppError("INVALID_JOB_STATUS", "Invalid job status filter.", 400)
         return await self.repo.list_for_organization(
@@ -115,7 +115,7 @@ class JobService:
             return job
         now = utc_now()
         job.cancel_requested_at = now
-        if job.status == "queued":
+        if job.status in ("queued", WAITING_STATUS):
             assert_transition(job.status, "cancelled")
             job.status = "cancelled"
             job.finished_at = now
@@ -251,6 +251,74 @@ class JobService:
         await self.session.commit()
         await self._publish_safely(event)
         return False
+
+    async def wait_for_input(self, job_id: uuid.UUID, pause: dict[str, object]) -> None:
+        """Release the worker while the analysis waits for the user's answers."""
+        job = await self.repo.lock(job_id)
+        if job is None:
+            raise AppError("JOB_NOT_FOUND", "Job not found.", 404)
+        if job.cancel_requested_at is not None:
+            await self._finish_cancelled(job)
+            return
+        assert_transition(job.status, WAITING_STATUS)
+        job.status = WAITING_STATUS
+        job.input = {
+            **{key: value for key, value in job.input.items() if key != "resume"},
+            "pause": pause,
+        }
+        job.claimed_by = None
+        job.lease_expires_at = None
+        event = await self._append_event_locked(
+            job,
+            "job.waiting_for_input",
+            {"question_message_id": pause.get("question_message_id")},
+        )
+        await self.session.commit()
+        await self._publish_safely(event)
+
+    def pause_expired(self, job: Job) -> bool:
+        pause = job.input.get("pause") if isinstance(job.input, dict) else None
+        asked_at = pause.get("asked_at") if isinstance(pause, dict) else None
+        if job.status != WAITING_STATUS or not isinstance(asked_at, str):
+            return False
+        expiry = timedelta(hours=self.settings.clarification_expiry_hours)
+        return datetime.fromisoformat(asked_at) + expiry < utc_now()
+
+    async def resume_with_answers(self, job: Job, resume: dict[str, object]) -> None:
+        """Queue a paused analysis again with the answers; the caller holds the job lock."""
+        assert_transition(job.status, "queued")
+        job.status = "queued"
+        job.input = {**job.input, "resume": resume}
+        event = await self._append_event_locked(
+            job, "job.resumed", {"answer_message_id": resume.get("answer_message_id")}
+        )
+        await self.session.commit()
+        await self.queue.enqueue(job.id)
+        await self._publish_safely(event)
+
+    async def expire_waiting(self, job: Job) -> None:
+        """End a paused analysis whose questions went unanswered; the caller holds the lock."""
+        assert_transition(job.status, "failed")
+        job.status = "failed"
+        job.error_code = "CLARIFICATION_EXPIRED"
+        job.error_message = "The questions were not answered in time."
+        job.finished_at = utc_now()
+        event = await self._append_event_locked(
+            job, "job.failed", {"code": job.error_code}, level="warning"
+        )
+        await self.session.commit()
+        await self._publish_safely(event)
+
+    async def expire_waiting_jobs(self, *, limit: int = 100) -> list[uuid.UUID]:
+        expired: list[uuid.UUID] = []
+        for job in await self.repo.list_waiting(limit=limit):
+            locked = await self.repo.lock(job.id)
+            if locked is not None and self.pause_expired(locked):
+                await self.expire_waiting(locked)
+                expired.append(locked.id)
+            else:
+                await self.session.rollback()
+        return expired
 
     async def recover_abandoned_jobs(self, *, before, limit: int = 100) -> int:
         """Requeue jobs whose worker lease expired. Duplicate Redis deliveries are harmless.

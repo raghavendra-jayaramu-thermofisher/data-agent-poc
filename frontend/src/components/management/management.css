@@ -175,6 +175,10 @@
   background: var(--db-danger-soft);
   color: var(--db-danger);
 }
+.management-badge[data-tone='warning'] {
+  background: var(--db-warning-soft);
+  color: var(--db-warning);
+}
 .management-more {
   width: 30px;
   min-width: 30px;
