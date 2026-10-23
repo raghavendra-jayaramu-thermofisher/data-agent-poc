@@ -80,12 +80,21 @@ export function ClarificationCard({
   );
 
   const shown = answered ?? sent;
+  // The agent's explanation is background; keep it visually apart from the questions.
+  const context = request.reason ? (
+    <div className="clarification-context">
+      <span className="clarification-context-label">Why I'm asking</span>
+      <p className="clarification-reason">{request.reason}</p>
+    </div>
+  ) : null;
+
   if (shown || !canAnswer) {
     const byId = new Map((shown ?? []).map((answer) => [answer.question_id, answer]));
     return (
       <section className="clarification-card" aria-label="Clarifying questions">
         {heading}
-        {request.reason && <p className="clarification-reason">{request.reason}</p>}
+        {context}
+        <h3 className="clarification-section-title">Your answers</h3>
         <dl className="clarification-summary">
           {request.questions
             .filter((question) => !question.is_extra || byId.get(question.id)?.text)
@@ -103,7 +112,8 @@ export function ClarificationCard({
   return (
     <section className="clarification-card" aria-label="Clarifying questions">
       {heading}
-      {request.reason && <p className="clarification-reason">{request.reason}</p>}
+      {context}
+      <h3 className="clarification-section-title">Questions</h3>
       <form
         id={formId}
         className="clarification-form"
@@ -124,8 +134,11 @@ export function ClarificationCard({
               aria-describedby={error ? errorId : undefined}
             >
               <legend>
-                <span className="clarification-number">{index + 1}.</span> {question.prompt}
-                {optional && <span className="clarification-optional"> (optional)</span>}
+                <span className="clarification-number">{index + 1}</span>
+                <span>
+                  {question.prompt}
+                  {optional && <span className="clarification-optional"> (optional)</span>}
+                </span>
               </legend>
               {question.kind === 'text' ? (
                 <textarea

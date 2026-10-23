@@ -2793,10 +2793,35 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
   color: var(--db-text-primary);
 }
 
+.clarification-context {
+  border-left: 3px solid var(--db-border-default);
+  background: var(--db-surface-muted);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+}
+
+.clarification-context-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--db-text-muted);
+}
+
 .clarification-reason {
   margin: 0;
   color: var(--db-text-secondary);
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.clarification-section-title {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--db-text-secondary);
 }
 
 .clarification-form {
@@ -2806,25 +2831,51 @@ code, pre, .font-mono { font-family: var(--db-font-mono); }
 }
 
 .clarification-question {
-  border: 1px solid var(--db-border-subtle);
+  border: 1px solid var(--db-border-default);
   border-radius: 8px;
-  padding: 10px 12px 12px;
+  padding: 12px 14px 14px;
   margin: 0;
   min-width: 0;
+  background: var(--db-surface);
 }
 
 .clarification-question[aria-invalid='true'] {
   border-color: var(--db-danger);
 }
 
+/* Keep the question title inside its panel rather than on the border line. */
 .clarification-question legend {
-  padding: 0 4px;
+  float: left;
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0 0 10px;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.45;
   color: var(--db-text-primary);
 }
 
-.clarification-number,
+.clarification-question legend + * {
+  clear: both;
+}
+
+.clarification-number {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--db-primary-soft);
+  color: var(--db-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .clarification-optional {
   color: var(--db-text-muted);
   font-weight: 400;
