@@ -63,7 +63,10 @@ function SourceTables({
   return (
     <section className="table-scope-source" aria-label={source.name}>
       <div className="table-scope-source-header">
-        <h3 title={source.name}>{source.name}</h3>
+        <h3 title={source.name}>
+          <Database size={14} aria-hidden="true" />
+          <span>{source.name}</span>
+        </h3>
         <div className="table-scope-modes" role="radiogroup" aria-label={`Tables for ${source.name}`}>
           <label className={scope.mode === 'all' ? 'is-active' : ''}>
             <input
@@ -168,12 +171,24 @@ function SourceTables({
             )}
           </div>
         )}
-        {schemas.map((schema) => (
-          <fieldset key={schema}>
-            <legend>{schema || 'Tables'}</legend>
-            {tables
-              .filter((table) => (table.schema ?? '') === schema)
-              .map((table) => {
+        {schemas.map((schema) => {
+          const schemaTables = tables.filter((table) => (table.schema ?? '') === schema);
+          return (
+            <div
+              key={schema}
+              className="table-scope-schema"
+              role="group"
+              aria-label={schema || 'Tables'}
+            >
+              <div className="table-scope-schema-header" aria-hidden="true">
+                <span>{schema || 'Tables'}</span>
+                {!catalog.hasNextPage && (
+                  <span>
+                    {schemaTables.length} {schemaTables.length === 1 ? 'table' : 'tables'}
+                  </span>
+                )}
+              </div>
+              {schemaTables.map((table) => {
                 const checked = scope.mode === 'selected' && selectedIds.has(tableIdentity(table));
                 return (
                   <label
@@ -195,11 +210,17 @@ function SourceTables({
                     {table.object_type === 'view' && (
                       <span className="table-scope-object-type">View</span>
                     )}
+                    {typeof table.column_count === 'number' && (
+                      <span className="table-scope-column-count">
+                        {table.column_count} {table.column_count === 1 ? 'column' : 'columns'}
+                      </span>
+                    )}
                   </label>
                 );
               })}
-          </fieldset>
-        ))}
+            </div>
+          );
+        })}
         {catalog.hasNextPage && (
           <div className="table-scope-load-more">
             <Button
@@ -340,24 +361,22 @@ export function TableScopeSelector({
                       : 'Select at least one table'
                     : summary}
                 </strong>
-                <span>
-                  The agent starts with these tables and uses others when needed. You can change
-                  them at any time.
-                </span>
               </div>
-              <Button variant="secondary" onPress={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                isDisabled={!valid || !sourceIds.length}
-                onPress={() => {
-                  onChange(normalizeTableScope(sourceIds, draft));
-                  setOpen(false);
-                }}
-              >
-                Apply
-              </Button>
+              <div className="table-scope-footer-actions">
+                <Button variant="secondary" onPress={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  isDisabled={!valid || !sourceIds.length}
+                  onPress={() => {
+                    onChange(normalizeTableScope(sourceIds, draft));
+                    setOpen(false);
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

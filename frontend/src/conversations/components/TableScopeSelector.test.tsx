@@ -150,11 +150,6 @@ describe('table selection dialog', () => {
     await user.click(trigger);
     expect(await screen.findByRole('checkbox', { name: /orders/ })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
-    expect(
-      screen.getByText('The agent starts with these tables and uses others when needed.', {
-        exact: false,
-      }),
-    ).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(change).not.toHaveBeenCalled();
