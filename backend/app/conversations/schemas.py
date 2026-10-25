@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.conversations.table_scope import SourceTableScope
 from app.core.pagination import CursorPage
+from app.models.reasoning import ReasoningEffort
 
 
 class ConversationCreate(BaseModel):
@@ -82,6 +83,8 @@ class MessageCreate(BaseModel):
 
     content: str = Field(min_length=1, max_length=50_000)
     model_profile_id: uuid.UUID | None = None
+    # None uses the model's default effort.
+    reasoning_effort: ReasoningEffort | None = None
 
     @field_validator("content")
     @classmethod

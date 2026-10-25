@@ -2073,6 +2073,8 @@ export interface components {
             content: string;
             /** Model Profile Id */
             model_profile_id?: string | null;
+            /** Reasoning Effort */
+            reasoning_effort?: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
         };
         /**
          * MessagePage
@@ -2222,6 +2224,8 @@ export interface components {
             provider_error_response?: {
                 [key: string]: unknown;
             } | null;
+            /** Reasoning Effort */
+            reasoning_effort?: string | null;
             /** Sequence */
             sequence: number;
             /**
@@ -2289,6 +2293,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Default Reasoning Effort */
+            readonly default_reasoning_effort: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             /** Display Name */
             display_name: string;
             /** Enabled */
@@ -2311,6 +2317,11 @@ export interface components {
             organization_id: string;
             /** Output Price Per Million */
             output_price_per_million?: number | null;
+            /**
+             * Reasoning Efforts
+             * @description Efforts a question may choose for this model; empty when it has no effort control.
+             */
+            readonly reasoning_efforts: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max")[];
             /** Settings */
             settings: {
                 [key: string]: unknown;

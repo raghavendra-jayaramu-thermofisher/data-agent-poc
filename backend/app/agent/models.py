@@ -88,6 +88,8 @@ class ModelExecution(Base):
         UUID(as_uuid=True), ForeignKey("model_profiles.id", ondelete="RESTRICT"), nullable=False
     )
     model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # The effort the question chose; None means the model's default.
+    reasoning_effort: Mapped[str | None] = mapped_column(String(20), nullable=True)
     phase: Mapped[str] = mapped_column(String(80), nullable=False, default="agent")
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

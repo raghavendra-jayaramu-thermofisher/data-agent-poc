@@ -344,6 +344,25 @@ async def test_answers_continue_the_original_request_with_the_next_round():
     assert extra["answers_message_id"] == str(asked.id)
     assert (extra["instruction_id"], extra["command"]) == ("inst-1", "kpi")
     assert str(call["payload"].model_profile_id) == asked.metadata_json["model_profile_id"]
+    assert call["payload"].reasoning_effort is None
+
+
+@pytest.mark.asyncio
+async def test_answers_keep_the_reasoning_effort_of_the_original_question():
+    asked, original = clarification_messages({"reasoning_effort": "high"})
+    service = ConversationService(AsyncMock(), Settings(_env_file=None), redis=object())
+    service.repo = FakeRepo(asked, original)
+    service.submit_message = AsyncMock(return_value=("message", "job"))
+
+    await service.answer_clarification(
+        conversation_id=asked.conversation_id, message_id=asked.id,
+        organization_id=uuid.uuid4(), user_id=uuid.uuid4(),
+        payload=answers(
+            {"question_id": "division", "selected": ["BID"]},
+            {"question_id": "regions", "selected": ["Japan"]},
+        ),
+    )
+    assert service.submit_message.await_args.kwargs["payload"].reasoning_effort == "high"
 
 
 @pytest.mark.asyncio

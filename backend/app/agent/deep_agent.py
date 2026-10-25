@@ -26,6 +26,7 @@ from app.core.database import get_session_factory
 from app.core.time import utc_now
 from app.models.client import ModelRuntimeConfiguration
 from app.models.diagnostics import provider_diagnostics
+from app.models.errors import unsupported_parameter_message
 
 SYSTEM_PROMPT = """You are Data Agent, a senior analytical engineer and database analyst working over authorized business databases.
 
@@ -482,6 +483,7 @@ class AgentAuditContext:
     model_profile_id: uuid.UUID
     model_name: str
     product_tool_names: frozenset[str]
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -570,15 +572,9 @@ def model_failure_details(error: BaseException) -> tuple[str, str]:
     if isinstance(body, dict):
         detail = body.get("error", body)
         if isinstance(detail, dict):
-            parameter = detail.get("param")
-            if status == 400 and parameter in {
-                "temperature", "max_tokens", "max_completion_tokens"
-            }:
-                return (
-                    "MODEL_PARAMETER_UNSUPPORTED",
-                    f"The provider rejected the {parameter} setting. "
-                    "Update the model profile settings.",
-                )
+            message = unsupported_parameter_message(status, detail.get("param"), detail.get("message"))
+            if message:
+                return "MODEL_PARAMETER_UNSUPPORTED", message
     if status == 401:
         return "MODEL_AUTHENTICATION_FAILED", "The provider rejected the model API credentials."
     if status == 403:
@@ -609,10 +605,14 @@ def _build_chat_model(model: ModelRuntimeConfiguration, timeout_seconds: float) 
         "timeout": timeout_seconds,
         "max_retries": 0,
     }
-    if "temperature" in model.settings and isinstance(model.settings["temperature"], (int, float)):
-        kwargs["temperature"] = float(model.settings["temperature"])
-    if "max_tokens" in model.settings and isinstance(model.settings["max_tokens"], int):
-        kwargs["max_tokens"] = int(model.settings["max_tokens"])
+    settings = model.request_settings()
+    if isinstance(settings.get("temperature"), (int, float)):
+        kwargs["temperature"] = float(settings["temperature"])
+    if isinstance(settings.get("max_tokens"), int):
+        kwargs["max_tokens"] = int(settings["max_tokens"])
+    if isinstance(settings.get("reasoning_effort"), str):
+        # ChatOpenAI sends it as reasoning.effort when it uses the Responses API.
+        kwargs["reasoning_effort"] = settings["reasoning_effort"]
     return ChatOpenAI(**kwargs)
 
 
@@ -704,6 +704,7 @@ class DeepAgentRuntime:
                 model_profile_id=uuid.UUID(model.profile_id),
                 model_name=model.model_name,
                 product_tool_names=frozenset(item.name for item in bindings),
+                reasoning_effort=model.reasoning_effort,
             )
         )
         await append_agent_event(
@@ -958,6 +959,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             sequence=await repo.next_model_sequence(self.audit_context.job_id),
                             model_profile_id=self.audit_context.model_profile_id,
                             model_name=self.audit_context.model_name,
+                            reasoning_effort=self.audit_context.reasoning_effort,
                             phase="analysis",
                             status="succeeded",
                             input_tokens=input_tokens,
@@ -1007,6 +1009,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             sequence=await repo.next_model_sequence(self.audit_context.job_id),
                             model_profile_id=self.audit_context.model_profile_id,
                             model_name=self.audit_context.model_name,
+                            reasoning_effort=self.audit_context.reasoning_effort,
                             phase="analysis",
                             status="failed",
                             error_code=error_code,

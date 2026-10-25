@@ -336,7 +336,8 @@ class ModelConfigurationService:
         )
 
     async def get_runtime_configuration(
-        self, *, profile_id: uuid.UUID, organization_id: uuid.UUID
+        self, *, profile_id: uuid.UUID, organization_id: uuid.UUID,
+        reasoning_effort: str | None = None,
     ) -> ModelRuntimeConfiguration:
         """Resolve one enabled profile into a runtime-only configuration.
 
@@ -355,6 +356,7 @@ class ModelConfigurationService:
             base_url=connection.base_url,
             api_key=await self._api_key(connection),
             settings=dict(profile.settings),
+            reasoning_effort=reasoning_effort,
         )
 
     async def _api_key(self, connection: ModelConnection) -> str | None:

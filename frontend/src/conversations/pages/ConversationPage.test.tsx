@@ -356,6 +356,7 @@ describe('durable conversation workspace', () => {
     expect(received).toHaveBeenCalledWith({
       content: 'Compare customers?',
       model_profile_id: null,
+      reasoning_effort: null,
     });
     expect(input).toHaveValue('My draft');
   });
@@ -659,11 +660,12 @@ describe('durable conversation workspace', () => {
         expect(await request.json()).toEqual({
           content: 'Why did revenue fall?',
           model_profile_id: null,
+          reasoning_effort: 'high',
         });
         return HttpResponse.json({ message_id: 'm-durable', job_id: 'j-chat' }, { status: 202 });
       }),
     );
-    renderPage({ pendingQuestion: 'Why did revenue fall?', modelProfileId: null });
+    renderPage({ pendingQuestion: 'Why did revenue fall?', modelProfileId: null, reasoningEffort: 'high' });
     expect(await screen.findByText('Why did revenue fall?')).toBeInTheDocument();
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-chat'));
     expect(submissions).toBe(1);
@@ -788,6 +790,7 @@ describe('durable conversation workspace', () => {
         expect(await request.json()).toEqual({
           content: 'Now compare enterprise customers.',
           model_profile_id: null,
+          reasoning_effort: null,
         });
         return HttpResponse.json({ message_id: 'm-follow', job_id: 'j-follow' }, { status: 202 });
       }),

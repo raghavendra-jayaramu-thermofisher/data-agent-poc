@@ -2521,6 +2521,26 @@
               }
             ],
             "title": "Model Profile Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
           }
         },
         "required": [
@@ -2975,6 +2995,17 @@
             ],
             "title": "Provider Error Response"
           },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
           "sequence": {
             "title": "Sequence",
             "type": "integer"
@@ -3128,6 +3159,27 @@
             "title": "Created At",
             "type": "string"
           },
+          "default_reasoning_effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true,
+            "title": "Default Reasoning Effort"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -3176,6 +3228,24 @@
             ],
             "title": "Output Price Per Million"
           },
+          "reasoning_efforts": {
+            "description": "Efforts a question may choose for this model; empty when it has no effort control.",
+            "items": {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            "readOnly": true,
+            "title": "Reasoning Efforts",
+            "type": "array"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -3197,7 +3267,9 @@
           "is_default",
           "enabled",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "reasoning_efforts",
+          "default_reasoning_effort"
         ],
         "title": "ModelProfileResponse",
         "type": "object"

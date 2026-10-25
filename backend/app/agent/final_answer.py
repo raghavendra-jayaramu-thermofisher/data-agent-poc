@@ -28,7 +28,7 @@ from app.models.client import (
     ModelStreamingUnsupportedError,
     OpenAICompatibleClient,
 )
-from app.models.errors import ModelProviderError
+from app.models.errors import ModelProviderError, unsupported_parameter_message
 from app.models.diagnostics import diagnostic_message
 
 FINALIZER_SYSTEM_PROMPT = """# Role and task
@@ -278,16 +278,21 @@ Generate the answer and suggestions together; do not call tools to generate sugg
                 "FINAL_ANSWER_TIMEOUT", "The final answer took too long to generate."
             ) from exc
         except ModelProviderError as exc:
+            diagnostics = exc.diagnostics or {}
+            unsupported = unsupported_parameter_message(
+                diagnostics.get("http_status"), diagnostics.get("parameter"),
+                diagnostics.get("provider_message"),
+            )
+            code = "MODEL_PARAMETER_UNSUPPORTED" if unsupported else "FINAL_ANSWER_PROVIDER_FAILED"
             await self._finish_execution(
                 execution_id,
                 status="failed",
-                error_code="FINAL_ANSWER_PROVIDER_FAILED",
+                error_code=code,
                 error_message=diagnostic_message(exc.public_message, exc.diagnostics),
-                provider_error_response=(exc.diagnostics or {}).get("provider_error_response"),
+                provider_error_response=diagnostics.get("provider_error_response"),
             )
             raise FinalAnswerError(
-                "FINAL_ANSWER_PROVIDER_FAILED",
-                "The final-answer model could not complete the response.",
+                code, unsupported or "The final-answer model could not complete the response.",
             ) from exc
         except FinalAnswerError as exc:
             await self._finish_execution(
@@ -338,7 +343,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
                 usage = None
                 returned_model = None
                 async with aclosing(stream(
-                    model=model.model_name, messages=messages, settings=model.settings,
+                    model=model.model_name, messages=messages, settings=model.request_settings(),
                 )) as chunks:
                     async for chunk in chunks:
                         usage = chunk.usage or usage
@@ -366,7 +371,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
                 await asyncio.gather(reader, return_exceptions=True)
 
         return await client.chat_completion(
-            model=model.model_name, messages=messages, settings=model.settings,
+            model=model.model_name, messages=messages, settings=model.request_settings(),
         )
 
     @staticmethod
@@ -378,6 +383,7 @@ Generate the answer and suggestions together; do not call tools to generate sugg
                 sequence=await repo.next_model_sequence(job_id),
                 model_profile_id=uuid.UUID(model.profile_id),
                 model_name=model.model_name,
+                reasoning_effort=model.reasoning_effort,
                 phase="finalization",
                 status="started",
                 started_at=utc_now(),

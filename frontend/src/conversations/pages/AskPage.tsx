@@ -14,8 +14,13 @@ import { ChatComposer } from '../components/ChatComposer';
 import { deriveConversationTitle } from '../utils/title';
 import { normalizeTableScope } from '../components/table-scope';
 import type { SourceTableScope } from '../components/table-scope';
+import type { ReasoningEffort } from '../reasoning-effort';
 
-type PendingConversationState = { pendingQuestion: string; modelProfileId: string | null };
+type PendingConversationState = {
+  pendingQuestion: string;
+  modelProfileId: string | null;
+  reasoningEffort: ReasoningEffort | null;
+};
 
 export function AskPage() {
   const navigate = useNavigate();
@@ -46,6 +51,7 @@ export function AskPage() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(() => {
     return preferences.get('lastSelectedModelProfileId') ?? null;
   });
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -110,6 +116,7 @@ export function AskPage() {
       const state: PendingConversationState = {
         pendingQuestion: question,
         modelProfileId: effectiveProfileId,
+        reasoningEffort,
       };
 
       navigate(`/conversations/${conversation.id}`, { state });
@@ -157,6 +164,8 @@ export function AskPage() {
           profiles={enabledProfiles}
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}
+          reasoningEffort={reasoningEffort}
+          onReasoningEffortChange={setReasoningEffort}
           isSubmitting={isSubmitting}
           disabled={!isPreparing && activeSources.length === 0}
           placement="inline"

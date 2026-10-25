@@ -10,6 +10,7 @@ import httpx
 
 from app.models.errors import ModelProviderError
 from app.models.diagnostics import provider_diagnostics
+from app.models.reasoning import request_settings
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +52,12 @@ class ModelRuntimeConfiguration:
     base_url: str
     api_key: str | None
     settings: dict[str, object]
+    # Chosen per question; None leaves the model's default.
+    reasoning_effort: str | None = None
+
+    def request_settings(self) -> dict[str, object]:
+        """The generation options sent to the provider on every call of this question."""
+        return request_settings(self.model_name, self.settings, self.reasoning_effort)
 
 
 class ModelClient(Protocol):

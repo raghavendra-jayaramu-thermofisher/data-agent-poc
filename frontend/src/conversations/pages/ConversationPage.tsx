@@ -30,8 +30,13 @@ import {
   useConversationMessages,
   useUpdateTableScope,
 } from '../hooks/useConversations';
+import type { ReasoningEffort } from '../reasoning-effort';
 
-type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
+type PendingConversationState = {
+  pendingQuestion?: string;
+  modelProfileId?: string | null;
+  reasoningEffort?: ReasoningEffort | null;
+} | null;
 
 function errorMessage(error: unknown) {
   return error && typeof error === 'object' && 'message' in error
@@ -71,6 +76,10 @@ export function ConversationPage() {
   const [initialSubmitError, setInitialSubmitError] = useState<string | null>(null);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  // Follow-ups start with the effort the first question was asked with.
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | null>(
+    () => (location.state as PendingConversationState)?.reasoningEffort ?? null,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sourceNames = useMemo(
     () => Object.fromEntries((dataSources.data ?? []).map((source) => [source.id, source.name])),
@@ -106,13 +115,14 @@ export function ConversationPage() {
   );
 
   const submit = useCallback(
-    async (content: string, modelProfileId?: string | null) => {
+    async (content: string, modelProfileId?: string | null, effort?: ReasoningEffort | null) => {
       if (!conversationId) throw new Error('Conversation ID is missing.');
       setIsSubmitting(true);
       try {
         const accepted = await api.submitMessage(conversationId, {
           content,
           model_profile_id: modelProfileId ?? null,
+          reasoning_effort: effort ?? null,
         });
         appendOptimisticMessage(accepted, content);
         await jobManager.registerJob(accepted.job_id);
@@ -143,8 +153,8 @@ export function ConversationPage() {
   );
 
   const submitFollowUp = useCallback(
-    (question: string) => submit(question, selectedProfileId),
-    [selectedProfileId, submit],
+    (question: string) => submit(question, selectedProfileId, reasoningEffort),
+    [reasoningEffort, selectedProfileId, submit],
   );
 
   useEffect(() => {
@@ -153,8 +163,9 @@ export function ConversationPage() {
     pendingStarted.current = true;
     const content = state.pendingQuestion;
     const modelProfileId = state.modelProfileId ?? null;
+    const effort = state.reasoningEffort ?? null;
     navigate(location.pathname, { replace: true, state: null });
-    void submit(content, modelProfileId).catch((error) =>
+    void submit(content, modelProfileId, effort).catch((error) =>
       setInitialSubmitError(errorMessage(error)),
     );
   }, [conversationId, location.pathname, location.state, navigate, submit]);
@@ -467,6 +478,9 @@ export function ConversationPage() {
         profiles={(profiles.data ?? []).filter((p) => p.enabled)}
         selectedProfileId={selectedProfileId}
         onProfileIdChange={setSelectedProfileId}
+        fallbackProfileId={conversation.data?.model_profile_id}
+        reasoningEffort={reasoningEffort}
+        onReasoningEffortChange={setReasoningEffort}
         isSubmitting={isSubmitting}
         disabled={awaitingAnswers}
         placeholder={

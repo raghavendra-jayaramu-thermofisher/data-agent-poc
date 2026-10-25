@@ -25,6 +25,9 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
           <Bot size={13} className="text-[var(--db-primary)]" />
           <strong className="font-semibold text-[var(--db-text-primary)]">{execution.model_name}</strong>
           <span className="text-[10px] text-[var(--db-text-muted)]">({execution.phase || 'Model Call'})</span>
+          {execution.reasoning_effort && (
+            <span className="text-[10px] text-[var(--db-text-muted)]">{execution.reasoning_effort} effort</span>
+          )}
         </div>
 
         <span className="text-[11px] text-[var(--db-text-muted)]">

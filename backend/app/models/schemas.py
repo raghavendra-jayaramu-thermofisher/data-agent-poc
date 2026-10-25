@@ -5,7 +5,9 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, computed_field, field_validator
+
+from app.models.reasoning import ReasoningEffort, reasoning_support
 
 
 _FORBIDDEN_MODEL_SETTINGS = {
@@ -151,6 +153,8 @@ class ModelProfileCreate(BaseModel):
         forbidden = sorted(set(value) & _FORBIDDEN_MODEL_SETTINGS)
         if forbidden:
             raise ValueError(f"Reserved/sensitive model setting(s): {', '.join(forbidden)}")
+        if {"reasoning_effort", "reasoning"} & set(value):
+            raise ValueError("Reasoning effort is chosen per question in the composer, not on the profile")
         for key, item in value.items():
             if item is None:
                 continue
@@ -218,3 +222,16 @@ class ModelProfileResponse(BaseModel):
     enabled: bool
     created_at: datetime
     updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def reasoning_efforts(self) -> list[ReasoningEffort]:
+        """Efforts a question may choose for this model; empty when it has no effort control."""
+        support = reasoning_support(self.model_name)
+        return list(support.efforts) if support else []
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def default_reasoning_effort(self) -> ReasoningEffort | None:
+        support = reasoning_support(self.model_name)
+        return support.default if support else None
