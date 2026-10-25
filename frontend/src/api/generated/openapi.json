@@ -524,6 +524,24 @@
         "title": "ConversationResponse",
         "type": "object"
       },
+      "ConversationTableScopeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "table_scope": {
+            "items": {
+              "$ref": "#/components/schemas/SourceTableScope"
+            },
+            "maxItems": 10,
+            "title": "Table Scope",
+            "type": "array"
+          }
+        },
+        "required": [
+          "table_scope"
+        ],
+        "title": "ConversationTableScopeUpdate",
+        "type": "object"
+      },
       "DashboardCreate": {
         "additionalProperties": false,
         "properties": {
@@ -3745,18 +3763,6 @@
             "title": "Data Source Id",
             "type": "string"
           },
-          "knowledge_version_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Knowledge Version Id"
-          },
           "mode": {
             "default": "all",
             "enum": [
@@ -5507,6 +5513,80 @@
           }
         ],
         "summary": "Verify Message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/table-scope": {
+      "put": {
+        "operationId": "update_table_scope_api_v1_conversations__conversation_id__table_scope_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationTableScopeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Table Scope",
         "tags": [
           "conversations"
         ]

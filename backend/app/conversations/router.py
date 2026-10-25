@@ -14,6 +14,7 @@ from app.conversations.schemas import (
     ConversationPage,
     ConversationRename,
     ConversationResponse,
+    ConversationTableScopeUpdate,
     MessageAcceptedResponse,
     MessageCreate,
     MessagePage,
@@ -87,6 +88,20 @@ async def rename_conversation(
     organization, _ = context
     service = ConversationService(session, settings)
     item = await service.rename(conversation_id, organization.id, payload)
+    return await service.to_response(item)
+
+
+@router.put("/{conversation_id}/table-scope", response_model=ConversationResponse)
+async def update_table_scope(
+    conversation_id: uuid.UUID,
+    payload: ConversationTableScopeUpdate,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ConversationResponse:
+    organization, _ = context
+    service = ConversationService(session, settings)
+    item = await service.update_table_scope(conversation_id, organization.id, payload)
     return await service.to_response(item)
 
 

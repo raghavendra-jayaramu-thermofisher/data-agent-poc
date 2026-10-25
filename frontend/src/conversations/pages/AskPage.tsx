@@ -37,7 +37,7 @@ export function AskPage() {
 
   const [question, setQuestion] = useState('');
   const [tableSelections, setTableSelections] = useState<Record<string, SourceTableScope[]>>(() =>
-    preferences.get('askTableScopesByScope') ?? {},
+    preferences.get('askTableSelectionsByScope') ?? {},
   );
   const sourceScope = JSON.stringify([user?.id, orgId]);
   const [sourceSelections, setSourceSelections] = useState<Record<string, string[]>>(() =>
@@ -88,7 +88,7 @@ export function AskPage() {
       ],
     };
     setTableSelections(next);
-    preferences.set('askTableScopesByScope', next);
+    preferences.set('askTableSelectionsByScope', next);
   };
   const enabledProfiles = (profiles.data ?? []).filter((profile) => profile.enabled);
   const effectiveProfileId = enabledProfiles.some((profile) => profile.id === selectedProfileId)

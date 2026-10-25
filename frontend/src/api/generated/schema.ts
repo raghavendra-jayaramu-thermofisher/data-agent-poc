@@ -225,6 +225,23 @@ export interface paths {
         patch: operations["verify_message_api_v1_conversations__conversation_id__messages__message_id__verification_patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/table-scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Table Scope */
+        put: operations["update_table_scope_api_v1_conversations__conversation_id__table_scope_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards": {
         parameters: {
             query?: never;
@@ -1261,6 +1278,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ConversationTableScopeUpdate */
+        ConversationTableScopeUpdate: {
+            /** Table Scope */
+            table_scope: components["schemas"]["SourceTableScope"][];
         };
         /** DashboardCreate */
         DashboardCreate: {
@@ -2508,8 +2530,6 @@ export interface components {
              * Format: uuid
              */
             data_source_id: string;
-            /** Knowledge Version Id */
-            knowledge_version_id?: string | null;
             /**
              * Mode
              * @default all
@@ -3346,6 +3366,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__conversations__schemas__MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_table_scope_api_v1_conversations__conversation_id__table_scope_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationTableScopeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
                 };
             };
             /** @description Validation Error */

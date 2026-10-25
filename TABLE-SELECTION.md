@@ -2,20 +2,14 @@
 
 On **Ask**, choose data sources, then open **Tables**. Choose **All tables** or check specific tables and views for each source, then press **Apply**. Cancel or Escape discards unfinished changes.
 
-The selector shows the table name for one selected table and a count for multiple tables. If other sources remain unrestricted, the label also says **all in other sources**.
+The selector shows the table name for one selected table and a count for multiple tables. If other sources remain on all tables, the label also says **all in other sources**.
 
-Selection is saved when the conversation is created and stays fixed for its follow-up questions. Open the Tables selector in an existing conversation to inspect its scope. Start a new conversation to change scope. Existing conversations default to All tables.
+Selected tables are where the agent starts, not a restriction. When they cannot answer a question, the agent may read and query other tables in the conversation's data sources, and the answer names the extra tables it used.
 
-The catalog uses generated schema knowledge. If it is not ready, generate knowledge in Data sources. Search and Load more support large catalogs; up to 500 specific objects can be selected per source.
+Change the tables at any time from the **Tables** button in a conversation. A question that is already running keeps the tables it started with; the next question uses the new selection.
 
-Selected scope filters the agent's schema discovery and validates physical SQL references before execution. Joins to unselected tables are rejected. Ambiguous unqualified names require schema qualification. Cross-database references and table functions are unavailable in selected mode. Views may read their underlying tables according to database permissions.
+The catalog uses generated schema knowledge. If it is not ready, generate knowledge in Data sources. Search and Load more support large catalogs; up to 500 specific objects can be selected per source. Selected tables that no longer exist after knowledge is regenerated are dropped; if none remain, the source uses all tables.
 
-## Updating another installation
+## What the agent receives
 
-Run the migration from `space/poc/backend`:
-
-```powershell
-.\.venv\Scripts\python.exe -m alembic upgrade head
-```
-
-Restart the backend API and worker using the commands in `MANUAL-START.md`, then refresh the frontend. The migration has already been applied to this local installation.
+With a selection, `read_knowledge_index` lists the selected tables with their type, column count and primary key, plus a count of the other tables and views. The agent requests the full index with `include_all_tables=true` only when it needs another table. Without a selection, it receives the full index.

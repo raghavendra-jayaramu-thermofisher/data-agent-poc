@@ -53,7 +53,7 @@ describe('new analysis screen', () => {
     await user.click(screen.getByRole('button', { name: 'Send question' }));
     await waitFor(() => expect(createConversation).toHaveBeenCalledWith({
       data_source_ids: ['ds1'], model_profile_id: null, title: 'Count orders',
-      table_scope: [{ data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }], knowledge_version_id: 'v1' }],
+      table_scope: [{ data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] }],
     }));
   });
 

@@ -1,4 +1,4 @@
-"""Explicit conversation table scope; an empty selected scope never means all tables."""
+"""Conversation table scope: the tables the agent starts with, not a restriction."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ class SourceTableScope(BaseModel):
     data_source_id: uuid.UUID
     mode: Literal["all", "selected"] = "all"
     tables: list[TableIdentifier] = Field(default_factory=list, max_length=500)
-    knowledge_version_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def validate_tables(self) -> SourceTableScope:
@@ -45,7 +44,7 @@ async def resolve_table_scope(
     source_ids: list[uuid.UUID],
     requested: list[SourceTableScope],
 ) -> list[dict[str, object]]:
-    """Revalidate against current knowledge before creation and each new job."""
+    """Drop selected tables missing from current knowledge; none left means all tables."""
     by_source = {item.data_source_id: item for item in requested}
     if len(by_source) != len(requested) or not set(by_source).issubset(source_ids):
         raise AppError(
@@ -57,36 +56,24 @@ async def resolve_table_scope(
         scope = by_source.get(source_id, SourceTableScope(data_source_id=source_id))
         if scope.mode == "selected":
             base = await repo.get_base_for_source(source_id, organization_id)
-            if base is None or base.status != "ready" or base.current_version_id is None:
-                raise AppError(
-                    "KNOWLEDGE_NOT_READY", "Generate schema knowledge before selecting tables.", 409
-                )
-            docs = (
-                (
+            if base is not None and base.status == "ready" and base.current_version_id is not None:
+                docs = (
                     await session.execute(
                         select(KnowledgeDocument.metadata_json).where(
                             KnowledgeDocument.knowledge_version_id == base.current_version_id,
                             KnowledgeDocument.document_type == "table_schema",
                         )
                     )
+                ).scalars().all()
+                available = {(doc.get("schema"), doc.get("table")) for doc in docs}
+                tables = [
+                    table for table in scope.tables
+                    if (table.schema_name, table.name) in available
+                ]
+                scope = (
+                    scope.model_copy(update={"tables": tables})
+                    if tables
+                    else SourceTableScope(data_source_id=source_id)
                 )
-                .scalars()
-                .all()
-            )
-            available = {(doc.get("schema"), doc.get("table")) for doc in docs}
-            missing = [
-                table.name
-                for table in scope.tables
-                if (table.schema_name, table.name) not in available
-            ]
-            if missing:
-                raise AppError(
-                    "TABLE_SCOPE_STALE",
-                    "Selected tables are no longer available: "
-                    + ", ".join(missing)
-                    + ". Start a new conversation with available tables.",
-                    409,
-                )
-            scope = scope.model_copy(update={"knowledge_version_id": base.current_version_id})
         result.append(scope.model_dump(mode="json", by_alias=True))
     return result

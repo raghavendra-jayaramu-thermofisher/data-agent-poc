@@ -89,7 +89,7 @@ async def test_job_persists_suggestions_as_metadata_and_clean_answer(monkeypatch
 
     async def finalize(**kwargs):
         context = json.loads(kwargs["follow_up_context"])
-        assert context["table_scope"] == [dict(scope[0], knowledge_version_id=None)]
+        assert context["table_scope"] == scope
         assert "Count orders" in context["recent_questions"]
         kwargs["follow_up_suggestions"][:] = ["Compare orders by region?"]
         return "# Open orders\n\nThere are 12 orders."

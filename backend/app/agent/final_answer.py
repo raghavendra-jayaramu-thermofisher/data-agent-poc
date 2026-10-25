@@ -67,7 +67,8 @@ Write clearly and directly. Treat conciseness as removing repetition while prese
 needed to answer the question.
 
 Preserve relevant units, dates, comparison periods, filters, and scope. Explain methodology and
-assumptions where they materially affect interpretation or help verify the result.
+assumptions where they materially affect interpretation or help verify the result. When the analyst
+notes name tables used outside the user's selected tables, mention them briefly.
 
 # Evidence and uncertainty
 
@@ -184,8 +185,8 @@ or act on it, given their question and the conversation so far.
 - Anchor each suggestion to a specific finding, gap, or caveat in this answer.
 - Keep the answer's scope (population, filters, period) and change exactly one thing.
 - Write the full scope into the question so it can be sent as is, in the user's own terms.
-- Suggest only what the verified schema and evidence can answer; keep the data-source and
-  table scope, and do not invent facts.
+- Suggest only what the verified schema and evidence can answer; keep the conversation's data
+  sources, and do not invent facts.
 - Give each suggestion a different direction: no two may change the same kind of thing (for
   example, two that only add a breakdown). Most useful first. Usually two or three; fewer when
   fewer are useful. Never add filler, generic invitations, or already answered questions.

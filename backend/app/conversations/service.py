@@ -18,6 +18,7 @@ from app.conversations.schemas import (
     ConversationPage,
     ConversationRename,
     ConversationResponse,
+    ConversationTableScopeUpdate,
     MessageCreate,
     MessagePage,
     MessageResponse,
@@ -317,6 +318,23 @@ class ConversationService:
     ) -> Conversation:
         item = await self.require_for_org(conversation_id, organization_id)
         item.title = payload.title
+        item.updated_at = utc_now()
+        await self.session.commit()
+        return item
+
+    async def update_table_scope(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        payload: ConversationTableScopeUpdate,
+    ) -> Conversation:
+        """Running and paused jobs keep their own scope; the change applies to new questions."""
+        item = await self.repo.lock_for_org(conversation_id, organization_id)
+        if item is None:
+            raise AppError("CONVERSATION_NOT_FOUND", "Conversation not found.", 404)
+        item.table_scope = await resolve_table_scope(
+            self.session, organization_id, await self.repo.source_ids(item.id), payload.table_scope
+        )
         item.updated_at = utc_now()
         await self.session.commit()
         return item

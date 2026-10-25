@@ -34,19 +34,10 @@ class ConversationCreate(BaseModel):
         return value
 
 
-class ConversationUpdate(BaseModel):
+class ConversationTableScopeUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str | None = Field(default=None, max_length=240)
-    model_profile_id: uuid.UUID | None = None
-
-    @field_validator("title")
-    @classmethod
-    def clean_title(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        return cleaned or None
+    table_scope: list[SourceTableScope] = Field(max_length=10)
 
 
 class ConversationRename(BaseModel):

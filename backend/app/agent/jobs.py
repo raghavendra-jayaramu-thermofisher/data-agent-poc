@@ -138,8 +138,9 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
         if conversation is None:
             raise JobFailureError("CONVERSATION_NOT_FOUND", "Conversation not found.")
         source_ids = await convo_repo.source_ids(conversation.id)
-        table_scope = tuple(SourceTableScope.model_validate(item) for item in
-            job.input.get("table_scope", conversation.table_scope or []))
+        table_scope = tuple(
+            SourceTableScope.model_validate(item) for item in job.input["table_scope"]
+        )
         if not source_ids:
             raise JobFailureError(
                 "CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource."

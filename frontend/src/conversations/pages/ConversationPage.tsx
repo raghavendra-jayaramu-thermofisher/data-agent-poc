@@ -28,6 +28,7 @@ import {
   appendMessage,
   useConversation,
   useConversationMessages,
+  useUpdateTableScope,
 } from '../hooks/useConversations';
 
 type PendingConversationState = { pendingQuestion?: string; modelProfileId?: string | null } | null;
@@ -49,6 +50,7 @@ export function ConversationPage() {
 
   const conversation = useConversation(conversationId);
   const messages = useConversationMessages(conversationId);
+  const updateTableScope = useUpdateTableScope();
   const dataSources = useQuery({
     queryKey: queryKeys.dataSources.list(orgId),
     queryFn: listDataSources,
@@ -451,6 +453,16 @@ export function ConversationPage() {
         dataSources={(dataSources.data ?? []).filter((s) => s.status === 'active')}
         selectedDataSourceIds={conversation.data?.data_source_ids ?? []}
         tableScope={conversation.data?.table_scope ?? []}
+        onTableScopeChange={(tableScope) => {
+          if (conversationId) updateTableScope.mutate({ id: conversationId, tableScope });
+        }}
+        status={
+          updateTableScope.isError ? (
+            <p className="chat-composer-error" role="alert">
+              {updateTableScope.error?.message || 'Unable to change tables. Try again.'}
+            </p>
+          ) : undefined
+        }
         onDataSourceIdsChange={() => {}}
         profiles={(profiles.data ?? []).filter((p) => p.enabled)}
         selectedProfileId={selectedProfileId}

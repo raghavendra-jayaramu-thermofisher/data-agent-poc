@@ -312,7 +312,6 @@ export function ChatComposer({
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
             <div className="chat-composer-group chat-composer-group--context">
-              {tableScope && dataSourceSelection === 'hidden' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} readOnly />}
               {dataSourceSelection === 'editable' ? (
                 <div className="chat-composer-picker" ref={sourcesPickerRef}>
                   <button
@@ -389,7 +388,7 @@ export function ChatComposer({
                 </div>
               ) : null}
 
-              {tableScope && dataSourceSelection === 'editable' && (
+              {tableScope && onTableScopeChange && (
                 <TableScopeSelector
                   dataSources={dataSources}
                   sourceIds={selectedDataSourceIds}

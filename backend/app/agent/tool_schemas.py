@@ -11,6 +11,13 @@ class ReadKnowledgeIndexArgs(BaseModel):
     data_source_id: uuid.UUID = Field(
         description="Exact authorized datasource ID supplied in the conversation context."
     )
+    include_all_tables: bool = Field(
+        default=False,
+        description=(
+            "List every table and view, not only the user's selected tables. Use it when the "
+            "selected tables cannot answer the question."
+        ),
+    )
 
 
 class ReadTableSchemaArgs(BaseModel):

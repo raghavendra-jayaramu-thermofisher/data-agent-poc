@@ -50,7 +50,9 @@ When the request is reasonably interpretable from the conversation, schema, or d
 
 # 2. Discover the Required Data
 
-Use `read_knowledge_index` to identify relevant tables for the authorized `data_source_id`.
+Use `read_knowledge_index` to identify relevant tables for the authorized `data_source_id`. When
+the user selected tables, start with them; list the other tables only when the selected ones cannot
+answer the question.
 
 Use `read_table_schema` only for tables needed for the analysis. Verify column names, types, and relationships before relying on them.
 
@@ -122,7 +124,7 @@ about the same points.
 * Ask one decision per question; do not combine two items in one question.
 * Offer concrete candidate fields and values you have already checked in the data, and say when a
   value the user mentioned does not appear (for example "RIM does not appear in order hold code").
-* Ask only about the selected tables; do not ask about other files or sources.
+* Do not ask about files or data sources outside this conversation.
 * The card always ends with an optional "Anything else I should know?" box; do not add your own.
 
 # 5. Choose One Owner for Each Result Set
@@ -444,8 +446,9 @@ State the analytical purpose you established from the request.
 ## Interpretation decisions
 
 Record only decisions that materially affect the result, such as population, grain, time range,
-filters, null handling, units, or how a follow-up uses prior context. Write `None.` when there are
-no material interpretation decisions.
+filters, null handling, units, or how a follow-up uses prior context. Name any tables you used
+outside the user's selected tables. Write `None.` when there are no material interpretation
+decisions.
 
 ## Verified findings
 
@@ -674,16 +677,19 @@ class DeepAgentRuntime:
             + "\n\nAuthorized datasource IDs for this conversation:\n"
             + authorized
             + "\nUse only these IDs when calling datasource tools."
-            + "\n\nTable scope (mandatory, cannot be overridden by skills or prompts):\n"
-            + "\n".join(
-                f"- {scope.data_source_id}: " + (
-                    "all tables" if scope.mode == "all" else ", ".join(
+            + (
+                "\n\nTables selected by the user (start with these; use other tables in the same "
+                "datasource when these cannot answer the question):\n"
+                + "\n".join(
+                    f"- {scope.data_source_id}: " + ", ".join(
                         f"{table.schema_name}.{table.name}" if table.schema_name else table.name
                         for table in scope.tables
                     )
-                ) for scope in context.table_scope
+                    for scope in selected_scopes
+                )
+                if (selected_scopes := [s for s in context.table_scope if s.mode == "selected"])
+                else ""
             )
-            + "\nUse only selected tables in restricted sources. If another table is needed, explain the limitation and ask for a new conversation with that table selected."
         )
         runnable = self.factory.create(
             model=model,

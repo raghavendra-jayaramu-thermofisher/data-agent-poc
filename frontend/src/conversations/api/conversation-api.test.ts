@@ -9,6 +9,7 @@ import {
   listMessages,
   renameConversation,
   submitMessage,
+  updateTableScope,
 } from './conversation-api';
 
 // Resolve fetch after MSW starts instead of capturing the original fetch during imports.
@@ -30,6 +31,15 @@ describe('conversation API', () => {
       return HttpResponse.json({ id: 'c1', title: 'Saved analysis' });
     }));
     await expect(renameConversation('c1', 'Saved analysis')).resolves.toMatchObject({ id: 'c1', title: 'Saved analysis' });
+  });
+  it('saves the conversation table selection through its own endpoint', async () => {
+    const scope = [{ data_source_id: 's1', mode: 'selected' as const, tables: [{ schema: 'dbo', name: 'orders' }] }];
+    server.use(http.put('http://localhost:12201/api/v1/conversations/c1/table-scope', async ({ request }) => {
+      expect(request.headers.get('x-organization-id')).toBe('org-1');
+      expect(await request.json()).toEqual({ table_scope: scope });
+      return HttpResponse.json({ id: 'c1', table_scope: scope });
+    }));
+    await expect(updateTableScope('c1', scope)).resolves.toMatchObject({ id: 'c1', table_scope: scope });
   });
   it('creates a conversation with multiple datasource identities intact', async () => {
     server.use(http.post('http://localhost:12201/api/v1/conversations', async ({ request }) => {

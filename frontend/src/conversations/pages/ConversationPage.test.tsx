@@ -723,6 +723,38 @@ describe('durable conversation workspace', () => {
     expect(screen.queryByRole('button', { name: /execution ledger/i })).not.toBeInTheDocument();
   });
 
+  it('changes the tables of an existing conversation for its next questions', async () => {
+    baseHandlers();
+    const saved: unknown[] = [];
+    server.use(
+      http.get('http://localhost:12201/api/v1/data-sources/ds1/tables', () =>
+        HttpResponse.json({
+          knowledge_version_id: 'v1',
+          items: [{ schema: 'dbo', name: 'orders', object_type: 'table', column_count: 4 }],
+          next_cursor: null,
+        }),
+      ),
+      http.put('http://localhost:12201/api/v1/conversations/c1/table-scope', async ({ request }) => {
+        const body = (await request.json()) as { table_scope: unknown };
+        saved.push(body);
+        return HttpResponse.json({ ...conversation, table_scope: body.table_scope });
+      }),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Tables: All tables' }));
+    await user.click(await screen.findByRole('checkbox', { name: /orders/ }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('button', { name: 'Tables: orders' })).toBeInTheDocument();
+    expect(saved).toEqual([
+      {
+        table_scope: [
+          { data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] },
+        ],
+      },
+    ]);
+  });
+
   it('keeps source context behind the conversation menu and removes scrolling controls', async () => {
     baseHandlers();
     renderPage();
