@@ -2,12 +2,16 @@ import { Button, Modal } from '@heroui/react';
 import { BookOpen, Plus, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '../../api/generated/schema';
+import { notifications } from '../../components/notifications';
+import { knowledgeMarkdown } from '../knowledge-markdown';
 import { AnnotationForm } from './AnnotationForm';
+import { CopyIconButton } from './CopyIconButton';
 import { AnnotationRow } from './AnnotationRow';
 import type { AnnotationValues } from '../schemas/annotation-schema';
 
 type Annotation = components['schemas']['KnowledgeAnnotationResponse'];
 type Props = {
+  sourceName: string;
   annotations: Annotation[];
   canManage: boolean;
   onCreate(values: AnnotationValues): Promise<void>;
@@ -16,6 +20,7 @@ type Props = {
 };
 
 export function BusinessKnowledgePanel({
+  sourceName,
   annotations,
   canManage,
   onCreate,
@@ -31,6 +36,16 @@ export function BusinessKnowledgePanel({
       .toLocaleLowerCase()
       .includes(search.trim().toLocaleLowerCase()),
   );
+  const copyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(knowledgeMarkdown(sourceName, annotations, new Date()));
+      notifications.success(
+        `Copied ${annotations.length} business knowledge note${annotations.length === 1 ? '' : 's'}`,
+      );
+    } catch {
+      notifications.error('Unable to copy the business knowledge. Try again.');
+    }
+  };
   const toggleOne = (id: string) =>
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -58,12 +73,19 @@ export function BusinessKnowledgePanel({
             </button>
           )}
         </div>
-        {canManage && (
-          <Button variant="primary" onPress={() => setIsAdding(true)}>
-            <Plus size={14} aria-hidden="true" />
-            Add knowledge
-          </Button>
-        )}
+        <div className="business-knowledge-actions">
+          <CopyIconButton
+            label="Copy all business knowledge as Markdown"
+            isDisabled={annotations.length === 0}
+            onPress={() => void copyAll()}
+          />
+          {canManage && (
+            <Button variant="primary" onPress={() => setIsAdding(true)}>
+              <Plus size={14} aria-hidden="true" />
+              Add knowledge
+            </Button>
+          )}
+        </div>
       </div>
       <div className="annotation-list">
         {visible.map((annotation) => (

@@ -411,6 +411,17 @@
   gap: 16px;
   margin-bottom: 16px;
 }
+.knowledge-tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.business-knowledge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .annotation-list {
   display: flex;
   flex-direction: column;
@@ -707,9 +718,3 @@
   }
 }
 
-.knowledge-header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}

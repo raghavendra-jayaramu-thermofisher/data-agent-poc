@@ -75,7 +75,7 @@ describe('Knowledge detail', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Copy all schemas' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy all table schemas' }));
     expect(api.getCompactSchema).toHaveBeenCalledWith('ds-1');
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(compact));
     expect(screen.queryByRole('button', { name: /Refresh schema/ })).not.toBeInTheDocument();

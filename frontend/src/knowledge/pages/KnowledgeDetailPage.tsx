@@ -1,6 +1,6 @@
 import { Button, Tabs } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Copy, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { AppError } from '../../api/errors';
@@ -11,6 +11,7 @@ import { getDataSource } from '../../data-sources/api/data-source-api';
 import { useJobManager } from '../../jobs/JobManagerProvider';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/knowledge-api';
+import { CopyIconButton } from '../components/CopyIconButton';
 import { BusinessKnowledgePanel } from '../components/BusinessKnowledgePanel';
 import { KnowledgeDocumentsPanel } from '../components/KnowledgeDocumentsPanel';
 import { KnowledgeStatus } from '../components/KnowledgeStatus';
@@ -137,30 +138,6 @@ export function KnowledgeDetailPage() {
           <h1 id="knowledge-source-title">{source.data.name}</h1>
           <KnowledgeStatus status={updating ? 'generating' : (status.data?.status ?? 'empty')} />
         </div>
-        <div className="knowledge-header-actions">
-          {hasSchema && (
-            <Button
-              variant="secondary"
-              isPending={copySchemas.isPending}
-              isDisabled={Boolean(updating)}
-              onPress={() => copySchemas.mutate()}
-            >
-              <Copy size={14} aria-hidden="true" />
-              Copy all schemas
-            </Button>
-          )}
-          {canManage && (
-            <Button
-              variant={hasSchema ? 'secondary' : 'primary'}
-              isPending={Boolean(updating)}
-              isDisabled={Boolean(updating)}
-              onPress={() => generate.mutate()}
-            >
-              <RefreshCw size={14} aria-hidden="true" />
-              {updating ? 'Updating…' : hasSchema ? 'Refresh schema' : 'Generate schema'}
-            </Button>
-          )}
-        </div>
       </header>
       {generate.isError && (
         <p role="alert" className="knowledge-inline-error">
@@ -187,6 +164,27 @@ export function KnowledgeDetailPage() {
           </Tabs.List>
         </Tabs.ListContainer>
         <Tabs.Panel id="explorer">
+          <div className="knowledge-tab-actions">
+            {hasSchema && (
+              <CopyIconButton
+                label="Copy all table schemas"
+                isPending={copySchemas.isPending}
+                isDisabled={Boolean(updating)}
+                onPress={() => copySchemas.mutate()}
+              />
+            )}
+            {canManage && (
+              <Button
+                variant={hasSchema ? 'secondary' : 'primary'}
+                isPending={Boolean(updating)}
+                isDisabled={Boolean(updating)}
+                onPress={() => generate.mutate()}
+              >
+                <RefreshCw size={14} aria-hidden="true" />
+                {updating ? 'Updating…' : hasSchema ? 'Refresh schema' : 'Generate schema'}
+              </Button>
+            )}
+          </div>
           {!hasSchema ? (
             <div className="knowledge-empty">
               <h2>{updating ? 'Preparing your schema' : 'Schema not set up yet'}</h2>
@@ -229,6 +227,7 @@ export function KnowledgeDetailPage() {
             />
           ) : (
             <BusinessKnowledgePanel
+              sourceName={source.data.name}
               annotations={annotations.data ?? []}
               canManage={canManage}
               onCreate={createAnnotation}
