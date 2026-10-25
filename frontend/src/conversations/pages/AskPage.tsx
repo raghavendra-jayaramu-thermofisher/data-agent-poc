@@ -54,9 +54,7 @@ export function AskPage() {
     preferences.set('lastSelectedModelProfileId', id);
   };
 
-  if (dataSources.isLoading || profiles.isLoading) {
-    return <PageState title="Preparing analysis workspace" loading />;
-  }
+  const isPreparing = dataSources.isLoading || profiles.isLoading;
 
   if (dataSources.isError || profiles.isError) {
     return (
@@ -140,7 +138,7 @@ export function AskPage() {
               {submitError}
             </div>
           )}
-          {activeSources.length === 0 && (
+          {!isPreparing && activeSources.length === 0 && (
             <div className="p-4 mb-6 bg-[var(--db-warning-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-warning)]">
               No active data sources found. Connect or activate a data source to begin.
             </div>
@@ -160,7 +158,7 @@ export function AskPage() {
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}
           isSubmitting={isSubmitting}
-          disabled={activeSources.length === 0}
+          disabled={!isPreparing && activeSources.length === 0}
           placement="inline"
         />
       </main>
