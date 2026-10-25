@@ -11,6 +11,7 @@ import {
   Settings,
   Lock,
   LayoutTemplate,
+  CircleDollarSign,
 } from 'lucide-react';
 import { Modal } from '@heroui/react';
 import { ALL_SIDEBAR_TABS, type SidebarTabKey, type TabVisibilityMap } from './useSidebarDisplay';
@@ -42,12 +43,16 @@ export function DisplaySettingsModal({
   onClose,
   visibility,
   onToggleTab,
+  showCost,
+  onToggleShowCost,
   onResetDefaults,
 }: {
   isOpen: boolean;
   onClose(): void;
   visibility: TabVisibilityMap;
   onToggleTab(key: SidebarTabKey): void;
+  showCost: boolean;
+  onToggleShowCost(): void;
   onResetDefaults(): void;
 }) {
   if (!isOpen) return null;
@@ -79,7 +84,7 @@ export function DisplaySettingsModal({
                   Display settings
                 </h3>
                 <p className="text-xs text-[var(--db-text-secondary)]">
-                  Choose items shown in navigation and More
+                  Choose what the app shows
                 </p>
               </div>
             </div>
@@ -96,6 +101,7 @@ export function DisplaySettingsModal({
 
           {/* Tab List */}
           <div className="p-4 space-y-2.5 max-h-[60vh] overflow-y-auto">
+            <h4 className="text-[11px] font-semibold text-[var(--db-text-muted)]">Navigation</h4>
             {ALL_SIDEBAR_TABS.filter(({ key }) => key !== '/settings').map(
               ({ key, label, fixed }) => {
                 const Icon = TAB_ICONS[key];
@@ -164,6 +170,49 @@ export function DisplaySettingsModal({
                 );
               },
             )}
+
+            <h4 className="pt-2 text-[11px] font-semibold text-[var(--db-text-muted)]">Analysis</h4>
+            <div
+              className={`flex items-center justify-between p-3 rounded border transition-all ${
+                showCost
+                  ? 'border-[var(--db-border-default)] bg-[var(--db-surface-raised)] hover:bg-[var(--db-surface-muted)]'
+                  : 'border-[var(--db-surface-hover)] bg-[var(--db-surface-muted)] opacity-75'
+              }`}
+            >
+              <div className="flex items-start gap-3 min-w-0 pr-2">
+                <div
+                  className={`w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5 ${
+                    showCost
+                      ? 'bg-[var(--db-surface-muted)] text-[var(--db-primary)]'
+                      : 'bg-[var(--db-surface-hover)] text-[var(--db-text-muted)]'
+                  }`}
+                >
+                  <CircleDollarSign size={15} />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-medium text-xs text-[var(--db-text-primary)]">Cost</span>
+                  <p className="text-[11px] text-[var(--db-text-muted)] leading-snug">
+                    Live cost while an analysis runs and the total cost of each answer.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Show cost"
+                aria-checked={showCost}
+                onClick={onToggleShowCost}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-150 focus:outline-none ${
+                  showCost ? 'bg-[var(--db-primary)]' : 'bg-[var(--db-border-default)]'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition duration-150 ${
+                    showCost ? 'translate-x-4.5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Footer */}

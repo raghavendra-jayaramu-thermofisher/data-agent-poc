@@ -28,6 +28,7 @@ import { BRANDING } from '../lib/branding';
 import { useSidebarDisplay } from './useSidebarDisplay';
 import { DisplaySettingsModal } from './DisplaySettingsModal';
 import { preferences } from '../lib/preferences';
+import { setShowCost, useShowCost } from '../lib/useShowCost';
 import { BrandLogo } from '../components/BrandLogo';
 import { UserAvatar } from '../components/UserAvatar';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
@@ -87,6 +88,7 @@ export function AppShell() {
   const { user, signOut } = useAuth();
   const { organizations, activeOrganization, setActiveOrganization } = useOrganization();
   const { visibility, isTabVisible, toggleTab, resetDefaults } = useSidebarDisplay();
+  const showCost = useShowCost();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
@@ -400,7 +402,12 @@ export function AppShell() {
         onClose={() => setDisplaySettingsOpen(false)}
         visibility={visibility}
         onToggleTab={toggleTab}
-        onResetDefaults={resetDefaults}
+        showCost={showCost}
+        onToggleShowCost={() => setShowCost(!showCost)}
+        onResetDefaults={() => {
+          resetDefaults();
+          setShowCost(true);
+        }}
       />
       <DeleteAllChatsModal
         isOpen={deleteAllOpen}

@@ -10,6 +10,7 @@ export type Preferences = {
   askDataSourceIdsByScope?: Record<string, string[]>;
   askTableSelectionsByScope?: Record<string, components['schemas']['SourceTableScope'][]>;
   lastSelectedModelProfileId?: string | null;
+  showCost?: boolean;
 };
 function readAll(): Preferences {
   try {
