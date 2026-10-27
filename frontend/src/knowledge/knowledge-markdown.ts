@@ -31,5 +31,20 @@ export function knowledgeMarkdown(sourceName: string, annotations: Annotation[],
     year: 'numeric',
   });
   const count = `${annotations.length} note${annotations.length === 1 ? '' : 's'}`;
-  return [`# Business knowledge: ${sourceName}\n\n${count} · copied ${date}\n`, ...notes].join('\n');
+  return [`# Business knowledge: ${sourceName}\n\n${count} · copied ${date}\n`, ...notes].join(
+    '\n',
+  );
+}
+
+/** Saves the exported notes ZIP under a name taken from the data source. */
+export function saveKnowledgeZip(file: Blob, sourceName: string) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  const name = sourceName.replace(/[^\p{L}\p{N}._ -]+/gu, '_').replace(/^[ ._]+|[ ._]+$/g, '');
+  link.download = `${name.slice(0, 100) || 'knowledge'} - business knowledge.zip`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

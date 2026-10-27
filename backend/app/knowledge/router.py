@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,10 +22,12 @@ from app.knowledge.schemas import (
     KnowledgeAnnotationUpdate,
     KnowledgeDocumentResponse,
     KnowledgeDocumentSummary,
+    KnowledgeImportResponse,
     KnowledgeJobResponse,
     KnowledgeStatusResponse,
     KnowledgeVersionResponse,
 )
+from app.knowledge.markdown_io import MAX_IMPORT_FILE_BYTES, MAX_IMPORT_FILES, export_zip
 from app.knowledge.service import KnowledgeService
 from app.organizations.models import Organization, OrganizationMembership
 
@@ -229,6 +231,53 @@ async def list_annotations(
         return []
     items = await service.repo.list_annotations(base.id, scope_type=scope_type, scope_key=scope_key)
     return [KnowledgeAnnotationResponse.model_validate(item) for item in items]
+
+
+@router.get("/data-sources/{data_source_id}/annotations/export")
+async def export_annotations(
+    data_source_id: uuid.UUID,
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    organization, _ = context
+    service = KnowledgeService(session, settings)
+    await service.require_source(data_source_id, organization.id)
+    base = await service.repo.get_base_for_source(data_source_id, organization.id)
+    items = await service.repo.list_annotations(base.id) if base else []
+    return Response(
+        content=export_zip(items),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="business-knowledge.zip"'},
+    )
+
+
+@router.post("/data-sources/{data_source_id}/annotations/import", response_model=KnowledgeImportResponse)
+async def import_annotations(
+    data_source_id: uuid.UUID,
+    files: list[UploadFile] = File(...),
+    on_duplicate: Literal["skip", "replace"] = "skip",
+    dry_run: bool = False,
+    current_user: User = Depends(get_current_user),
+    context: tuple[Organization, OrganizationMembership] = Depends(get_current_organization),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeImportResponse:
+    organization, membership = context
+    require_admin(membership)
+    if len(files) > MAX_IMPORT_FILES:
+        raise AppError(
+            "KNOWLEDGE_IMPORT_TOO_MANY_FILES", f"Import at most {MAX_IMPORT_FILES} files at a time.", 422
+        )
+    uploads = [(file.filename or "unnamed.md", await file.read(MAX_IMPORT_FILE_BYTES + 1)) for file in files]
+    return await KnowledgeService(session, settings).import_notes(
+        data_source_id=data_source_id,
+        organization_id=organization.id,
+        user_id=current_user.id,
+        files=uploads,
+        replace_duplicates=on_duplicate == "replace",
+        dry_run=dry_run,
+    )
 
 
 @router.post("/data-sources/{data_source_id}/annotations", response_model=KnowledgeAnnotationResponse, status_code=201)

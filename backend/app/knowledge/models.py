@@ -100,6 +100,7 @@ class KnowledgeAnnotation(TimestampMixin, Base):
     )
     scope_type: Mapped[str] = mapped_column(String(30), nullable=False)
     scope_key: Mapped[str | None] = mapped_column(String(600), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False

@@ -736,6 +736,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Annotations */
+        get: operations["export_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Annotations */
+        post: operations["import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge/data-sources/{data_source_id}/documents": {
         parameters: {
             query?: never;
@@ -1147,6 +1181,11 @@ export interface components {
             file: string;
             /** Name */
             name: string;
+        };
+        /** Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post */
+        Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post: {
+            /** Files */
+            files: string[];
         };
         /** Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post */
         Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post: {
@@ -1829,6 +1868,8 @@ export interface components {
              * @enum {string}
              */
             scope_type: "datasource" | "table" | "column" | "metric";
+            /** Title */
+            title?: string | null;
         };
         /** KnowledgeAnnotationResponse */
         KnowledgeAnnotationResponse: {
@@ -1858,6 +1899,8 @@ export interface components {
             scope_key: string | null;
             /** Scope Type */
             scope_type: string;
+            /** Title */
+            title: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -1868,6 +1911,8 @@ export interface components {
         KnowledgeAnnotationUpdate: {
             /** Content */
             content: string;
+            /** Title */
+            title?: string | null;
         };
         /** KnowledgeDocumentResponse */
         KnowledgeDocumentResponse: {
@@ -1920,6 +1965,42 @@ export interface components {
             };
             /** Title */
             title: string;
+        };
+        /**
+         * KnowledgeImportItem
+         * @description What happened (or, for a dry run, would happen) to one uploaded file.
+         */
+        KnowledgeImportItem: {
+            /** Filename */
+            filename: string;
+            /** Message */
+            message?: string | null;
+            /** Scope Key */
+            scope_key?: string | null;
+            /** Scope Type */
+            scope_type?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "updated" | "skipped" | "error";
+            /** Title */
+            title?: string | null;
+        };
+        /** KnowledgeImportResponse */
+        KnowledgeImportResponse: {
+            /** Created */
+            created: number;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Failed */
+            failed: number;
+            /** Items */
+            items: components["schemas"]["KnowledgeImportItem"][];
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
         };
         /** KnowledgeJobResponse */
         KnowledgeJobResponse: {
@@ -4788,6 +4869,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeAnnotationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post: {
+        parameters: {
+            query?: {
+                on_duplicate?: "skip" | "replace";
+                dry_run?: boolean;
+            };
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeImportResponse"];
                 };
             };
             /** @description Validation Error */

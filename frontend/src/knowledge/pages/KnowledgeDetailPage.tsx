@@ -227,12 +227,14 @@ export function KnowledgeDetailPage() {
             />
           ) : (
             <BusinessKnowledgePanel
+              dataSourceId={dataSourceId}
               sourceName={source.data.name}
               annotations={annotations.data ?? []}
               canManage={canManage}
               onCreate={createAnnotation}
               onUpdate={updateAnnotation}
               onDelete={deleteAnnotation}
+              onImported={invalidateAnnotations}
             />
           )}
         </Tabs.Panel>

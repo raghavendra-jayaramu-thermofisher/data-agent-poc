@@ -46,6 +46,7 @@ export const annotation: S['KnowledgeAnnotationResponse'] = {
   created_by: 'u1',
   scope_type: 'datasource',
   scope_key: null,
+  title: null,
   content: '# Fiscal calendar\n\nThe fiscal year starts on October 1.',
   created_at: time,
   updated_at: time,

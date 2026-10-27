@@ -1,3 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { annotationSchema } from './annotation-schema';
-describe('knowledge annotations', () => { it('allows datasource annotations without a key', () => { expect(annotationSchema.safeParse({ scopeType: 'datasource', scopeKey: '', content: 'Use settled orders only.' }).success).toBe(true); }); it('requires a key for metric/table/column annotations', () => { expect(annotationSchema.safeParse({ scopeType: 'metric', scopeKey: '', content: 'Revenue definition' }).success).toBe(false); expect(annotationSchema.safeParse({ scopeType: 'metric', scopeKey: 'revenue', content: 'Revenue definition' }).success).toBe(true); }); });
+describe('knowledge annotations', () => {
+  it('allows datasource annotations without a key', () => {
+    expect(
+      annotationSchema.safeParse({
+        scopeType: 'datasource',
+        scopeKey: '',
+        content: 'Use settled orders only.',
+      }).success,
+    ).toBe(true);
+  });
+  it('requires a key for metric/table/column annotations', () => {
+    expect(
+      annotationSchema.safeParse({
+        scopeType: 'metric',
+        scopeKey: '',
+        content: 'Revenue definition',
+      }).success,
+    ).toBe(false);
+    expect(
+      annotationSchema.safeParse({
+        scopeType: 'metric',
+        scopeKey: 'revenue',
+        content: 'Revenue definition',
+      }).success,
+    ).toBe(true);
+  });
+});

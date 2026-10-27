@@ -6,6 +6,7 @@ const note = (id: string, scope_type: string, scope_key: string | null, content:
   knowledge_base_id: 'kb1',
   scope_type,
   scope_key,
+  title: null,
   content,
   created_by: 'u1',
   created_at: '2026-10-25T00:00:00Z',

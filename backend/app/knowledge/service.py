@@ -14,7 +14,13 @@ from app.data_sources.repository import DataSourceRepository
 from app.jobs.service import JobService
 from app.knowledge.models import KnowledgeAnnotation, KnowledgeBase, KnowledgeVersion
 from app.knowledge.repository import KnowledgeRepository
-from app.knowledge.schemas import KnowledgeAnnotationCreate, KnowledgeAnnotationUpdate
+from app.knowledge.markdown_io import NoteFileError, parse_note
+from app.knowledge.schemas import (
+    KnowledgeAnnotationCreate,
+    KnowledgeAnnotationUpdate,
+    KnowledgeImportItem,
+    KnowledgeImportResponse,
+)
 
 
 class KnowledgeService:
@@ -119,6 +125,7 @@ class KnowledgeService:
             knowledge_base_id=base.id,
             scope_type=payload.scope_type,
             scope_key=payload.scope_key,
+            title=payload.title,
             content=payload.content.strip(),
             created_by=user_id,
         )
@@ -137,6 +144,8 @@ class KnowledgeService:
         if item is None:
             raise AppError("KNOWLEDGE_ANNOTATION_NOT_FOUND", "Knowledge annotation not found.", 404)
         item.content = payload.content.strip()
+        if payload.title is not None:
+            item.title = payload.title.strip() or None
         item.updated_at = utc_now()
         await self.session.commit()
         return item
@@ -147,3 +156,82 @@ class KnowledgeService:
             raise AppError("KNOWLEDGE_ANNOTATION_NOT_FOUND", "Knowledge annotation not found.", 404)
         await self.session.delete(item)
         await self.session.commit()
+
+    async def import_notes(
+        self,
+        *,
+        data_source_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        files: list[tuple[str, bytes]],
+        replace_duplicates: bool,
+        dry_run: bool,
+    ) -> KnowledgeImportResponse:
+        """Import Markdown notes. A duplicate has the same scope, key and title; each file is judged alone."""
+        await self.require_source(data_source_id, organization_id)
+        base = await self.repo.get_base_for_source(data_source_id, organization_id)
+        existing = await self.repo.list_annotations(base.id) if base else []
+        by_identity = {self._identity(item.scope_type, item.scope_key, item.title): item for item in existing}
+        items: list[KnowledgeImportItem] = []
+        new_notes: list[KnowledgeAnnotationCreate] = []
+        seen: set[tuple[str, str, str]] = set()
+        for filename, raw in files:
+            try:
+                payload = parse_note(filename, raw).payload
+            except NoteFileError as error:
+                items.append(KnowledgeImportItem(filename=filename, status="error", message=str(error)))
+                continue
+            identity = self._identity(payload.scope_type, payload.scope_key, payload.title)
+            info = {
+                "filename": filename,
+                "title": payload.title,
+                "scope_type": payload.scope_type,
+                "scope_key": payload.scope_key,
+            }
+            if identity in seen:
+                message = "Another file in this upload has the same scope, key and title."
+                items.append(KnowledgeImportItem(**info, status="skipped", message=message))
+                continue
+            seen.add(identity)
+            match = by_identity.get(identity)
+            if match is None:
+                new_notes.append(payload)
+                items.append(KnowledgeImportItem(**info, status="created"))
+            elif replace_duplicates:
+                if not dry_run:
+                    match.content = payload.content
+                    match.updated_at = utc_now()
+                items.append(KnowledgeImportItem(**info, status="updated"))
+            else:
+                items.append(KnowledgeImportItem(**info, status="skipped", message="Already exists."))
+        if not dry_run:
+            if new_notes:
+                base = await self.ensure_base(data_source_id, organization_id)
+                for payload in new_notes:
+                    self.repo.add_annotation(
+                        KnowledgeAnnotation(
+                            knowledge_base_id=base.id,
+                            scope_type=payload.scope_type,
+                            scope_key=payload.scope_key,
+                            title=payload.title,
+                            content=payload.content,
+                            created_by=user_id,
+                        )
+                    )
+            await self.session.commit()
+
+        def count(status: str) -> int:
+            return sum(item.status == status for item in items)
+
+        return KnowledgeImportResponse(
+            dry_run=dry_run,
+            created=count("created"),
+            updated=count("updated"),
+            skipped=count("skipped"),
+            failed=count("error"),
+            items=items,
+        )
+
+    @staticmethod
+    def _identity(scope_type: str, scope_key: str | None, title: str | None) -> tuple[str, str, str]:
+        return (scope_type, (scope_key or "").casefold(), (title or "").casefold())

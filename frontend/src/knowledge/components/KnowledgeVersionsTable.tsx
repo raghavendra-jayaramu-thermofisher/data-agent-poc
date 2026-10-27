@@ -68,7 +68,11 @@ export function KnowledgeVersionsTable({ versions }: { versions: Version[] }) {
                         type="button"
                         onClick={() => handleCopy(version.id, version.schema_fingerprint)}
                         className="p-1 rounded text-[var(--db-text-muted)] hover:text-[var(--db-primary)] hover:bg-[var(--db-surface-hover)] transition-colors cursor-pointer"
-                        title={copiedId === version.id ? 'Copied full fingerprint!' : 'Copy full fingerprint'}
+                        title={
+                          copiedId === version.id
+                            ? 'Copied full fingerprint!'
+                            : 'Copy full fingerprint'
+                        }
                       >
                         {copiedId === version.id ? (
                           <Check size={11} className="text-emerald-500" />

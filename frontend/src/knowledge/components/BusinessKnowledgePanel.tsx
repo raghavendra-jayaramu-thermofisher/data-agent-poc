@@ -1,34 +1,42 @@
-import { Button, Modal } from '@heroui/react';
-import { BookOpen, Plus, Search, X } from 'lucide-react';
+import { Button, Modal, Tooltip } from '@heroui/react';
+import { BookOpen, Download, Plus, Search, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '../../api/generated/schema';
 import { notifications } from '../../components/notifications';
-import { knowledgeMarkdown } from '../knowledge-markdown';
+import * as api from '../api/knowledge-api';
+import { knowledgeMarkdown, saveKnowledgeZip } from '../knowledge-markdown';
 import { AnnotationForm } from './AnnotationForm';
 import { CopyIconButton } from './CopyIconButton';
 import { AnnotationRow } from './AnnotationRow';
+import { ImportKnowledgeModal } from './ImportKnowledgeModal';
 import type { AnnotationValues } from '../schemas/annotation-schema';
 
 type Annotation = components['schemas']['KnowledgeAnnotationResponse'];
 type Props = {
+  dataSourceId: string;
   sourceName: string;
   annotations: Annotation[];
   canManage: boolean;
   onCreate(values: AnnotationValues): Promise<void>;
   onUpdate(annotationId: string, content: string): Promise<void>;
   onDelete(annotationId: string): Promise<void>;
+  onImported(): Promise<void> | void;
 };
 
 export function BusinessKnowledgePanel({
+  dataSourceId,
   sourceName,
   annotations,
   canManage,
   onCreate,
   onUpdate,
   onDelete,
+  onImported,
 }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const visible = annotations.filter((item) =>
@@ -44,6 +52,16 @@ export function BusinessKnowledgePanel({
       );
     } catch {
       notifications.error('Unable to copy the business knowledge. Try again.');
+    }
+  };
+  const exportAll = async () => {
+    setExporting(true);
+    try {
+      saveKnowledgeZip(await api.exportAnnotations(dataSourceId), sourceName);
+    } catch {
+      notifications.error('Unable to export the business knowledge. Try again.');
+    } finally {
+      setExporting(false);
     }
   };
   const toggleOne = (id: string) =>
@@ -79,6 +97,25 @@ export function BusinessKnowledgePanel({
             isDisabled={annotations.length === 0}
             onPress={() => void copyAll()}
           />
+          <Tooltip delay={350}>
+            <Button
+              isIconOnly
+              variant="secondary"
+              aria-label="Export business knowledge as Markdown files"
+              isDisabled={annotations.length === 0}
+              isPending={exporting}
+              onPress={() => void exportAll()}
+            >
+              <Download size={15} aria-hidden="true" />
+            </Button>
+            <Tooltip.Content>Export as Markdown files (.zip)</Tooltip.Content>
+          </Tooltip>
+          {canManage && (
+            <Button variant="secondary" onPress={() => setIsImporting(true)}>
+              <Upload size={14} aria-hidden="true" />
+              Import
+            </Button>
+          )}
           {canManage && (
             <Button variant="primary" onPress={() => setIsAdding(true)}>
               <Plus size={14} aria-hidden="true" />
@@ -117,6 +154,22 @@ export function BusinessKnowledgePanel({
           </div>
         )}
       </div>
+      {canManage && isImporting && (
+        <ImportKnowledgeModal
+          dataSourceId={dataSourceId}
+          onClose={() => setIsImporting(false)}
+          onImported={(result) => {
+            setIsImporting(false);
+            void onImported();
+            const added = result.created + result.updated;
+            notifications.success(
+              `Imported ${added} note${added === 1 ? '' : 's'}` +
+                (result.skipped ? `, skipped ${result.skipped}` : '') +
+                (result.failed ? `, ${result.failed} failed` : ''),
+            );
+          }}
+        />
+      )}
       {canManage && isAdding && (
         <Modal.Backdrop
           isOpen
