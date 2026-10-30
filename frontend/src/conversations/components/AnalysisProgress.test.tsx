@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ManagedJob } from '../../jobs/types';
 import { AnalysisProgress } from './AnalysisProgress';
+import { setShowCost } from '../../lib/useShowCost';
 
 const managedJob: ManagedJob = {
   job: {
@@ -101,6 +102,10 @@ describe('AnalysisProgress', () => {
       />,
     );
     expect(screen.getByLabelText('Cost so far $0.0061')).toHaveTextContent('$0.0061');
+
+    act(() => setShowCost(false));
+    expect(screen.queryByLabelText(/Cost so far/)).not.toBeInTheDocument();
+    expect(screen.queryByText('$0.0061')).not.toBeInTheDocument();
   });
 
   it('uses a clear stop action and prevents repeated cancellation', () => {

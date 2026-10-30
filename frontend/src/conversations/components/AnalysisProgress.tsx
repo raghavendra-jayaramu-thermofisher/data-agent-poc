@@ -4,6 +4,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import type { ManagedJob } from '../../jobs/types';
 import { getSafeJobEventLabel } from '../../jobs/sse/job-events';
 import { formatCost } from '../../agent/lib/execution-format';
+import { useShowCost } from '../../lib/useShowCost';
 import './AnalysisProgress.css';
 
 function secondsBetween(start: string, endMs: number) {
@@ -38,7 +39,8 @@ export function AnalysisProgress({
     : (getSafeJobEventLabel(events.at(-1)) ??
       (job.status === 'queued' ? 'Waiting to start' : 'Working on your request…'));
   const elapsed = secondsBetween(job.created_at, now);
-  const liveCost = latestJobCost(events);
+  const showCost = useShowCost();
+  const liveCost = showCost ? latestJobCost(events) : null;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);

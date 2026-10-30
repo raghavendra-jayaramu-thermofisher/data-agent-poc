@@ -32,12 +32,14 @@ export function AnnotationRow({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const expanded = expandedProp ?? internalExpanded;
   const title =
+    annotation.title?.trim() ||
     annotation.content
       .trim()
       .split('\n')[0]
       ?.replace(/^[#*\x60\s-]+/, '')
       .replace(/[*\x60]+$/, '')
-      .trim() || 'Business knowledge';
+      .trim() ||
+    'Business knowledge';
   const scope =
     (
       { datasource: 'Data source', table: 'Table', column: 'Column', metric: 'Metric' } as Record<

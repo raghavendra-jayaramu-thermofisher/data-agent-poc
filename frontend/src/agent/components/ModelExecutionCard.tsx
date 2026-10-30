@@ -2,6 +2,7 @@ import { Bot, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatLocalDateTime } from '../../lib/datetime';
 import type { ModelExecution } from '../api/execution-api';
 import { formatCost, formatElapsed, sanitizeOperationalText } from '../lib/execution-format';
+import { useShowCost } from '../../lib/useShowCost';
 
 function token(value: number | null) {
   return value == null ? '—' : value.toLocaleString();
@@ -10,6 +11,7 @@ function token(value: number | null) {
 export function ModelExecutionCard({ execution }: { execution: ModelExecution }) {
   const error = sanitizeOperationalText(execution.error_message);
   const isSucceeded = execution.status === 'succeeded';
+  const showCost = useShowCost();
 
   return (
     <div className="border border-[var(--db-border-default)] bg-[var(--db-surface-raised)] rounded-lg p-2.5 text-xs mb-2 shadow-2xs">
@@ -23,6 +25,9 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
           <Bot size={13} className="text-[var(--db-primary)]" />
           <strong className="font-semibold text-[var(--db-text-primary)]">{execution.model_name}</strong>
           <span className="text-[10px] text-[var(--db-text-muted)]">({execution.phase || 'Model Call'})</span>
+          {execution.reasoning_effort && (
+            <span className="text-[10px] text-[var(--db-text-muted)]">{execution.reasoning_effort} effort</span>
+          )}
         </div>
 
         <span className="text-[11px] text-[var(--db-text-muted)]">
@@ -43,15 +48,17 @@ export function ModelExecutionCard({ execution }: { execution: ModelExecution })
           <span className="text-[var(--db-text-muted)] block">Total Tokens</span>
           <span className="font-semibold font-mono text-[var(--db-text-primary)]">{token(execution.total_tokens)}</span>
         </div>
-        <div>
-          <span className="text-[var(--db-text-muted)] block">Cost</span>
-          <span
-            className="font-semibold font-mono text-[var(--db-text-primary)]"
-            title={execution.cost == null ? 'No price set for this model profile' : undefined}
-          >
-            {formatCost(execution.cost)}
-          </span>
-        </div>
+        {showCost && (
+          <div>
+            <span className="text-[var(--db-text-muted)] block">Cost</span>
+            <span
+              className="font-semibold font-mono text-[var(--db-text-primary)]"
+              title={execution.cost == null ? 'No price set for this model profile' : undefined}
+            >
+              {formatCost(execution.cost)}
+            </span>
+          </div>
+        )}
         <div>
           <span className="text-[var(--db-text-muted)] block">Started</span>
           <span className="font-mono text-[var(--db-text-primary)] truncate block">{formatLocalDateTime(execution.started_at)}</span>

@@ -169,8 +169,8 @@ export function ConversationActions({
                   <p>No data sources are recorded for this conversation.</p>
                 )}
                 <p className="conversation-details-note">
-                  Source and table scope are fixed for this conversation. Start a new analysis to
-                  use a different scope.
+                  The agent starts with these tables and uses others when needed. Change them with
+                  the Tables button under the message box.
                 </p>
               </Modal.Body>
               <Modal.Footer>

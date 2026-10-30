@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DataSource } from '../../api/types';
+import type { DataSource, ModelProfile } from '../../api/types';
+import type { ReasoningEffort } from '../reasoning-effort';
 import { ChatComposer } from './ChatComposer';
 
 const templates = vi.hoisted(() => [
@@ -42,6 +43,8 @@ function EditableComposer({ onSubmit }: { onSubmit(): void }) {
       profiles={[]}
       selectedProfileId={null}
       onProfileIdChange={() => undefined}
+      reasoningEffort={null}
+      onReasoningEffortChange={() => undefined}
       placement="inline"
     />
   );
@@ -56,6 +59,7 @@ describe('ChatComposer data-source scope', () => {
       return <ChatComposer question={question} onQuestionChange={setQuestion} onSubmit={onSubmit}
         dataSources={[]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined}
         profiles={[]} selectedProfileId={null} onProfileIdChange={() => undefined}
+        reasoningEffort={null} onReasoningEffortChange={() => undefined}
         dataSourceSelection="hidden" isSubmitting={busy} />;
     }
     const view = render(<DraftComposer busy />);
@@ -104,6 +108,8 @@ describe('ChatComposer data-source scope', () => {
         profiles={[]}
         selectedProfileId={null}
         onProfileIdChange={() => undefined}
+        reasoningEffort={null}
+        onReasoningEffortChange={() => undefined}
         dataSourceSelection="hidden"
         inputLabel="Ask a follow-up"
       />,
@@ -143,7 +149,7 @@ describe('ChatComposer data-source scope', () => {
 
 function SkillComposer({ onSend, followUp = false }: { onSend: (text: string) => void; followUp?: boolean }) {
   const [question, setQuestion] = useState('Show revenue');
-  return <ChatComposer question={question} onQuestionChange={setQuestion} onSubmit={() => onSend(question)} dataSources={[source]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined} profiles={[]} selectedProfileId={null} onProfileIdChange={() => undefined} dataSourceSelection={followUp ? 'hidden' : 'editable'} />;
+  return <ChatComposer question={question} onQuestionChange={setQuestion} onSubmit={() => onSend(question)} dataSources={[source]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined} profiles={[]} selectedProfileId={null} onProfileIdChange={() => undefined} reasoningEffort={null} onReasoningEffortChange={() => undefined} dataSourceSelection={followUp ? 'hidden' : 'editable'} />;
 }
 describe('composer template selection', () => {
   it('searches templates, preserves the question, and submits the selected command', async () => {
@@ -185,5 +191,64 @@ describe('composer template selection', () => {
     expect(screen.getByText('Trend report')).toBeInTheDocument();
     await user.type(input, 'Last month'); await user.keyboard('{Enter}');
     expect(send).toHaveBeenCalledWith('/trend Last month');
+  });
+});
+
+function profile(id: string, modelName: string, efforts: ReasoningEffort[], defaultEffort: ReasoningEffort | null, isDefault = false): ModelProfile {
+  return {
+    id, organization_id: 'org1', connection_id: 'c1', display_name: id, model_name: modelName, settings: {},
+    is_default: isDefault, enabled: true, created_at: '2026-10-25T00:00:00Z', updated_at: '2026-10-25T00:00:00Z',
+    reasoning_efforts: efforts, default_reasoning_effort: defaultEffort,
+  };
+}
+
+const reasoningProfile = profile('GPT 5.5', 'gpt-5.5', ['none', 'low', 'medium', 'high', 'xhigh'], 'medium', true);
+const lowOnlyProfile = profile('O3', 'o3', ['low', 'medium', 'high'], 'medium');
+const plainProfile = profile('GPT 4o', 'gpt-4o', [], null);
+
+function EffortComposer({ profiles, onSend }: { profiles: ModelProfile[]; onSend(effort: ReasoningEffort | null): void }) {
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [effort, setEffort] = useState<ReasoningEffort | null>(null);
+  return (
+    <ChatComposer question="Show revenue" onQuestionChange={() => undefined} onSubmit={() => onSend(effort)}
+      dataSources={[]} selectedDataSourceIds={['ds1']} onDataSourceIdsChange={() => undefined}
+      profiles={profiles} selectedProfileId={profileId} onProfileIdChange={setProfileId}
+      reasoningEffort={effort} onReasoningEffortChange={setEffort} dataSourceSelection="hidden" />
+  );
+}
+
+describe('composer reasoning effort', () => {
+  it('offers only the efforts the default model supports and sends the chosen one', async () => {
+    const user = userEvent.setup(); const send = vi.fn();
+    render(<EffortComposer profiles={[reasoningProfile, plainProfile]} onSend={send} />);
+
+    await user.click(screen.getByRole('button', { name: 'Effort: Default' }));
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['Model defaultMedium', 'None', 'Low', 'Medium', 'High', 'Extra high']);
+    await user.click(screen.getByRole('option', { name: 'High' }));
+    expect(screen.queryByRole('listbox', { name: 'Select reasoning effort' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(send).toHaveBeenLastCalledWith('high');
+  });
+
+  it('hides the control for models without reasoning and resets an effort the new model rejects', async () => {
+    const user = userEvent.setup(); const send = vi.fn();
+    render(<EffortComposer profiles={[reasoningProfile, lowOnlyProfile, plainProfile]} onSend={send} />);
+
+    await user.click(screen.getByRole('button', { name: 'Effort: Default' }));
+    await user.click(screen.getByRole('option', { name: 'High' }));
+    // o3 also accepts high, so the choice stays.
+    await user.click(screen.getByRole('button', { name: 'Default model' }));
+    await user.click(screen.getByRole('option', { name: /O3/ }));
+    expect(screen.getByRole('button', { name: 'Effort: High' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Effort: High' }));
+    await user.click(screen.getByRole('option', { name: 'Low' }));
+    await user.click(screen.getByRole('button', { name: 'O3' }));
+    await user.click(screen.getByRole('option', { name: /GPT 4o/ }));
+    expect(screen.queryByRole('button', { name: /Effort:/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(send).toHaveBeenLastCalledWith(null);
   });
 });

@@ -36,9 +36,7 @@ export function KnowledgeSummary({ status }: { status: KnowledgeStatus | undefin
           <Database size={13} className="text-[var(--db-primary)]" />
           <span>Schema Objects</span>
         </div>
-        <div className="knowledge-stat-value">
-          {status?.object_count?.toLocaleString() ?? '—'}
-        </div>
+        <div className="knowledge-stat-value">{status?.object_count?.toLocaleString() ?? '—'}</div>
       </div>
 
       <div className="knowledge-stat-card">
@@ -46,7 +44,10 @@ export function KnowledgeSummary({ status }: { status: KnowledgeStatus | undefin
           <Clock size={13} className="text-[var(--db-primary)]" />
           <span>Last Generated</span>
         </div>
-        <div className="knowledge-stat-subvalue truncate" title={status?.generated_at ? formatLocalDateTime(status.generated_at) : undefined}>
+        <div
+          className="knowledge-stat-subvalue truncate"
+          title={status?.generated_at ? formatLocalDateTime(status.generated_at) : undefined}
+        >
           {status?.generated_at ? formatLocalDateTime(status.generated_at) : 'Never'}
         </div>
       </div>

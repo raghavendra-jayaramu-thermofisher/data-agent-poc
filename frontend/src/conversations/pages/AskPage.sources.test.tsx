@@ -60,7 +60,7 @@ describe('Ask source defaults', () => {
   it('isolates remembered tables by user and workspace and restores them when a source is reselected', async () => {
     const scope = JSON.stringify(['u1', 'org1']);
     preferences.set('askDataSourceIdsByScope', { [scope]: ['ds1'] });
-    preferences.set('askTableScopesByScope', {
+    preferences.set('askTableSelectionsByScope', {
       [scope]: [
         { data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] },
         { data_source_id: 'removed', mode: 'selected', tables: [{ schema: 'dbo', name: 'old_table' }] },

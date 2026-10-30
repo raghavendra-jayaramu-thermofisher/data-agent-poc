@@ -10,6 +10,7 @@ import {
 import { queryKeys } from '../../api/queryKeys';
 import { useOrganization } from '../../organizations/OrganizationProvider';
 import * as api from '../api/conversation-api';
+import type { SourceTableScope } from '../components/table-scope';
 
 export type ConversationPages = InfiniteData<api.ConversationPage, unknown>;
 export type MessagePages = InfiniteData<api.MessagePage, unknown>;
@@ -101,6 +102,23 @@ export function useRenameConversation() {
         },
       );
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.lists(orgId) });
+    },
+  });
+}
+
+export function useUpdateTableScope() {
+  const queryClient = useQueryClient();
+  const { activeOrganization } = useOrganization();
+  const orgId = activeOrganization?.id ?? null;
+
+  return useMutation({
+    mutationFn: ({ id, tableScope }: { id: string; tableScope: SourceTableScope[] }) =>
+      api.updateTableScope(id, tableScope),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<api.Conversation>(
+        queryKeys.conversations.detail(orgId, updated.id),
+        (current) => current ? { ...current, ...updated } : undefined,
+      );
     },
   });
 }

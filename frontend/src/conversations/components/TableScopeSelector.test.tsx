@@ -20,7 +20,7 @@ const firstPage = {
   next_cursor: null,
 };
 
-function mount(value = all, readOnly = false, dataSources = sources) {
+function mount(value = all, dataSources = sources) {
   const change = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -30,7 +30,6 @@ function mount(value = all, readOnly = false, dataSources = sources) {
         sourceIds={dataSources.map((source) => source.id)}
         value={value}
         onChange={change}
-        readOnly={readOnly}
       />
     </QueryClientProvider>,
   );
@@ -44,7 +43,7 @@ beforeEach(() => {
 
 describe('table selection dialog', () => {
   it('keeps each source selection while switching between sources', async () => {
-    const { user, change } = mount(all, false, [
+    const { user, change } = mount(all, [
       ...sources,
       { id: 'ds2', name: 'Finance' } as DataSource,
     ]);
@@ -90,7 +89,6 @@ describe('table selection dialog', () => {
         data_source_id: 'ds1',
         mode: 'selected',
         tables: [{ schema: 'dbo', name: 'orders' }],
-        knowledge_version_id: 'v1',
       },
     ]);
   });
@@ -144,16 +142,14 @@ describe('table selection dialog', () => {
     expect(change.mock.calls[0]![0][0].tables).toHaveLength(2);
   });
 
-  it('shows saved scope without querying the catalog and closes with Escape', async () => {
-    const { user, change } = mount(
-      [{ data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] }],
-      true,
-    );
+  it('opens a saved selection for editing and closes with Escape', async () => {
+    const { user, change } = mount([
+      { data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] },
+    ]);
     const trigger = screen.getByRole('button', { name: 'Tables: orders' });
     await user.click(trigger);
-    expect(await screen.findByText('dbo.orders')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
-    expect(listTables).not.toHaveBeenCalled();
+    expect(await screen.findByRole('checkbox', { name: /orders/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(change).not.toHaveBeenCalled();

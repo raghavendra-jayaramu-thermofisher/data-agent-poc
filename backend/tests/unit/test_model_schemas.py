@@ -43,10 +43,10 @@ def test_profile_settings_validate_common_fields_and_allow_provider_specific_gen
         connection_id=uuid.uuid4(),
         display_name="Fast model",
         model_name="gpt-compatible",
-        settings={"temperature": 0.2, "max_tokens": 500, "seed": 7, "reasoning_effort": "medium"},
+        settings={"temperature": 0.2, "max_tokens": 500, "seed": 7, "frequency_penalty": 0.1},
     )
     assert profile.settings["max_tokens"] == 500
-    assert profile.settings["reasoning_effort"] == "medium"
+    assert profile.settings["frequency_penalty"] == 0.1
 
     with pytest.raises(ValidationError):
         ModelProfileCreate(

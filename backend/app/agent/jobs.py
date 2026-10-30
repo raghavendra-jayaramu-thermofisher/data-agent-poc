@@ -6,7 +6,12 @@ import uuid
 from app.agent.artifact_directives import replace_artifact_directives
 from app.agent.checkpoints import current_checkpointer, thread_id
 from app.agent.clarification import questions_markdown
-from app.agent.deep_agent import AnalysisRunResult, DeepAgentDependencyError, DeepAgentRuntime
+from app.agent.deep_agent import (
+    AnalysisRunResult,
+    DeepAgentDependencyError,
+    DeepAgentRuntime,
+    model_failure_details,
+)
 from app.agent.evidence import (
     EvidenceBundle,
     build_evidence_correction,
@@ -35,6 +40,7 @@ from app.instructions.repository import InstructionRepository
 from app.jobs.handlers import JobHandlerRegistry
 from app.jobs.repository import JobRepository
 from app.jobs.worker import JobFailureError, JobWaitingForInput
+from app.models.reasoning import REASONING_EFFORTS
 from app.models.service import ModelConfigurationService
 
 
@@ -132,14 +138,18 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             raise JobFailureError(
                 "JOB_INPUT_INVALID", "The analytical job input is invalid."
             ) from exc
+        reasoning_effort = job.input.get("reasoning_effort")
+        if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
+            raise JobFailureError("JOB_INPUT_INVALID", "The analytical job input is invalid.")
 
         convo_repo = ConversationRepository(session)
         conversation = await convo_repo.get_for_org(conversation_id, job.organization_id)
         if conversation is None:
             raise JobFailureError("CONVERSATION_NOT_FOUND", "Conversation not found.")
         source_ids = await convo_repo.source_ids(conversation.id)
-        table_scope = tuple(SourceTableScope.model_validate(item) for item in
-            job.input.get("table_scope", conversation.table_scope or []))
+        table_scope = tuple(
+            SourceTableScope.model_validate(item) for item in job.input["table_scope"]
+        )
         if not source_ids:
             raise JobFailureError(
                 "CONVERSATION_DATASOURCE_REQUIRED", "The conversation has no datasource."
@@ -198,6 +208,7 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
             runtime_model = await model_service.get_runtime_configuration(
                 profile_id=profile_id,
                 organization_id=job.organization_id,
+                reasoning_effort=reasoning_effort,
             )
         except AppError as exc:
             raise JobFailureError(
@@ -320,6 +331,9 @@ async def run_chat_query_job(job_id: uuid.UUID) -> dict[str, object]:
     except (JobFailureError, JobWaitingForInput):
         raise
     except Exception as exc:
+        code, message = model_failure_details(exc)
+        if code == "MODEL_PARAMETER_UNSUPPORTED":
+            raise JobFailureError(code, message) from exc
         # Never leak provider/LangGraph internals to API-visible job errors.
         raise JobFailureError(
             "AGENT_EXECUTION_FAILED",

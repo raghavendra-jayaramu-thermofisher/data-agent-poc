@@ -51,6 +51,7 @@ class ModelExecutionResponse(BaseModel):
     sequence: int
     model_profile_id: uuid.UUID
     model_name: str
+    reasoning_effort: str | None = None
     phase: str
     status: str
     input_tokens: int | None

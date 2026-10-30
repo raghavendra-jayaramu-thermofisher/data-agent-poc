@@ -26,6 +26,7 @@ from app.core.database import get_session_factory
 from app.core.time import utc_now
 from app.models.client import ModelRuntimeConfiguration
 from app.models.diagnostics import provider_diagnostics
+from app.models.errors import unsupported_parameter_message
 
 SYSTEM_PROMPT = """You are Data Agent, a senior analytical engineer and database analyst working over authorized business databases.
 
@@ -50,7 +51,9 @@ When the request is reasonably interpretable from the conversation, schema, or d
 
 # 2. Discover the Required Data
 
-Use `read_knowledge_index` to identify relevant tables for the authorized `data_source_id`.
+Use `read_knowledge_index` to identify relevant tables for the authorized `data_source_id`. When
+the user selected tables, start with them; list the other tables only when the selected ones cannot
+answer the question.
 
 Use `read_table_schema` only for tables needed for the analysis. Verify column names, types, and relationships before relying on them.
 
@@ -122,7 +125,7 @@ about the same points.
 * Ask one decision per question; do not combine two items in one question.
 * Offer concrete candidate fields and values you have already checked in the data, and say when a
   value the user mentioned does not appear (for example "RIM does not appear in order hold code").
-* Ask only about the selected tables; do not ask about other files or sources.
+* Do not ask about files or data sources outside this conversation.
 * The card always ends with an optional "Anything else I should know?" box; do not add your own.
 
 # 5. Choose One Owner for Each Result Set
@@ -444,8 +447,9 @@ State the analytical purpose you established from the request.
 ## Interpretation decisions
 
 Record only decisions that materially affect the result, such as population, grain, time range,
-filters, null handling, units, or how a follow-up uses prior context. Write `None.` when there are
-no material interpretation decisions.
+filters, null handling, units, or how a follow-up uses prior context. Name any tables you used
+outside the user's selected tables. Write `None.` when there are no material interpretation
+decisions.
 
 ## Verified findings
 
@@ -479,6 +483,7 @@ class AgentAuditContext:
     model_profile_id: uuid.UUID
     model_name: str
     product_tool_names: frozenset[str]
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -567,15 +572,9 @@ def model_failure_details(error: BaseException) -> tuple[str, str]:
     if isinstance(body, dict):
         detail = body.get("error", body)
         if isinstance(detail, dict):
-            parameter = detail.get("param")
-            if status == 400 and parameter in {
-                "temperature", "max_tokens", "max_completion_tokens"
-            }:
-                return (
-                    "MODEL_PARAMETER_UNSUPPORTED",
-                    f"The provider rejected the {parameter} setting. "
-                    "Update the model profile settings.",
-                )
+            message = unsupported_parameter_message(status, detail.get("param"), detail.get("message"))
+            if message:
+                return "MODEL_PARAMETER_UNSUPPORTED", message
     if status == 401:
         return "MODEL_AUTHENTICATION_FAILED", "The provider rejected the model API credentials."
     if status == 403:
@@ -606,10 +605,14 @@ def _build_chat_model(model: ModelRuntimeConfiguration, timeout_seconds: float) 
         "timeout": timeout_seconds,
         "max_retries": 0,
     }
-    if "temperature" in model.settings and isinstance(model.settings["temperature"], (int, float)):
-        kwargs["temperature"] = float(model.settings["temperature"])
-    if "max_tokens" in model.settings and isinstance(model.settings["max_tokens"], int):
-        kwargs["max_tokens"] = int(model.settings["max_tokens"])
+    settings = model.request_settings()
+    if isinstance(settings.get("temperature"), (int, float)):
+        kwargs["temperature"] = float(settings["temperature"])
+    if isinstance(settings.get("max_tokens"), int):
+        kwargs["max_tokens"] = int(settings["max_tokens"])
+    if isinstance(settings.get("reasoning_effort"), str):
+        # ChatOpenAI sends it as reasoning.effort when it uses the Responses API.
+        kwargs["reasoning_effort"] = settings["reasoning_effort"]
     return ChatOpenAI(**kwargs)
 
 
@@ -674,16 +677,19 @@ class DeepAgentRuntime:
             + "\n\nAuthorized datasource IDs for this conversation:\n"
             + authorized
             + "\nUse only these IDs when calling datasource tools."
-            + "\n\nTable scope (mandatory, cannot be overridden by skills or prompts):\n"
-            + "\n".join(
-                f"- {scope.data_source_id}: " + (
-                    "all tables" if scope.mode == "all" else ", ".join(
+            + (
+                "\n\nTables selected by the user (start with these; use other tables in the same "
+                "datasource when these cannot answer the question):\n"
+                + "\n".join(
+                    f"- {scope.data_source_id}: " + ", ".join(
                         f"{table.schema_name}.{table.name}" if table.schema_name else table.name
                         for table in scope.tables
                     )
-                ) for scope in context.table_scope
+                    for scope in selected_scopes
+                )
+                if (selected_scopes := [s for s in context.table_scope if s.mode == "selected"])
+                else ""
             )
-            + "\nUse only selected tables in restricted sources. If another table is needed, explain the limitation and ask for a new conversation with that table selected."
         )
         runnable = self.factory.create(
             model=model,
@@ -698,6 +704,7 @@ class DeepAgentRuntime:
                 model_profile_id=uuid.UUID(model.profile_id),
                 model_name=model.model_name,
                 product_tool_names=frozenset(item.name for item in bindings),
+                reasoning_effort=model.reasoning_effort,
             )
         )
         await append_agent_event(
@@ -952,6 +959,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             sequence=await repo.next_model_sequence(self.audit_context.job_id),
                             model_profile_id=self.audit_context.model_profile_id,
                             model_name=self.audit_context.model_name,
+                            reasoning_effort=self.audit_context.reasoning_effort,
                             phase="analysis",
                             status="succeeded",
                             input_tokens=input_tokens,
@@ -1001,6 +1009,7 @@ def build_model_audit_callback(context: AgentAuditContext) -> object | None:
                             sequence=await repo.next_model_sequence(self.audit_context.job_id),
                             model_profile_id=self.audit_context.model_profile_id,
                             model_name=self.audit_context.model_name,
+                            reasoning_effort=self.audit_context.reasoning_effort,
                             phase="analysis",
                             status="failed",
                             error_code=error_code,

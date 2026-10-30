@@ -82,7 +82,7 @@ async def test_production_factory_runs_real_deepagents_multistep_graph(monkeypat
     executed: list[str] = []
     sql_id = "22222222-2222-2222-2222-222222222222"
 
-    async def read_index(data_source_id: str) -> str:
+    async def read_index(data_source_id: str, include_all_tables: bool = False) -> str:
         executed.append("read_knowledge_index")
         return json.dumps({"tables": ["orders", "payments"]})
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Modal } from '@heroui/react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, Database, LockKeyhole, Search, Table2, X } from 'lucide-react';
+import { ChevronDown, Database, Search, Table2, X } from 'lucide-react';
 import type { AppError } from '../../api/errors';
 import type { DataSource } from '../../api/types';
 import { queryKeys } from '../../api/queryKeys';
@@ -15,8 +15,7 @@ type Props = {
   dataSources: DataSource[];
   sourceIds: string[];
   value: SourceTableScope[];
-  onChange?(scope: SourceTableScope[]): void;
-  readOnly?: boolean;
+  onChange(scope: SourceTableScope[]): void;
   disabled?: boolean;
 };
 
@@ -24,12 +23,10 @@ function SourceTables({
   source,
   scope,
   onChange,
-  readOnly,
 }: {
   source: { id: string; name: string };
   scope: SourceTableScope;
   onChange(scope: SourceTableScope): void;
-  readOnly: boolean;
 }) {
   const { activeOrganization } = useOrganization();
   const client = useQueryClient();
@@ -49,86 +46,67 @@ function SourceTables({
       page.next_cursor
         ? { cursor: page.next_cursor, version: page.knowledge_version_id }
         : undefined,
-    enabled: !readOnly && Boolean(activeOrganization?.id),
+    enabled: Boolean(activeOrganization?.id),
     retry: false,
     staleTime: 30_000,
   });
   const tables = catalog.data?.pages.flatMap((page) => page.items) ?? [];
   const selected = scope.tables ?? [];
   const selectedIds = new Set(selected.map(tableIdentity));
-  const visibleTables = readOnly
-    ? selected
-        .filter((table) =>
-          `${table.schema ?? ''}.${table.name}`.toLowerCase().includes(query.toLowerCase()),
-        )
-        .map((table) => ({ ...table, object_type: '' }))
-    : tables;
-  const schemas = [...new Set(visibleTables.map((table) => table.schema ?? ''))];
+  const schemas = [...new Set(tables.map((table) => table.schema ?? ''))];
   const toggle = (table: TableIdentifier) => {
     const next = selectedIds.has(tableIdentity(table))
       ? selected.filter((item) => tableIdentity(item) !== tableIdentity(table))
       : [...selected, { schema: table.schema ?? null, name: table.name }];
-    onChange({
-      ...scope,
-      mode: 'selected',
-      tables: next,
-      knowledge_version_id: catalog.data?.pages[0]?.knowledge_version_id,
-    });
+    onChange({ ...scope, mode: 'selected', tables: next });
   };
   return (
     <section className="table-scope-source" aria-label={source.name}>
       <div className="table-scope-source-header">
-        <h3 title={source.name}>{source.name}</h3>
-        {!readOnly && (
-          <div
-            className="table-scope-modes"
-            role="radiogroup"
-            aria-label={`Tables for ${source.name}`}
-          >
-            <label className={scope.mode === 'all' ? 'is-active' : ''}>
-              <input
-                type="radio"
-                name={`table-mode-${source.id}`}
-                checked={scope.mode === 'all'}
-                onChange={() =>
-                  onChange({ ...scope, mode: 'all', tables: [], knowledge_version_id: null })
-                }
-              />
-              All tables
-            </label>
-            <label className={scope.mode === 'selected' ? 'is-active' : ''}>
-              <input
-                type="radio"
-                name={`table-mode-${source.id}`}
-                checked={scope.mode === 'selected'}
-                onChange={() => onChange({ ...scope, mode: 'selected', tables: selected })}
-              />
-              Choose tables
-            </label>
-          </div>
-        )}
-      </div>
-      {!(readOnly && scope.mode === 'all') && (
-        <div className="table-scope-list-toolbar">
-          <div className="table-scope-search db-icon-search">
-            <Search size={15} aria-hidden="true" />
+        <h3 title={source.name}>
+          <Database size={14} aria-hidden="true" />
+          <span>{source.name}</span>
+        </h3>
+        <div className="table-scope-modes" role="radiogroup" aria-label={`Tables for ${source.name}`}>
+          <label className={scope.mode === 'all' ? 'is-active' : ''}>
             <input
-              className="db-icon-search__input"
-              aria-label="Search tables or schemas"
-              type="search"
-              value={search}
-              placeholder="Search tables…"
-              onChange={(event) => setSearch(event.target.value)}
+              type="radio"
+              name={`table-mode-${source.id}`}
+              checked={scope.mode === 'all'}
+              onChange={() => onChange({ ...scope, mode: 'all', tables: [] })}
             />
-            {search && (
-              <button type="button" aria-label="Clear table search" onClick={() => setSearch('')}>
-                <X size={14} aria-hidden="true" />
-              </button>
-            )}
-          </div>
+            All tables
+          </label>
+          <label className={scope.mode === 'selected' ? 'is-active' : ''}>
+            <input
+              type="radio"
+              name={`table-mode-${source.id}`}
+              checked={scope.mode === 'selected'}
+              onChange={() => onChange({ ...scope, mode: 'selected', tables: selected })}
+            />
+            Choose tables
+          </label>
         </div>
-      )}
-      {!readOnly && scope.mode === 'selected' && selected.length > 0 && (
+      </div>
+      <div className="table-scope-list-toolbar">
+        <div className="table-scope-search db-icon-search">
+          <Search size={15} aria-hidden="true" />
+          <input
+            className="db-icon-search__input"
+            aria-label="Search tables or schemas"
+            type="search"
+            value={search}
+            placeholder="Search tables…"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {search && (
+            <button type="button" aria-label="Clear table search" onClick={() => setSearch('')}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </div>
+      {scope.mode === 'selected' && selected.length > 0 && (
         <aside className="table-scope-selection" aria-label="Selected tables summary">
           <div className="table-scope-selection-header">
             <span>Selected</span>
@@ -157,18 +135,18 @@ function SourceTables({
           </ul>
         </aside>
       )}
-      {selected.length >= 500 && !readOnly && (
+      {selected.length >= 500 && (
         <p className="table-scope-limit" role="status">
           You’ve selected 500 tables. Choose All tables to include more.
         </p>
       )}
       <div className="table-scope-catalog" aria-label="Tables" tabIndex={0}>
-        {!readOnly && catalog.isPending && (
+        {catalog.isPending && (
           <div className="table-scope-empty" role="status">
             <p>Loading tables…</p>
           </div>
         )}
-        {!readOnly && catalog.isError && (
+        {catalog.isError && (
           <div role="alert" className="table-scope-empty table-scope-error">
             <p>
               {(catalog.error as unknown as AppError)?.message ||
@@ -183,82 +161,77 @@ function SourceTables({
             </Button>
           </div>
         )}
-        {readOnly && scope.mode === 'all' ? (
+        {!catalog.isPending && !catalog.isError && tables.length === 0 && (
           <div className="table-scope-empty">
-            <Table2 size={24} aria-hidden="true" />
-            <strong>All tables included</strong>
-          </div>
-        ) : (
-          <>
-            {(readOnly || (!catalog.isPending && !catalog.isError)) &&
-              visibleTables.length === 0 && (
-                <div className="table-scope-empty">
-                  <p>
-                    {query ? 'No tables match your search.' : 'No tables or views are available.'}
-                  </p>
-                  {query && (
-                    <Button size="sm" variant="secondary" onPress={() => setSearch('')}>
-                      Clear search
-                    </Button>
-                  )}
-                </div>
-              )}
-            {schemas.map((schema) => (
-              <fieldset key={schema}>
-                <legend>{schema || 'Tables'}</legend>
-                {visibleTables
-                  .filter((table) => (table.schema ?? '') === schema)
-                  .map((table) => {
-                    const checked =
-                      scope.mode === 'selected' && selectedIds.has(tableIdentity(table));
-                    return readOnly ? (
-                      <div key={tableIdentity(table)} className="table-scope-row is-selected">
-                        <Check size={14} aria-hidden="true" />
-                        <span className="table-scope-name">
-                          {table.schema ? table.schema + '.' : ''}
-                          {table.name}
-                        </span>
-                      </div>
-                    ) : (
-                      <label
-                        key={tableIdentity(table)}
-                        className={`table-scope-row ${checked ? 'is-selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={
-                            !selectedIds.has(tableIdentity(table)) && selected.length >= 500
-                          }
-                          onChange={() => toggle(table)}
-                        />
-                        <span
-                          className="table-scope-name"
-                          title={table.schema ? table.schema + '.' + table.name : table.name}
-                        >
-                          {table.name}
-                        </span>
-                        {table.object_type === 'view' && (
-                          <span className="table-scope-object-type">View</span>
-                        )}
-                      </label>
-                    );
-                  })}
-              </fieldset>
-            ))}
-            {!readOnly && catalog.hasNextPage && (
-              <div className="table-scope-load-more">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  isPending={catalog.isFetchingNextPage}
-                  onPress={() => void catalog.fetchNextPage()}
-                >
-                  Load more tables
-                </Button>
-              </div>
+            <p>{query ? 'No tables match your search.' : 'No tables or views are available.'}</p>
+            {query && (
+              <Button size="sm" variant="secondary" onPress={() => setSearch('')}>
+                Clear search
+              </Button>
             )}
-          </>
+          </div>
+        )}
+        {schemas.map((schema) => {
+          const schemaTables = tables.filter((table) => (table.schema ?? '') === schema);
+          return (
+            <div
+              key={schema}
+              className="table-scope-schema"
+              role="group"
+              aria-label={schema || 'Tables'}
+            >
+              <div className="table-scope-schema-header" aria-hidden="true">
+                <span>{schema || 'Tables'}</span>
+                {!catalog.hasNextPage && (
+                  <span>
+                    {schemaTables.length} {schemaTables.length === 1 ? 'table' : 'tables'}
+                  </span>
+                )}
+              </div>
+              {schemaTables.map((table) => {
+                const checked = scope.mode === 'selected' && selectedIds.has(tableIdentity(table));
+                return (
+                  <label
+                    key={tableIdentity(table)}
+                    className={`table-scope-row ${checked ? 'is-selected' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!selectedIds.has(tableIdentity(table)) && selected.length >= 500}
+                      onChange={() => toggle(table)}
+                    />
+                    <span
+                      className="table-scope-name"
+                      title={table.schema ? table.schema + '.' + table.name : table.name}
+                    >
+                      {table.name}
+                    </span>
+                    {table.object_type === 'view' && (
+                      <span className="table-scope-object-type">View</span>
+                    )}
+                    {typeof table.column_count === 'number' && (
+                      <span className="table-scope-column-count">
+                        {table.column_count} {table.column_count === 1 ? 'column' : 'columns'}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          );
+        })}
+        {catalog.hasNextPage && (
+          <div className="table-scope-load-more">
+            <Button
+              size="sm"
+              variant="secondary"
+              isPending={catalog.isFetchingNextPage}
+              onPress={() => void catalog.fetchNextPage()}
+            >
+              Load more tables
+            </Button>
+          </div>
         )}
       </div>
     </section>
@@ -270,7 +243,6 @@ export function TableScopeSelector({
   sourceIds,
   value,
   onChange,
-  readOnly = false,
   disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -287,7 +259,7 @@ export function TableScopeSelector({
     (id) =>
       dataSources.find((source) => source.id === id) ?? { id, name: 'Unavailable data source' },
   );
-  const displayedScope = readOnly ? scope : normalizeTableScope(sourceIds, draft);
+  const displayedScope = normalizeTableScope(sourceIds, draft);
   const activeSource = sources.find((source) => source.id === activeSourceId) ?? sources[0];
   const selectedCount = displayedScope.reduce(
     (count, item) => count + (item.tables?.length ?? 0),
@@ -310,17 +282,13 @@ export function TableScopeSelector({
         onClick={openDialog}
         title={
           sourceIds.length
-            ? `${tableScopeLabel(scope)} · ${readOnly ? 'Used for this chat' : 'Choose tables for this chat'}`
+            ? `${tableScopeLabel(scope)} · Choose tables for the agent to start with`
             : 'Select a data source first'
         }
       >
         <Table2 size={12} aria-hidden="true" />
         <span>{tableScopeLabel(scope)}</span>
-        {readOnly ? (
-          <LockKeyhole size={11} aria-hidden="true" />
-        ) : (
-          <ChevronDown size={11} aria-hidden="true" />
-        )}
+        <ChevronDown size={11} aria-hidden="true" />
       </button>
       <Modal.Backdrop isOpen={open} onOpenChange={setOpen} className="table-scope-backdrop">
         <Modal.Container
@@ -331,7 +299,7 @@ export function TableScopeSelector({
         >
           <Modal.Dialog className="table-scope-dialog">
             <Modal.Header className="table-scope-header">
-              <Modal.Heading>{readOnly ? 'Tables in this chat' : 'Choose tables'}</Modal.Heading>
+              <Modal.Heading>Choose tables</Modal.Heading>
               <Button
                 isIconOnly
                 variant="ghost"
@@ -373,7 +341,6 @@ export function TableScopeSelector({
                       key={activeSource.id}
                       source={activeSource}
                       scope={item}
-                      readOnly={readOnly}
                       onChange={(next) =>
                         setDraft((current) =>
                           normalizeTableScope(sourceIds, current).map((entry) =>
@@ -388,39 +355,28 @@ export function TableScopeSelector({
             <Modal.Footer className="table-scope-footer">
               <div className="table-scope-footer-summary">
                 <strong aria-live="polite">
-                  {!valid && !readOnly
+                  {!valid
                     ? sources.length > 1
                       ? 'Choose tables for each data source'
                       : 'Select at least one table'
                     : summary}
                 </strong>
-                <span>
-                  {readOnly
-                    ? 'Start a new chat to change tables.'
-                    : 'Tables stay the same after your first question.'}
-                </span>
               </div>
-              {readOnly ? (
+              <div className="table-scope-footer-actions">
                 <Button variant="secondary" onPress={() => setOpen(false)}>
-                  Close
+                  Cancel
                 </Button>
-              ) : (
-                <>
-                  <Button variant="secondary" onPress={() => setOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    isDisabled={!valid || !sourceIds.length}
-                    onPress={() => {
-                      onChange?.(normalizeTableScope(sourceIds, draft));
-                      setOpen(false);
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </>
-              )}
+                <Button
+                  variant="primary"
+                  isDisabled={!valid || !sourceIds.length}
+                  onPress={() => {
+                    onChange(normalizeTableScope(sourceIds, draft));
+                    setOpen(false);
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

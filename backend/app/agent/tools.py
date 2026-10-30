@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from langgraph.errors import GraphBubbleUp
 from langgraph.types import interrupt
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
 
 from app.agent.clarification import (
     MAX_QUESTIONS,
@@ -43,7 +42,6 @@ from app.data_sources.errors import DataSourceOperationError
 from app.data_sources.service import DataSourceService
 from app.jobs.repository import JobRepository
 from app.jobs.service import JobService
-from app.knowledge.models import KnowledgeDocument
 from app.knowledge.repository import KnowledgeRepository
 
 
@@ -194,6 +192,16 @@ def _parse_source_id(context: AgentToolContext, arguments: dict[str, object]) ->
     return source_id
 
 
+def _index_line(key: str, metadata: dict[str, object]) -> str:
+    """Match the generated index line so selected tables read like the full index."""
+    primary_key = metadata.get("primary_key") or []
+    pk = f"; PK: {', '.join(map(str, primary_key))}" if primary_key else ""
+    return (
+        f"- `{key}` — {metadata.get('object_type', 'table')}; "
+        f"{metadata.get('column_count', 0)} columns{pk}; schema document key: `{key}`"
+    )
+
+
 async def read_knowledge_index(
     context: AgentToolContext,
     arguments: dict[str, object],
@@ -217,26 +225,32 @@ async def read_knowledge_index(
             for item in annotations
             if item.scope_type in {"datasource", "metric"}
         ]
+        index_markdown = doc.content_markdown
+        selected = context.selected_scope(source_id)
+        if selected is not None:
+            lines = []
+            for table in selected.tables:
+                key = f"{table.schema_name}.{table.name}" if table.schema_name else table.name
+                entry = await repo.get_document(base.current_version_id, "table_schema", key)
+                if entry is not None:
+                    lines.append(_index_line(key, entry.metadata_json))
+            others = int(doc.metadata_json.get("object_count", 0)) - len(lines)
+            index_markdown = "# Tables selected by the user\n\n" + "\n".join(lines) + "\n"
+            if arguments.get("include_all_tables"):
+                index_markdown += "\n" + doc.content_markdown
+            elif others > 0:
+                index_markdown += (
+                    f"\n{others} other tables and views exist in this datasource. Call "
+                    "read_knowledge_index with include_all_tables=true if the selected tables "
+                    "cannot answer the question.\n"
+                )
         payload: dict[str, object] = {
             "data_source_id": str(source_id),
             "knowledge_version_id": str(base.current_version_id),
-            "index_markdown": doc.content_markdown,
+            "index_markdown": index_markdown,
             "business_annotations": business,
         }
-        estimated_tokens = doc.estimated_tokens
-        selected = context.selected_scope(source_id)
-        if selected is not None:
-            version = selected.knowledge_version_id
-            documents = []
-            for table in selected.tables:
-                key = f"{table.schema_name}.{table.name}" if table.schema_name else table.name
-                entry = await repo.get_document(version, "table_schema", key)
-                if entry is None or (entry.metadata_json.get("schema"), entry.metadata_json.get("table")) != (table.schema_name, table.name):
-                    raise AgentToolError("TABLE_SCOPE_STALE", "A selected table is unavailable in the job's schema snapshot.")
-                documents.append(f"- `{key}` — {entry.metadata_json.get('object_type', 'table')}; schema document key: `{key}`")
-            payload["knowledge_version_id"] = str(version)
-            payload["index_markdown"] = "# Selected tables and views\n\n" + "\n".join(documents)
-            estimated_tokens = len(str(payload["index_markdown"])) // 4
+        estimated_tokens = len(index_markdown) // 4
     await append_agent_event(
         context.job_id,
         "knowledge.index.loaded",
@@ -263,22 +277,12 @@ async def read_table_schema(
                 "KNOWLEDGE_NOT_READY",
                 "Knowledge has not been generated for this datasource yet.",
             )
-        selected = context.selected_scope(source_id)
-        if selected is not None:
-            allowed = {(f"{table.schema_name}.{table.name}" if table.schema_name else table.name): table for table in selected.tables}
-            if table_key not in allowed:
-                raise AgentToolError("TABLE_NOT_AUTHORIZED", "This table is not selected for the conversation.")
-        version = selected.knowledge_version_id if selected else base.current_version_id
-        doc = await repo.get_document(version, "table_schema", table_key)
+        doc = await repo.get_document(base.current_version_id, "table_schema", table_key)
         if doc is None:
             raise AgentToolError(
                 "KNOWLEDGE_TABLE_NOT_FOUND",
                 "The requested table schema is not present in the current knowledge version.",
             )
-        if selected is not None:
-            table = allowed[table_key]
-            if (doc.metadata_json.get("schema"), doc.metadata_json.get("table")) != (table.schema_name, table.name):
-                raise AgentToolError("TABLE_SCOPE_STALE", "The selected table identity no longer matches its schema document.")
         annotations = await repo.list_annotations(base.id)
         relevant = [
             {"scope_type": item.scope_type, "scope_key": item.scope_key, "content": item.content}
@@ -324,25 +328,8 @@ async def execute_sql(
         source = await source_service.require_for_org(source_id, context.organization_id)
         if source.status != "active":
             raise AgentToolError("DATASOURCE_NOT_ACTIVE", "The datasource is not active.")
-        selected = context.selected_scope(source_id)
-        allowed_tables = None
-        catalog_tables = None
-        if selected is not None:
-            allowed_tables = tuple((table.schema_name, table.name) for table in selected.tables)
-            knowledge_repo = KnowledgeRepository(session)
-            base = await knowledge_repo.get_base_for_source(source_id, context.organization_id)
-            if base is None or base.status != "ready" or base.current_version_id is None:
-                raise AgentToolError("KNOWLEDGE_NOT_READY", "Schema knowledge is unavailable.")
-            metadata = (await session.execute(select(KnowledgeDocument.metadata_json).where(
-                KnowledgeDocument.knowledge_version_id == base.current_version_id,
-                KnowledgeDocument.document_type == "table_schema",
-            ))).scalars().all()
-            catalog_tables = tuple((item.get("schema"), item["table"]) for item in metadata)
-            if not set(allowed_tables).issubset(catalog_tables):
-                raise AgentToolError("TABLE_SCOPE_STALE", "A selected table is no longer available. Start a new conversation with available tables.")
         try:
-            sql = validate_read_only_sql(raw_sql, source_kind=source.kind,
-                allowed_tables=allowed_tables, catalog_tables=catalog_tables)
+            sql = validate_read_only_sql(raw_sql, source_kind=source.kind)
         except SQLSafetyViolation as exc:
             raise AgentToolError(exc.code, exc.public_message) from exc
         adapter = await source_service.resolve_adapter(source)
@@ -1085,9 +1072,10 @@ def build_default_tool_registry() -> AgentToolRegistry:
             description=(
                 "Start data discovery for one authorized datasource. Returns its compact table/view "
                 "catalog plus datasource- and metric-level business guidance; it does not return "
-                "columns or data rows. Call this before read_table_schema or execute_sql, use it to "
-                "shortlist likely tables, and revisit discovery if the first candidates are not "
-                "sufficient."
+                "columns or data rows. When the user selected tables, it lists those and counts the "
+                "rest; set include_all_tables=true to list every table. Call this before "
+                "read_table_schema or execute_sql, use it to shortlist likely tables, and revisit "
+                "discovery if the first candidates are not sufficient."
             ),
             args_schema=ReadKnowledgeIndexArgs,
             handler=read_knowledge_index,

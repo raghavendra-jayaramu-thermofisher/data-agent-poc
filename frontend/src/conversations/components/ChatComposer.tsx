@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, LayoutTemplate } from 'lucide-react';
+import { ArrowUp, Database, Sparkles, ChevronDown, Check, Loader2, X, Search, LayoutTemplate, Brain } from 'lucide-react';
 import type { DataSource } from '../../api/types';
 import type { ModelProfile } from '../../api/types';
+import { REASONING_EFFORT_LABELS, effectiveProfile, supportsEffort, type ReasoningEffort } from '../reasoning-effort';
 import { useInstructions } from '../../settings/hooks/useInstructions';
 import type { AgentInstruction } from '../../settings/api/instructions-api';
 import { TableScopeSelector } from './TableScopeSelector';
@@ -18,6 +19,10 @@ type ChatComposerProps = {
   profiles: ModelProfile[];
   selectedProfileId: string | null;
   onProfileIdChange(id: string | null): void;
+  /** The profile used when none is selected; the workspace default when absent. */
+  fallbackProfileId?: string | null;
+  reasoningEffort: ReasoningEffort | null;
+  onReasoningEffortChange(effort: ReasoningEffort | null): void;
   isSubmitting?: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -40,6 +45,9 @@ export function ChatComposer({
   profiles,
   selectedProfileId,
   onProfileIdChange,
+  fallbackProfileId,
+  reasoningEffort,
+  onReasoningEffortChange,
   isSubmitting = false,
   disabled = false,
   placeholder = 'Ask a question about your business data…',
@@ -53,6 +61,7 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [effortOpen, setEffortOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
   const skillsPickerRef = useRef<HTMLDivElement>(null);
@@ -61,6 +70,7 @@ export function ChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sourcesPickerRef = useRef<HTMLDivElement>(null);
   const modelsPickerRef = useRef<HTMLDivElement>(null);
+  const effortPickerRef = useRef<HTMLDivElement>(null);
 
   const instructionsQuery = useInstructions();
   const [autocompleteDismissed, setAutocompleteDismissed] = useState(false);
@@ -127,13 +137,14 @@ export function ChatComposer({
   }, [question]);
 
   useEffect(() => {
-    if (!sourcesOpen && !modelsOpen && !skillsOpen) return;
+    if (!sourcesOpen && !modelsOpen && !effortOpen && !skillsOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!sourcesPickerRef.current?.contains(target) && !modelsPickerRef.current?.contains(target) && !skillsPickerRef.current?.contains(target) && !skillsButtonRef.current?.contains(target)) {
+      if (!sourcesPickerRef.current?.contains(target) && !modelsPickerRef.current?.contains(target) && !effortPickerRef.current?.contains(target) && !skillsPickerRef.current?.contains(target) && !skillsButtonRef.current?.contains(target)) {
         setSourcesOpen(false);
         setModelsOpen(false);
+        setEffortOpen(false);
         setSkillsOpen(false);
       }
     };
@@ -141,6 +152,7 @@ export function ChatComposer({
       if (event.key === 'Escape') {
         setSourcesOpen(false);
         setModelsOpen(false);
+        setEffortOpen(false);
         setSkillsOpen(false);
       }
     };
@@ -151,7 +163,7 @@ export function ChatComposer({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [modelsOpen, sourcesOpen, skillsOpen]);
+  }, [modelsOpen, effortOpen, sourcesOpen, skillsOpen]);
 
   const activeSources = dataSources.filter((s) => s.status === 'active');
   const filteredSources = activeSources.filter((s) =>
@@ -160,6 +172,18 @@ export function ChatComposer({
   );
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const effortProfile = effectiveProfile(profiles, selectedProfileId, fallbackProfileId);
+  const efforts = effortProfile?.reasoning_efforts ?? [];
+  const defaultEffort = effortProfile?.default_reasoning_effort;
+
+  const chooseProfile = (id: string | null) => {
+    onProfileIdChange(id);
+    // An effort the new model does not accept would be rejected; fall back to its default.
+    if (!supportsEffort(effectiveProfile(profiles, id, fallbackProfileId), reasoningEffort)) {
+      onReasoningEffortChange(null);
+    }
+    setModelsOpen(false);
+  };
   const hasDataSourceScope = dataSourceSelection === 'hidden' || selectedDataSourceIds.length > 0;
 
   const toggleSource = (sourceId: string) => {
@@ -312,7 +336,6 @@ export function ChatComposer({
         <div className="chat-composer-toolbar">
           <div className="chat-composer-chips">
             <div className="chat-composer-group chat-composer-group--context">
-              {tableScope && dataSourceSelection === 'hidden' && <TableScopeSelector dataSources={dataSources} sourceIds={selectedDataSourceIds} value={tableScope} readOnly />}
               {dataSourceSelection === 'editable' ? (
                 <div className="chat-composer-picker" ref={sourcesPickerRef}>
                   <button
@@ -321,6 +344,7 @@ export function ChatComposer({
                     onClick={() => {
                       setSourcesOpen(!sourcesOpen);
                       setModelsOpen(false);
+                      setEffortOpen(false);
                       setSkillsOpen(false);
                     }}
                     aria-haspopup="dialog"
@@ -389,7 +413,7 @@ export function ChatComposer({
                 </div>
               ) : null}
 
-              {tableScope && dataSourceSelection === 'editable' && (
+              {tableScope && onTableScopeChange && (
                 <TableScopeSelector
                   dataSources={dataSources}
                   sourceIds={selectedDataSourceIds}
@@ -411,6 +435,7 @@ export function ChatComposer({
                   onClick={() => {
                     setModelsOpen(!modelsOpen);
                     setSourcesOpen(false);
+                    setEffortOpen(false);
                     setSkillsOpen(false);
                   }}
                   aria-haspopup="listbox"
@@ -435,10 +460,7 @@ export function ChatComposer({
                       type="button"
                       role="option"
                       aria-selected={selectedProfileId === null}
-                      onClick={() => {
-                        onProfileIdChange(null);
-                        setModelsOpen(false);
-                      }}
+                      onClick={() => chooseProfile(null)}
                       className={`chat-composer-option ${selectedProfileId === null ? 'is-selected' : ''}`}
                     >
                       <div className="chat-composer-option__label">
@@ -456,10 +478,7 @@ export function ChatComposer({
                           role="option"
                           aria-selected={isSelected}
                           key={profile.id}
-                          onClick={() => {
-                            onProfileIdChange(profile.id);
-                            setModelsOpen(false);
-                          }}
+                          onClick={() => chooseProfile(profile.id)}
                           className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
                         >
                           <div className="chat-composer-option__label">
@@ -476,6 +495,67 @@ export function ChatComposer({
                 )}
               </div>
 
+              {/* Reasoning effort, only for models that accept one */}
+              {efforts.length > 0 ? (
+                <div className="chat-composer-picker" ref={effortPickerRef}>
+                  <button
+                    type="button"
+                    className={`chat-composer-chip ${effortOpen || reasoningEffort ? 'active' : ''}`}
+                    onClick={() => {
+                      setEffortOpen(!effortOpen);
+                      setSourcesOpen(false);
+                      setModelsOpen(false);
+                      setSkillsOpen(false);
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={effortOpen}
+                    title="How much the model reasons before answering this question"
+                  >
+                    <Brain size={12} aria-hidden="true" />
+                    <span>Effort: {reasoningEffort ? REASONING_EFFORT_LABELS[reasoningEffort] : 'Default'}</span>
+                    <ChevronDown size={11} aria-hidden="true" />
+                  </button>
+
+                  {effortOpen && (
+                    <div
+                      className="chat-composer-popover chat-composer-popover--effort"
+                      role="listbox"
+                      aria-label="Select reasoning effort"
+                    >
+                      <div className="chat-composer-popover__header">
+                        <strong>Reasoning effort</strong>
+                      </div>
+                      {[null, ...efforts].map((effort) => {
+                        const isSelected = reasoningEffort === effort;
+                        return (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            key={effort ?? 'default'}
+                            onClick={() => {
+                              onReasoningEffortChange(effort);
+                              setEffortOpen(false);
+                            }}
+                            className={`chat-composer-option ${isSelected ? 'is-selected' : ''}`}
+                          >
+                            <div className="chat-composer-option__label">
+                              <span className="chat-composer-option__title">
+                                {effort ? REASONING_EFFORT_LABELS[effort] : 'Model default'}
+                              </span>
+                              {effort === null && defaultEffort ? (
+                                <small>{REASONING_EFFORT_LABELS[defaultEffort]}</small>
+                              ) : null}
+                            </div>
+                            {isSelected ? <Check size={14} className="shrink-0 text-[var(--db-primary)]" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
               <button
                 ref={skillsButtonRef}
                 type="button"
@@ -488,6 +568,7 @@ export function ChatComposer({
                   setSkillSearch('');
                   setSourcesOpen(false);
                   setModelsOpen(false);
+                  setEffortOpen(false);
                   setAutocompleteDismissed(true);
                 }}
               >

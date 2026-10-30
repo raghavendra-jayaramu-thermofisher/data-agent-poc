@@ -18,6 +18,7 @@ from app.conversations.schemas import (
     ConversationPage,
     ConversationRename,
     ConversationResponse,
+    ConversationTableScopeUpdate,
     MessageCreate,
     MessagePage,
     MessageResponse,
@@ -33,6 +34,8 @@ from app.instructions.repository import InstructionRepository
 from app.jobs.repository import JobRepository
 from app.jobs.service import JobService
 from app.jobs.state import WAITING_STATUS
+from app.models.models import ModelProfile
+from app.models.reasoning import reasoning_support
 from app.models.service import ModelConfigurationService
 
 
@@ -222,6 +225,7 @@ class ConversationService:
             payload=MessageCreate(
                 content=content,
                 model_profile_id=uuid.UUID(str(profile)) if profile else None,
+                reasoning_effort=original_metadata.get("reasoning_effort"),
             ),
             extra_metadata=extra,
         )
@@ -321,20 +325,37 @@ class ConversationService:
         await self.session.commit()
         return item
 
-    async def resolve_model_profile_id(
+    async def update_table_scope(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        payload: ConversationTableScopeUpdate,
+    ) -> Conversation:
+        """Running and paused jobs keep their own scope; the change applies to new questions."""
+        item = await self.repo.lock_for_org(conversation_id, organization_id)
+        if item is None:
+            raise AppError("CONVERSATION_NOT_FOUND", "Conversation not found.", 404)
+        item.table_scope = await resolve_table_scope(
+            self.session, organization_id, await self.repo.source_ids(item.id), payload.table_scope
+        )
+        item.updated_at = utc_now()
+        await self.session.commit()
+        return item
+
+    async def resolve_model_profile(
         self,
         *,
         conversation: Conversation,
         organization_id: uuid.UUID,
         override_profile_id: uuid.UUID | None,
-    ) -> uuid.UUID:
+    ) -> ModelProfile:
         model_service = ModelConfigurationService(self.session, self.settings)
         requested = override_profile_id or conversation.model_profile_id
         if requested is not None:
             profile = await model_service.require_profile(requested, organization_id)
             if not profile.enabled:
                 raise AppError("MODEL_PROFILE_DISABLED", "Model profile is disabled.", 409)
-            return profile.id
+            return profile
         default = await model_service.get_default(organization_id)
         if default is None or not default.enabled:
             raise AppError(
@@ -342,7 +363,7 @@ class ConversationService:
                 "Configure an enabled default model before asking a question.",
                 409,
             )
-        return default.id
+        return default
 
     async def submit_message(
         self,
@@ -364,11 +385,20 @@ class ConversationService:
                 "The conversation has no datasource.",
                 409,
             )
-        profile_id = await self.resolve_model_profile_id(
+        profile = await self.resolve_model_profile(
             conversation=conversation,
             organization_id=organization_id,
             override_profile_id=payload.model_profile_id,
         )
+        profile_id = profile.id
+        effort = payload.reasoning_effort
+        support = reasoning_support(profile.model_name)
+        if effort is not None and (support is None or effort not in support.efforts):
+            raise AppError(
+                "REASONING_EFFORT_UNSUPPORTED",
+                f"{profile.display_name} does not support {effort} reasoning effort.",
+                422,
+            )
         table_scope = await resolve_table_scope(
             self.session, organization_id, source_ids,
             [SourceTableScope.model_validate(item) for item in (conversation.table_scope or [])],
@@ -377,6 +407,8 @@ class ConversationService:
         # User message and job are both durable. The job contains only identifiers/content and
         # never credentials. JobService performs the queue publish after PostgreSQL commit.
         metadata: dict[str, object] = {"model_profile_id": str(profile_id)}
+        if effort is not None:
+            metadata["reasoning_effort"] = effort
         content = payload.content.strip()
         match = re.match(r"^/([a-zA-Z0-9_-]+)(?:\s+(.*))?$", content, re.DOTALL)
         if match:
@@ -427,6 +459,7 @@ class ConversationService:
                 "conversation_id": str(conversation.id),
                 "user_message_id": str(message.id),
                 "model_profile_id": str(profile_id),
+                "reasoning_effort": effort,
                 "table_scope": table_scope,
             },
             conversation_id=conversation.id,

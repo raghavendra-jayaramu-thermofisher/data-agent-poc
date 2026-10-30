@@ -356,6 +356,7 @@ describe('durable conversation workspace', () => {
     expect(received).toHaveBeenCalledWith({
       content: 'Compare customers?',
       model_profile_id: null,
+      reasoning_effort: null,
     });
     expect(input).toHaveValue('My draft');
   });
@@ -659,11 +660,12 @@ describe('durable conversation workspace', () => {
         expect(await request.json()).toEqual({
           content: 'Why did revenue fall?',
           model_profile_id: null,
+          reasoning_effort: 'high',
         });
         return HttpResponse.json({ message_id: 'm-durable', job_id: 'j-chat' }, { status: 202 });
       }),
     );
-    renderPage({ pendingQuestion: 'Why did revenue fall?', modelProfileId: null });
+    renderPage({ pendingQuestion: 'Why did revenue fall?', modelProfileId: null, reasoningEffort: 'high' });
     expect(await screen.findByText('Why did revenue fall?')).toBeInTheDocument();
     await waitFor(() => expect(manager.registerJob).toHaveBeenCalledWith('j-chat'));
     expect(submissions).toBe(1);
@@ -723,6 +725,38 @@ describe('durable conversation workspace', () => {
     expect(screen.queryByRole('button', { name: /execution ledger/i })).not.toBeInTheDocument();
   });
 
+  it('changes the tables of an existing conversation for its next questions', async () => {
+    baseHandlers();
+    const saved: unknown[] = [];
+    server.use(
+      http.get('http://localhost:12201/api/v1/data-sources/ds1/tables', () =>
+        HttpResponse.json({
+          knowledge_version_id: 'v1',
+          items: [{ schema: 'dbo', name: 'orders', object_type: 'table', column_count: 4 }],
+          next_cursor: null,
+        }),
+      ),
+      http.put('http://localhost:12201/api/v1/conversations/c1/table-scope', async ({ request }) => {
+        const body = (await request.json()) as { table_scope: unknown };
+        saved.push(body);
+        return HttpResponse.json({ ...conversation, table_scope: body.table_scope });
+      }),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Tables: All tables' }));
+    await user.click(await screen.findByRole('checkbox', { name: /orders/ }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('button', { name: 'Tables: orders' })).toBeInTheDocument();
+    expect(saved).toEqual([
+      {
+        table_scope: [
+          { data_source_id: 'ds1', mode: 'selected', tables: [{ schema: 'dbo', name: 'orders' }] },
+        ],
+      },
+    ]);
+  });
+
   it('keeps source context behind the conversation menu and removes scrolling controls', async () => {
     baseHandlers();
     renderPage();
@@ -756,6 +790,7 @@ describe('durable conversation workspace', () => {
         expect(await request.json()).toEqual({
           content: 'Now compare enterprise customers.',
           model_profile_id: null,
+          reasoning_effort: null,
         });
         return HttpResponse.json({ message_id: 'm-follow', job_id: 'j-follow' }, { status: 202 });
       }),

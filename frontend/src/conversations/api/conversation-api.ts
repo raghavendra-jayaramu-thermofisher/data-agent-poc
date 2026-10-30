@@ -38,6 +38,16 @@ export function renameConversation(id: string, title: string): Promise<Conversat
   }));
 }
 
+export function updateTableScope(
+  id: string,
+  tableScope: S['SourceTableScope'][],
+): Promise<Conversation> {
+  return withAuthRefresh(() => apiClient.PUT('/api/v1/conversations/{conversation_id}/table-scope', {
+    params: { path: { conversation_id: id } },
+    body: { table_scope: tableScope },
+  }));
+}
+
 /** Newest messages first; `cursor` continues toward older messages. Items are chronological. */
 export function listMessages(
   id: string,

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.conversations.table_scope import SourceTableScope
 from app.core.pagination import CursorPage
+from app.models.reasoning import ReasoningEffort
 
 
 class ConversationCreate(BaseModel):
@@ -34,19 +35,10 @@ class ConversationCreate(BaseModel):
         return value
 
 
-class ConversationUpdate(BaseModel):
+class ConversationTableScopeUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str | None = Field(default=None, max_length=240)
-    model_profile_id: uuid.UUID | None = None
-
-    @field_validator("title")
-    @classmethod
-    def clean_title(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        return cleaned or None
+    table_scope: list[SourceTableScope] = Field(max_length=10)
 
 
 class ConversationRename(BaseModel):
@@ -91,6 +83,8 @@ class MessageCreate(BaseModel):
 
     content: str = Field(min_length=1, max_length=50_000)
     model_profile_id: uuid.UUID | None = None
+    # None uses the model's default effort.
+    reasoning_effort: ReasoningEffort | None = None
 
     @field_validator("content")
     @classmethod

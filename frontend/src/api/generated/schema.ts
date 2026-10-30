@@ -225,6 +225,23 @@ export interface paths {
         patch: operations["verify_message_api_v1_conversations__conversation_id__messages__message_id__verification_patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/table-scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Table Scope */
+        put: operations["update_table_scope_api_v1_conversations__conversation_id__table_scope_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards": {
         parameters: {
             query?: never;
@@ -719,6 +736,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Annotations */
+        get: operations["export_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Annotations */
+        post: operations["import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge/data-sources/{data_source_id}/documents": {
         parameters: {
             query?: never;
@@ -1131,6 +1182,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post */
+        Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post: {
+            /** Files */
+            files: string[];
+        };
         /** Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post */
         Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post: {
             /** File */
@@ -1261,6 +1317,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ConversationTableScopeUpdate */
+        ConversationTableScopeUpdate: {
+            /** Table Scope */
+            table_scope: components["schemas"]["SourceTableScope"][];
         };
         /** DashboardCreate */
         DashboardCreate: {
@@ -1807,6 +1868,8 @@ export interface components {
              * @enum {string}
              */
             scope_type: "datasource" | "table" | "column" | "metric";
+            /** Title */
+            title?: string | null;
         };
         /** KnowledgeAnnotationResponse */
         KnowledgeAnnotationResponse: {
@@ -1836,6 +1899,8 @@ export interface components {
             scope_key: string | null;
             /** Scope Type */
             scope_type: string;
+            /** Title */
+            title: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -1846,6 +1911,8 @@ export interface components {
         KnowledgeAnnotationUpdate: {
             /** Content */
             content: string;
+            /** Title */
+            title?: string | null;
         };
         /** KnowledgeDocumentResponse */
         KnowledgeDocumentResponse: {
@@ -1898,6 +1965,42 @@ export interface components {
             };
             /** Title */
             title: string;
+        };
+        /**
+         * KnowledgeImportItem
+         * @description What happened (or, for a dry run, would happen) to one uploaded file.
+         */
+        KnowledgeImportItem: {
+            /** Filename */
+            filename: string;
+            /** Message */
+            message?: string | null;
+            /** Scope Key */
+            scope_key?: string | null;
+            /** Scope Type */
+            scope_type?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "updated" | "skipped" | "error";
+            /** Title */
+            title?: string | null;
+        };
+        /** KnowledgeImportResponse */
+        KnowledgeImportResponse: {
+            /** Created */
+            created: number;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Failed */
+            failed: number;
+            /** Items */
+            items: components["schemas"]["KnowledgeImportItem"][];
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
         };
         /** KnowledgeJobResponse */
         KnowledgeJobResponse: {
@@ -2051,6 +2154,8 @@ export interface components {
             content: string;
             /** Model Profile Id */
             model_profile_id?: string | null;
+            /** Reasoning Effort */
+            reasoning_effort?: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
         };
         /**
          * MessagePage
@@ -2200,6 +2305,8 @@ export interface components {
             provider_error_response?: {
                 [key: string]: unknown;
             } | null;
+            /** Reasoning Effort */
+            reasoning_effort?: string | null;
             /** Sequence */
             sequence: number;
             /**
@@ -2267,6 +2374,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Default Reasoning Effort */
+            readonly default_reasoning_effort: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             /** Display Name */
             display_name: string;
             /** Enabled */
@@ -2289,6 +2398,11 @@ export interface components {
             organization_id: string;
             /** Output Price Per Million */
             output_price_per_million?: number | null;
+            /**
+             * Reasoning Efforts
+             * @description Efforts a question may choose for this model; empty when it has no effort control.
+             */
+            readonly reasoning_efforts: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max")[];
             /** Settings */
             settings: {
                 [key: string]: unknown;
@@ -2508,8 +2622,6 @@ export interface components {
              * Format: uuid
              */
             data_source_id: string;
-            /** Knowledge Version Id */
-            knowledge_version_id?: string | null;
             /**
              * Mode
              * @default all
@@ -3346,6 +3458,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__conversations__schemas__MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_table_scope_api_v1_conversations__conversation_id__table_scope_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationTableScopeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4720,6 +4869,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeAnnotationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post: {
+        parameters: {
+            query?: {
+                on_duplicate?: "skip" | "replace";
+                dry_run?: boolean;
+            };
+            header?: {
+                "X-Organization-ID"?: string | null;
+            };
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeImportResponse"];
                 };
             };
             /** @description Validation Error */

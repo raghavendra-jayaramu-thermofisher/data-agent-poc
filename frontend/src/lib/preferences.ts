@@ -8,8 +8,9 @@ export type Preferences = {
   lastPath?: string;
   lastAskDataSourceIds?: string[];
   askDataSourceIdsByScope?: Record<string, string[]>;
-  askTableScopesByScope?: Record<string, components['schemas']['SourceTableScope'][]>;
+  askTableSelectionsByScope?: Record<string, components['schemas']['SourceTableScope'][]>;
   lastSelectedModelProfileId?: string | null;
+  showCost?: boolean;
 };
 function readAll(): Preferences {
   try {

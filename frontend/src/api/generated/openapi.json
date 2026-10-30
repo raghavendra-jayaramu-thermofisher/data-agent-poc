@@ -125,6 +125,23 @@
         "title": "Body_create_excel_data_source_api_v1_data_sources_excel_post",
         "type": "object"
       },
+      "Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post",
+        "type": "object"
+      },
       "Body_replace_excel_data_source_api_v1_data_sources__data_source_id__excel_replace_post": {
         "properties": {
           "file": {
@@ -522,6 +539,24 @@
           "updated_at"
         ],
         "title": "ConversationResponse",
+        "type": "object"
+      },
+      "ConversationTableScopeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "table_scope": {
+            "items": {
+              "$ref": "#/components/schemas/SourceTableScope"
+            },
+            "maxItems": 10,
+            "title": "Table Scope",
+            "type": "array"
+          }
+        },
+        "required": [
+          "table_scope"
+        ],
+        "title": "ConversationTableScopeUpdate",
         "type": "object"
       },
       "DashboardCreate": {
@@ -1949,6 +1984,18 @@
             ],
             "title": "Scope Type",
             "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "required": [
@@ -1999,6 +2046,17 @@
             "title": "Scope Type",
             "type": "string"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -2010,6 +2068,7 @@
           "knowledge_base_id",
           "scope_type",
           "scope_key",
+          "title",
           "content",
           "created_by",
           "created_at",
@@ -2026,6 +2085,18 @@
             "minLength": 1,
             "title": "Content",
             "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "required": [
@@ -2129,6 +2200,116 @@
           "created_at"
         ],
         "title": "KnowledgeDocumentSummary",
+        "type": "object"
+      },
+      "KnowledgeImportItem": {
+        "description": "What happened (or, for a dry run, would happen) to one uploaded file.",
+        "properties": {
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "scope_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Key"
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Type"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "updated",
+              "skipped",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "filename",
+          "status"
+        ],
+        "title": "KnowledgeImportItem",
+        "type": "object"
+      },
+      "KnowledgeImportResponse": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImportItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dry_run",
+          "created",
+          "updated",
+          "skipped",
+          "failed",
+          "items"
+        ],
+        "title": "KnowledgeImportResponse",
         "type": "object"
       },
       "KnowledgeJobResponse": {
@@ -2503,6 +2684,26 @@
               }
             ],
             "title": "Model Profile Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
           }
         },
         "required": [
@@ -2957,6 +3158,17 @@
             ],
             "title": "Provider Error Response"
           },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
           "sequence": {
             "title": "Sequence",
             "type": "integer"
@@ -3110,6 +3322,27 @@
             "title": "Created At",
             "type": "string"
           },
+          "default_reasoning_effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true,
+            "title": "Default Reasoning Effort"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -3158,6 +3391,24 @@
             ],
             "title": "Output Price Per Million"
           },
+          "reasoning_efforts": {
+            "description": "Efforts a question may choose for this model; empty when it has no effort control.",
+            "items": {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            "readOnly": true,
+            "title": "Reasoning Efforts",
+            "type": "array"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -3179,7 +3430,9 @@
           "is_default",
           "enabled",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "reasoning_efforts",
+          "default_reasoning_effort"
         ],
         "title": "ModelProfileResponse",
         "type": "object"
@@ -3744,18 +3997,6 @@
             "format": "uuid",
             "title": "Data Source Id",
             "type": "string"
-          },
-          "knowledge_version_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Knowledge Version Id"
           },
           "mode": {
             "default": "all",
@@ -5507,6 +5748,80 @@
           }
         ],
         "summary": "Verify Message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/table-scope": {
+      "put": {
+        "operationId": "update_table_scope_api_v1_conversations__conversation_id__table_scope_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationTableScopeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Table Scope",
         "tags": [
           "conversations"
         ]
@@ -8333,6 +8648,166 @@
           }
         ],
         "summary": "Create Annotation",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/export": {
+      "get": {
+        "operationId": "export_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "data_source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Data Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Annotations",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/data-sources/{data_source_id}/annotations/import": {
+      "post": {
+        "operationId": "import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "data_source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Data Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on_duplicate",
+            "required": false,
+            "schema": {
+              "default": "skip",
+              "enum": [
+                "skip",
+                "replace"
+              ],
+              "title": "On Duplicate",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_annotations_api_v1_knowledge_data_sources__data_source_id__annotations_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Annotations",
         "tags": [
           "knowledge"
         ]

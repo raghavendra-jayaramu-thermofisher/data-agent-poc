@@ -14,8 +14,13 @@ import { ChatComposer } from '../components/ChatComposer';
 import { deriveConversationTitle } from '../utils/title';
 import { normalizeTableScope } from '../components/table-scope';
 import type { SourceTableScope } from '../components/table-scope';
+import type { ReasoningEffort } from '../reasoning-effort';
 
-type PendingConversationState = { pendingQuestion: string; modelProfileId: string | null };
+type PendingConversationState = {
+  pendingQuestion: string;
+  modelProfileId: string | null;
+  reasoningEffort: ReasoningEffort | null;
+};
 
 export function AskPage() {
   const navigate = useNavigate();
@@ -37,7 +42,7 @@ export function AskPage() {
 
   const [question, setQuestion] = useState('');
   const [tableSelections, setTableSelections] = useState<Record<string, SourceTableScope[]>>(() =>
-    preferences.get('askTableScopesByScope') ?? {},
+    preferences.get('askTableSelectionsByScope') ?? {},
   );
   const sourceScope = JSON.stringify([user?.id, orgId]);
   const [sourceSelections, setSourceSelections] = useState<Record<string, string[]>>(() =>
@@ -46,6 +51,7 @@ export function AskPage() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(() => {
     return preferences.get('lastSelectedModelProfileId') ?? null;
   });
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -54,9 +60,7 @@ export function AskPage() {
     preferences.set('lastSelectedModelProfileId', id);
   };
 
-  if (dataSources.isLoading || profiles.isLoading) {
-    return <PageState title="Preparing analysis workspace" loading />;
-  }
+  const isPreparing = dataSources.isLoading || profiles.isLoading;
 
   if (dataSources.isError || profiles.isError) {
     return (
@@ -88,7 +92,7 @@ export function AskPage() {
       ],
     };
     setTableSelections(next);
-    preferences.set('askTableScopesByScope', next);
+    preferences.set('askTableSelectionsByScope', next);
   };
   const enabledProfiles = (profiles.data ?? []).filter((profile) => profile.enabled);
   const effectiveProfileId = enabledProfiles.some((profile) => profile.id === selectedProfileId)
@@ -112,6 +116,7 @@ export function AskPage() {
       const state: PendingConversationState = {
         pendingQuestion: question,
         modelProfileId: effectiveProfileId,
+        reasoningEffort,
       };
 
       navigate(`/conversations/${conversation.id}`, { state });
@@ -140,7 +145,7 @@ export function AskPage() {
               {submitError}
             </div>
           )}
-          {activeSources.length === 0 && (
+          {!isPreparing && activeSources.length === 0 && (
             <div className="p-4 mb-6 bg-[var(--db-warning-soft)] border border-[var(--db-border-default)] rounded text-xs text-[var(--db-warning)]">
               No active data sources found. Connect or activate a data source to begin.
             </div>
@@ -159,8 +164,10 @@ export function AskPage() {
           profiles={enabledProfiles}
           selectedProfileId={effectiveProfileId}
           onProfileIdChange={handleProfileChange}
+          reasoningEffort={reasoningEffort}
+          onReasoningEffortChange={setReasoningEffort}
           isSubmitting={isSubmitting}
-          disabled={activeSources.length === 0}
+          disabled={!isPreparing && activeSources.length === 0}
           placement="inline"
         />
       </main>
