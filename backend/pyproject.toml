@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "db-assistant-backend"
 version = "0.6.0"
 description = "DB Assistant backend - Task 6 production reporting and hardening"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
